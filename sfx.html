@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SFX Forge · m.js v3</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎛</text></svg>">
+<style>
+  :root {
+    --bg: #0b0e14; --panel: #11161f; --line: #1e2633;
+    --ink: #d7e1ee; --dim: #64748b; --acc: #5eead4; --acc2: #f472b6;
+  }
+  * { box-sizing: border-box }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 14px/1.45 ui-monospace, 'Cascadia Code', 'JetBrains Mono', Menlo, Consolas, monospace;
+  }
+  .app { max-width: 760px; margin: 0 auto; padding: 20px 16px 40px }
+  header { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 14px }
+  h1 { font-size: 20px; margin: 0; letter-spacing: 2px }
+  h1 em { font-style: normal; color: var(--acc) }
+  .transport { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap }
+  .btn {
+    background: #161d29; color: var(--ink); border: 1px solid var(--line);
+    border-radius: 8px; padding: 7px 14px; font: inherit; cursor: pointer;
+  }
+  .btn:hover { border-color: var(--acc) }
+  .btn:disabled { opacity: .4; cursor: default }
+  .btn.play { background: var(--acc); color: #06231f; border-color: var(--acc); font-weight: 700 }
+  .btn.play:hover { filter: brightness(1.1) }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 12px 14px; margin-bottom: 12px;
+  }
+  .scope-panel { padding: 8px }
+  canvas { display: block; width: 100%; height: auto; border-radius: 6px }
+  .presets { display: flex; flex-wrap: wrap; gap: 8px }
+  .chip {
+    background: transparent; border: 1px solid var(--line); color: var(--dim);
+    border-radius: 999px; padding: 5px 14px; font: inherit; cursor: pointer;
+  }
+  .chip:hover { color: var(--ink); border-color: var(--dim) }
+  .chip.active { color: #06231f; background: var(--acc); border-color: var(--acc); font-weight: 700 }
+  .rows { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 22px }
+  .row { display: flex; flex-direction: column; gap: 5px }
+  .lbl { display: flex; justify-content: space-between; font-size: 12px; color: var(--dim) }
+  .lbl b { color: var(--acc); font-weight: 600 }
+  input[type=range] { width: 100%; accent-color: var(--acc); margin: 0 }
+  select {
+    background: #161d29; color: var(--ink); border: 1px solid var(--line);
+    border-radius: 6px; padding: 5px 8px; font: inherit;
+  }
+  .toggle {
+    display: flex; border: 1px solid var(--line);
+    border-radius: 6px; overflow: hidden; width: fit-content;
+  }
+  .toggle button { background: transparent; color: var(--dim); border: 0; padding: 5px 14px; font: inherit; cursor: pointer }
+  .toggle button.on { background: var(--acc); color: #06231f; font-weight: 700 }
+  .hist-head { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); margin-bottom: 6px }
+  .hrow {
+    display: flex; gap: 10px; align-items: baseline; padding: 4px 0;
+    border-bottom: 1px dashed var(--line); font-size: 13px;
+  }
+  .hrow:last-child { border-bottom: 0 }
+  .hrow .name { color: var(--acc2); min-width: 96px }
+  .hrow .spec { color: var(--dim) }
+  footer { color: var(--dim); font-size: 12px; text-align: center; margin-top: 4px }
+  @media (max-width: 600px) { .rows { grid-template-columns: 1fr } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module">
+import M from 'https://mikesmullin.github.io/m-js/dist/m.min.js'
+
+// ---- log-frequency helpers (module-level: pure, no reactivity needed) ----
+const FMIN = 20, FMAX = 8000
+const f2s = (f) => Math.round(1000 * Math.log(Math.max(FMIN, f) / FMIN) / Math.log(FMAX / FMIN))
+const s2f = (s) => Math.round(FMIN * Math.pow(FMAX / FMIN, Math.min(1000, Math.max(0, s)) / 1000))
+
+// ---- audio engine (plain module state, deliberately outside the reactive store) ----
+const A = { ctx: null, an: null, data: null, out: null, live: null, timer: null, nb: null, raf: 0 }
+
+function ensureCtx() {
+  if (A.ctx) return
+  const AC = window.AudioContext || window.webkitAudioContext
+  A.ctx = new AC()
+  A.an = A.ctx.createAnalyser()
+  A.an.fftSize = 1024
+  A.data = new Uint8Array(1024)
+  A.out = A.ctx.createGain()
+  A.out.connect(A.an)
+  A.an.connect(A.ctx.destination)
+}
+
+function noiseBuf(ctx) {
+  if (A.nb && A.nb.ctx === ctx) return A.nb.buf
+  const len = Math.ceil(ctx.sampleRate * 1.5)
+  const buf = ctx.createBuffer(1, len, ctx.sampleRate)
+  const d = buf.getChannelData(0)
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1
+  A.nb = { buf, ctx }
+  return buf
+}
+
+// Builds osc + optional vibrato LFO + optional noise, through a lowpass and
+// an ADSR-ish gain envelope. Works in a live or OfflineAudioContext.
+function buildGraph(ctx, dest, t0, P) {
+  const dur = P.dur
+  const end = t0 + dur
+  const vol = Math.max(0.001, P.vol)
+  const a = Math.min(P.att, Math.max(0.002, dur * 0.5))
+  const relStart = Math.max(t0 + a, t0 + dur * (1 - P.rel))
+
+  const filter = ctx.createBiquadFilter()
+  filter.type = 'lowpass'
+  filter.frequency.value = P.cut
+  filter.Q.value = P.q
+  filter.connect(dest)
+
+  const sources = []
+
+  const osc = ctx.createOscillator()
+  osc.type = P.wave
+  osc.frequency.setValueAtTime(Math.max(1, P.f0), t0)
+  if (P.f1 !== P.f0) {
+    if (P.curve === 'exp') osc.frequency.exponentialRampToValueAtTime(Math.max(1, P.f1), end)
+    else osc.frequency.linearRampToValueAtTime(P.f1, end)
+  }
+  const og = ctx.createGain()
+  og.gain.setValueAtTime(0.0001, t0)
+  og.gain.exponentialRampToValueAtTime(vol, t0 + a)
+  og.gain.setValueAtTime(vol, relStart)
+  og.gain.exponentialRampToValueAtTime(0.0001, end)
+  osc.connect(og)
+  og.connect(filter)
+  sources.push(osc)
+
+  if (P.vib > 0) {
+    const lfo = ctx.createOscillator()
+    lfo.frequency.value = 8
+    const lg = ctx.createGain()
+    lg.gain.value = P.vib
+    lfo.connect(lg)
+    lg.connect(osc.frequency)
+    sources.push(lfo)
+  }
+
+  if (P.noise > 0) {
+    const ns = ctx.createBufferSource()
+    ns.buffer = noiseBuf(ctx)
+    ns.loop = ns.buffer.duration < dur
+    const ng = ctx.createGain()
+    ng.gain.setValueAtTime(0.0001, t0)
+    ng.gain.exponentialRampToValueAtTime(Math.max(0.0001, vol * P.noise), t0 + a)
+    ng.gain.exponentialRampToValueAtTime(0.0001, end)
+    ns.connect(ng)
+    ng.connect(filter)
+    sources.push(ns)
+  }
+
+  for (const s of sources) { s.start(t0); s.stop(end + 0.05) }
+  return { sources, end }
+}
+
+function encodeWav(buf) {
+  const d = buf.getChannelData(0)
+  const n = d.length
+  const ab = new ArrayBuffer(44 + n * 2)
+  const v = new DataView(ab)
+  const ws = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)) }
+  ws(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); ws(8, 'WAVE')
+  ws(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true)
+  v.setUint16(22, 1, true); v.setUint32(24, buf.sampleRate, true)
+  v.setUint32(28, buf.sampleRate * 2, true)
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true)
+  ws(36, 'data'); v.setUint32(40, n * 2, true)
+  let o = 44
+  for (let i = 0; i < n; i++) {
+    const s = Math.max(-1, Math.min(1, d[i]))
+    v.setInt16(o, s < 0 ? s * 0x8000 : s * 0x7fff, true)
+    o += 2
+  }
+  return ab
+}
+
+// Live oscilloscope: rAF loop reading the analyser. Started from x-init,
+// where $refs is populated (per docs, refs are not available on first build pass).
+function startScope(cv) {
+  const g = cv.getContext('2d')
+  const sfx = M.store('sfx')
+  const draw = () => {
+    A.raf = requestAnimationFrame(draw)
+    const w = cv.width, h = cv.height
+    g.fillStyle = '#0d1117'
+    g.fillRect(0, 0, w, h)
+    g.lineWidth = 1
+    g.strokeStyle = 'rgba(94,234,212,.12)'
+    g.beginPath(); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke()
+    g.lineWidth = 2
+    g.strokeStyle = sfx.playing ? '#5eead4' : '#334155'
+    g.beginPath()
+    if (A.an && sfx.playing) {
+      A.an.getByteTimeDomainData(A.data)
+      const n = A.data.length
+      for (let i = 0; i < n; i++) {
+        const x = i / (n - 1) * w
+        const y = h / 2 + (A.data[i] - 128) / 128 * (h / 2 - 6)
+        if (i) g.lineTo(x, y); else g.moveTo(x, y)
+      }
+    } else {
+      g.moveTo(0, h / 2)
+      g.lineTo(w, h / 2)
+    }
+    g.stroke()
+  }
+  draw()
+}
+
+// ---- reactive store: synth params + engine controls + history ----
+M.store('sfx', {
+  wave: 'square', f0: 880, f1: 220, curve: 'exp',
+  dur: 0.3, att: 0.005, rel: 0.6, noise: 0, cut: 6000, q: 1, vib: 0, vol: 0.6,
+  active: null, activeName: 'Custom', playing: false, history: [],
+
+  sliders: [
+    { key: 'f0',    label: 'start freq',   to: f2s, from: s2f, fmt: (v) => v + ' Hz' },
+    { key: 'f1',    label: 'end freq',     to: f2s, from: s2f, fmt: (v) => v + ' Hz' },
+    { key: 'dur',   label: 'duration',     min: 0.05, max: 2,    step: 0.01,  fmt: (v) => v.toFixed(2) + ' s' },
+    { key: 'att',   label: 'attack',       min: 0.001, max: 0.3, step: 0.001, fmt: (v) => Math.round(v * 1000) + ' ms' },
+    { key: 'rel',   label: 'release',      min: 0.05, max: 0.95, step: 0.01,  fmt: (v) => Math.round(v * 100) + '%' },
+    { key: 'noise', label: 'noise mix',    min: 0, max: 1,       step: 0.01,  fmt: (v) => Math.round(v * 100) + '%' },
+    { key: 'cut',   label: 'filter cut',   to: f2s, from: s2f, fmt: (v) => v + ' Hz' },
+    { key: 'q',     label: 'filter Q',     min: 0.1, max: 20,    step: 0.1,   fmt: (v) => v.toFixed(1) },
+    { key: 'vib',   label: 'vibrato',      min: 0, max: 40,      step: 1,     fmt: (v) => (v ? v + ' Hz' : 'off') },
+    { key: 'vol',   label: 'volume',       min: 0, max: 1,       step: 0.01,  fmt: (v) => Math.round(v * 100) + '%' },
+  ],
+
+  presets: [
+    { id: 'laser', name: 'laser',    p: { wave: 'sawtooth', f0: 1400, f1: 120,  curve: 'exp', dur: 0.22, att: 0.002, rel: 0.7,  noise: 0,    cut: 7000, q: 1,   vib: 0 } },
+    { id: 'zap',   name: 'zap',      p: { wave: 'square',   f0: 150,  f1: 2200, curve: 'exp', dur: 0.16, att: 0.002, rel: 0.8,  noise: 0.15, cut: 8000, q: 2,   vib: 0 } },
+    { id: 'boom',  name: 'boom',     p: { wave: 'sine',     f0: 110,  f1: 28,   curve: 'exp', dur: 0.7,  att: 0.005, rel: 0.85, noise: 0.85, cut: 900,  q: 0.7, vib: 0 } },
+    { id: 'coin',  name: 'coin',     p: { wave: 'square',   f0: 988,  f1: 1319, curve: 'lin', dur: 0.2,  att: 0.001, rel: 0.3,  noise: 0,    cut: 8000, q: 0.5, vib: 0 } },
+    { id: 'power', name: 'power-up', p: { wave: 'square',   f0: 180,  f1: 1800, curve: 'exp', dur: 0.5,  att: 0.01,  rel: 0.3,  noise: 0.1,  cut: 8000, q: 1.5, vib: 0 } },
+    { id: 'jump',  name: 'jump',     p: { wave: 'triangle', f0: 250,  f1: 850,  curve: 'lin', dur: 0.22, att: 0.005, rel: 0.5,  noise: 0,    cut: 8000, q: 1,   vib: 0 } },
+    { id: 'scan',  name: 'scan',     p: { wave: 'sine',     f0: 900,  f1: 900,  curve: 'exp', dur: 1.2,  att: 0.08,  rel: 0.7,  noise: 0,    cut: 4000, q: 3,   vib: 14 } },
+    { id: 'alarm', name: 'alarm',    p: { wave: 'sawtooth', f0: 620,  f1: 620,  curve: 'exp', dur: 0.9,  att: 0.005, rel: 0.2,  noise: 0,    cut: 5000, q: 4,   vib: 30 } },
+  ],
+
+  // Central param setter: any edit marks the current preset as "custom".
+  set(k, v) {
+    this[k] = v
+    this.active = null
+    this.activeName = 'Custom'
+  },
+
+  applyPreset(pr) {
+    Object.assign(this, pr.p)
+    this.active = pr.id
+    this.activeName = pr.name
+    this.play()
+  },
+
+  random() {
+    const waves = ['sine', 'square', 'sawtooth', 'triangle']
+    this.wave = waves[Math.floor(Math.random() * waves.length)]
+    this.f0 = s2f(Math.floor(Math.random() * 1000))
+    this.f1 = s2f(Math.floor(Math.random() * 1000))
+    this.curve = Math.random() < 0.5 ? 'exp' : 'lin'
+    this.dur = 0.1 + Math.random() * 0.9
+    this.att = 0.002 + Math.random() * 0.08
+    this.rel = 0.2 + Math.random() * 0.6
+    this.noise = Math.random() < 0.4 ? Math.random() * 0.8 : 0
+    this.cut = s2f(Math.floor(Math.random() * 1000))
+    this.q = Math.round((0.5 + Math.random() * 8) * 10) / 10
+    this.vib = Math.random() < 0.3 ? Math.floor(Math.random() * 30) : 0
+    this.active = null
+    this.activeName = 'Random'
+    this.play()
+  },
+
+  spec() {
+    return this.wave + ' ' + this.f0 + '→' + this.f1 + ' Hz · ' + this.dur.toFixed(2) + 's' +
+      (this.noise > 0 ? ' · noise ' + Math.round(this.noise * 100) + '%' : '') +
+      (this.vib > 0 ? ' · vibrato' : '')
+  },
+
+  play() {
+    ensureCtx()
+    if (A.ctx.state === 'suspended') A.ctx.resume()
+    this.stop()
+    const t0 = A.ctx.currentTime + 0.03
+    const g = buildGraph(A.ctx, A.out, t0, this)
+    A.live = g
+    this.playing = true
+    this.history = [
+      { id: Date.now() + ':' + Math.random(), name: this.activeName, spec: this.spec() },
+      ...this.history,
+    ].slice(0, 6)
+    A.timer = setTimeout(() => { A.timer = null; this.playing = false }, (g.end - t0) * 1000 + 60)
+  },
+
+  stop() {
+    if (A.timer) { clearTimeout(A.timer); A.timer = null }
+    if (A.live) {
+      for (const s of A.live.sources) { try { s.stop() } catch (e) { /* already stopped */ } }
+      A.live = null
+    }
+    this.playing = false
+  },
+
+  // Renders the same graph offline and downloads a 16-bit PCM .wav
+  async exportWav() {
+    try {
+      const rate = 44100
+      const off = new OfflineAudioContext(1, Math.ceil(rate * this.dur), rate)
+      buildGraph(off, off.destination, 0, this)
+      const buf = await off.startRendering()
+      const url = URL.createObjectURL(new Blob([encodeWav(buf)], { type: 'audio/wav' }))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'sfx-' + (this.active || 'custom') + '.wav'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 2000)
+    } catch (e) {
+      console.warn('wav export failed', e)
+    }
+  },
+
+  // x-effect: re-runs on any param it reads; writes to localStorage (a
+  // non-reactive sink, so it can never retrigger itself).
+  persist() {
+    const { wave, f0, f1, curve, dur, att, rel, noise, cut, q, vib, vol } = this
+    try {
+      localStorage.setItem('sfxforge', JSON.stringify({ wave, f0, f1, curve, dur, att, rel, noise, cut, q, vib, vol }))
+    } catch (e) { /* private mode */ }
+  },
+})
+
+// Restore saved params before the first render, so there is no flash of defaults.
+try {
+  const saved = JSON.parse(localStorage.getItem('sfxforge') || 'null')
+  if (saved) Object.assign(M.store('sfx'), saved)
+} catch (e) { /* no saved state */ }
+
+// ---- root component ----
+M.mount('#app', () => ({
+  template: `
+    <div class="app" x-effect="$store.sfx.persist()">
+      <header>
+        <h1>SFX<em>FORGE</em></h1>
+        <div class="transport">
+          <button type="button" class="btn play" @click="$store.sfx.play()">▶ play</button>
+          <button type="button" class="btn" :disabled="!$store.sfx.playing" @click="$store.sfx.stop()">■ stop</button>
+          <button type="button" class="btn" @click="$store.sfx.random()">🎲 random</button>
+          <button type="button" class="btn" @click="$store.sfx.exportWav()">⬇ .wav</button>
+        </div>
+      </header>
+
+      <div class="panel scope-panel">
+        <canvas x-ref="scope" width="720" height="150"></canvas>
+      </div>
+
+      <div class="panel presets">
+        <button type="button" x-for="pr in $store.sfx.presets" :key="pr.id"
+                class="chip" :class="{ active: $store.sfx.active === pr.id }"
+                @click="$store.sfx.applyPreset(pr)" x-text="pr.name"></button>
+      </div>
+
+      <div class="panel">
+        <div class="rows">
+          <label class="row">
+            <span class="lbl"><span>waveform</span></span>
+            <!-- x-init syncs after first commit: :value is a no-op before the options exist -->
+            <select x-init="$el.value = $store.sfx.wave" :value="$store.sfx.wave"
+                    @change="$store.sfx.set('wave', $event.target.value)">
+              <option value="sine">sine</option>
+              <option value="square">square</option>
+              <option value="sawtooth">sawtooth</option>
+              <option value="triangle">triangle</option>
+            </select>
+          </label>
+
+          <label class="row">
+            <span class="lbl"><span>freq curve</span></span>
+            <div class="toggle">
+              <button type="button" :class="{ on: $store.sfx.curve === 'exp' }"
+                      @click="$store.sfx.set('curve', 'exp')">exp</button>
+              <button type="button" :class="{ on: $store.sfx.curve === 'lin' }"
+                      @click="$store.sfx.set('curve', 'lin')">linear</button>
+            </div>
+          </label>
+
+          <label class="row" x-for="p in $store.sfx.sliders" :key="p.key">
+            <span class="lbl"><span x-text="p.label"></span><b x-text="p.fmt($store.sfx[p.key])"></b></span>
+            <input type="range" :min="p.min ?? 0" :max="p.max ?? 1000" :step="p.step ?? 1"
+                   :value="p.to ? p.to($store.sfx[p.key]) : $store.sfx[p.key]"
+                   @input="$store.sfx.set(p.key, p.from ? p.from(+$event.target.value) : +$event.target.value)">
+          </label>
+        </div>
+      </div>
+
+      <div class="panel" x-show="$store.sfx.history.length" x-transition.duration.400ms>
+        <div class="hist-head">last played</div>
+        <div class="hrow" x-for="h in $store.sfx.history" :key="h.id">
+          <span class="name" x-text="h.name"></span>
+          <span class="spec" x-text="h.spec"></span>
+        </div>
+      </div>
+
+      <footer x-text="$store.sfx.spec() + '  ·  m.js v3'"></footer>
+    </div>
+  `,
+  init() { startScope($refs.scope) },
+  destroy() { cancelAnimationFrame(A.raf) },
+}))
+</script>
+</body>
+</html>
