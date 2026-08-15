@@ -872,10 +872,14 @@ function retintPeers() {
 }
 function reconcile() {
   if (!mpReady || !Playroom) return;
-  let live;
-  try { live = Playroom.getParticipants() || {}; } catch { live = {}; }
-  const liveIds = new Set(Object.keys(live).filter(id => id !== myId));
-  for (const id of liveIds) trackPlayer(live[id]);
+  let parts;
+  try { parts = Playroom.getParticipants(); } catch { parts = null; }
+  /* UMD build may return an Array or a Record — normalize to a list, key by real p.id */
+  const list = Array.isArray(parts) ? parts : (parts ? Object.values(parts) : []);
+  const liveIds = new Set();
+  for (const p of list) {
+    if (p && p.id && p.id !== myId) { liveIds.add(p.id); trackPlayer(p); }
+  }
   /* join-order bookkeeping */
   for (const id of liveIds) {
     if (!peerOrder.includes(id)) {
