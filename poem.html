@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verse Machine — poem generator</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --panel: #181b25;
+      --panel-2: #1f2330;
+      --ink: #e6e9f0;
+      --muted: #8b93a7;
+      --accent: #c8a96a;
+      --accent-2: #7fb2d9;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(1200px 600px at 70% -10%, #1d2333 0%, var(--bg) 60%);
+      color: var(--ink);
+      font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    .wrap { max-width: 780px; margin: 0 auto; padding: 48px 20px 80px; }
+    header h1 { font-size: 30px; letter-spacing: .04em; margin: 0; }
+    header p { color: var(--muted); margin: 6px 0 28px; }
+    .panel {
+      background: var(--panel);
+      border: 1px solid #262b3a;
+      border-radius: 14px;
+      padding: 18px 20px;
+      margin-bottom: 18px;
+    }
+    .row { display: flex; gap: 14px; flex-wrap: wrap; align-items: end; }
+    label {
+      display: block; font-size: 11px; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px;
+    }
+    select {
+      background: var(--panel-2); color: var(--ink);
+      border: 1px solid #2c3245; border-radius: 8px;
+      padding: 8px 10px; font: inherit;
+    }
+    button {
+      background: var(--panel-2); color: var(--ink);
+      border: 1px solid #2c3245; border-radius: 8px;
+      padding: 9px 14px; font: inherit; cursor: pointer;
+      transition: border-color .15s, transform .05s;
+    }
+    button:hover { border-color: var(--accent); }
+    button:active { transform: translateY(1px); }
+    button.primary { background: linear-gradient(135deg, #2a3247, #20283a); border-color: #3a4358; }
+    .poem { font-family: Georgia, "Times New Roman", serif; font-size: 17px; line-height: 1.9; }
+    .poem .title { font-style: italic; color: var(--accent); margin-bottom: 10px; }
+    .poem .line { white-space: pre-wrap; }
+    .empty { color: var(--muted); font-style: italic; }
+    .history-item {
+      display: flex; gap: 10px; align-items: baseline;
+      padding: 8px 0; border-top: 1px solid #232838; font-size: 13px;
+    }
+    .history-item .t { color: var(--accent-2); }
+    .x {
+      margin-left: auto; background: none; border: none;
+      color: var(--muted); padding: 2px 8px; font-size: 14px;
+    }
+    .x:hover { color: #e07a7a; border-color: transparent; }
+    .copied { color: #8fd3a0; font-size: 13px; }
+    footer { color: var(--muted); font-size: 12px; text-align: center; margin-top: 30px; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script type="module">
+    import M from 'https://mikesmullin.github.io/m-js/dist/m.min.js'
+
+    const BANKS = {
+      night: {
+        adjectives: ['silver', 'hollow', 'sleeping', 'distant', 'restless', 'lunar', 'dim', 'patient'],
+        nouns: ['moon', 'shadow', 'star', 'streetlight', 'dream', 'silence', 'window', 'ember'],
+        verbs: ['whispers over', 'drifts across', 'holds', 'unfolds beneath', 'haunts', 'gathers under', 'leans against', 'remembers'],
+        places: ['the rooftop', 'the old town', 'the harbor', 'the attic', 'the far shore', 'the empty train', 'the garden wall']
+      },
+      sea: {
+        adjectives: ['salt-worn', 'restless', 'brine-bright', 'deep', 'tired', 'shimmering', 'cold', 'patient'],
+        nouns: ['wave', 'tide', 'lighthouse', 'gull', 'buoy', 'horizon', 'wake', 'anchor'],
+        verbs: ['breaks against', 'rolls into', 'keeps watch over', 'pulls back from', 'rings around', 'carries toward', 'settles over', 'forgets'],
+        places: ['the breakwater', 'the pier', 'the drowned field', 'the open water', 'the sea wall', 'the fishing boats']
+      },
+      forest: {
+        adjectives: ['moss-quiet', 'tall', 'green-throated', 'ancient', 'wet', 'hushed', 'birch-pale', 'root-deep'],
+        nouns: ['birch', 'mushroom', 'raven', 'stream', 'fern', 'owl', 'log', 'fog'],
+        verbs: ['pours through', 'settles on', 'knocks at', 'drinks from', 'unfolds beneath', 'carries through', 'sleeps in', 'remembers'],
+        places: ['the clearing', 'the old growth', 'the underbrush', 'the river bend', 'the mossy stones', 'the fallen oak']
+      },
+      city: {
+        adjectives: ['neon-streaked', 'late', 'crowded', 'glass-cold', 'restless', 'electric', 'smoke-warm', 'sleepless'],
+        nouns: ['subway', 'billboard', 'stranger', 'taxi', 'rooftop', 'café', 'escalator', 'siren'],
+        verbs: ['hum beneath', 'passes by', 'keeps its eye on', 'leaves', 'rings through', 'drags across', 'settles into', 'forgets'],
+        places: ['the avenue', 'the platform', 'the fire escape', 'the last bar', 'the overpass', 'the newsstand']
+      }
+    }
+
+    const pick = (arr) => arr[Math.floor(Math.random() * arr.length)]
+
+    function makeLine(bank) {
+      const patterns = [
+        () => 'the ' + pick(bank.adjectives) + ' ' + pick(bank.nouns) + ' ' + pick(bank.verbs) + ' ' + pick(bank.places),
+        () => pick(bank.nouns) + 's, ' + pick(bank.adjectives) + ' ' + pick(bank.nouns) + 's, ' + pick(bank.verbs) + ' ' + pick(bank.places),
+        () => 'and ' + pick(bank.places) + ' ' + pick(bank.verbs) + ' ' + pick(bank.adjectives) + ' ' + pick(bank.nouns),
+        () => 'we ' + pick(bank.verbs).replace(/^(\w+)/, (w) => w.replace(/s$/, '')) + ' ' + pick(bank.places) + ', ' + pick(bank.adjectives) + ' as the ' + pick(bank.nouns)
+      ]
+      return pick(patterns)()
+    }
+
+    function makeTitle(bank) {
+      const t = pick(bank.adjectives) + ' ' + pick(bank.nouns)
+      return t[0].toUpperCase() + t.slice(1)
+    }
+
+    M.mount('#app', () => ({
+      themes: Object.keys(BANKS),
+      lineCounts: [4, 6, 8, 10, 12],
+      theme: 'night',
+      lines: 6,
+      poem: null,
+      history: [],
+      copied: false,
+      copyFailed: false,
+
+      generate() {
+        const bank = BANKS[this.theme]
+        const count = Math.max(2, Math.min(12, this.lines))
+        const lines = Array.from({ length: count }, () => makeLine(bank))
+        this.poem = {
+          id: Date.now() + Math.random(),
+          theme: this.theme,
+          title: makeTitle(bank),
+          lines
+        }
+        this.history = [this.poem, ...this.history].slice(0, 12)
+        this.copied = false
+      },
+
+      surprise() {
+        this.theme = pick(this.themes)
+        this.generate()
+      },
+
+      copy() {
+        if (!this.poem) return
+        const text = this.poem.lines.join('\n')
+        navigator.clipboard.writeText(text)
+          .then(() => {
+            this.copied = true
+            setTimeout(() => { this.copied = false }, 3000)
+          })
+          .catch(() => { this.copyFailed = true; setTimeout(() => { this.copyFailed = false }, 2000) })
+      },
+
+      drop(id) {
+        this.history = this.history.filter(p => p.id !== id)
+      },
+
+      template: `
+      <div class="wrap">
+        <header>
+          <h1>Verse Machine</h1>
+          <p>a tiny poem generator · one m.js mount, no build step</p>
+        </header>
+
+        <div class="panel">
+          <div class="row">
+            <div>
+              <label>theme</label>
+              <select x-model="theme" x-init="$el.value = theme">
+                <option x-for="t in themes" :value="t" x-text="t"></option>
+              </select>
+            </div>
+            <div>
+              <label>lines</label>
+              <select x-model.number="lines" x-init="$el.value = lines">
+                <option x-for="n in lineCounts" :value="n" x-text="n"></option>
+              </select>
+            </div>
+            <button class="primary" @click="generate()">Generate</button>
+            <button @click="surprise()">Surprise me</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div x-if="!poem" class="empty">press generate — the machine does the rest</div>
+          <div x-if="poem" class="poem">
+            <div class="title" x-text="poem.title"></div>
+            <div x-for="l in poem.lines" class="line" x-text="l"></div>
+          </div>
+          <div class="row" x-if="poem" style="margin-top:14px">
+            <button @click="copy()" x-text="copied ? 'copied ✓' : 'copy'"></button>
+            <span class="copied" x-show="copied">on the clipboard</span>
+            <span class="copied" x-show="copyFailed" style="color:#e07a7a">clipboard blocked by the browser</span>
+          </div>
+        </div>
+
+        <div class="panel">
+          <label>recent verses</label>
+          <div x-if="history.length === 0" class="empty">none yet</div>
+          <div x-for="p in history" :key="p.id" class="history-item">
+            <span class="t" x-text="p.title"></span>
+            <span x-text="p.lines[0]"></span>
+            <button class="x" @click="drop(p.id)" title="dismiss">×</button>
+          </div>
+        </div>
+
+        <footer>built with m.js v3 · x-data, x-model, x-for, x-if, x-show, x-init</footer>
+      </div>`
+    }))
+  </script>
+</body>
+</html>
