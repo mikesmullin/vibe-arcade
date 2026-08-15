@@ -54,6 +54,25 @@
   @keyframes pulse { 50% { box-shadow:0 0 26px rgba(255,150,70,.65); } }
   .hidden { display:none !important; }
   #finalStats { margin:18px 0; font-size:15px; line-height:1.9; color:#f2d9c4; }
+  #scoreboard { top:14px; left:50%; transform:translateX(-50%); min-width:230px; }
+  .sbrow { display:flex; align-items:center; gap:8px; padding:2px 0; font-size:13px; }
+  .sbdot { width:9px; height:9px; border-radius:50%; flex:none; }
+  .sbname { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sbscore { font-weight:700; font-variant-numeric:tabular-nums; }
+  .sbdot.me { box-shadow:0 0 8px 1px rgba(255,255,255,.8); }
+  .dead { opacity:.45; text-decoration:line-through; }
+  #roomPanel { top:auto; bottom:14px; right:14px; min-width:210px; }
+  #roomPanel button { pointer-events:auto; cursor:pointer; font:inherit; font-size:11px;
+    background:#3a1c10; color:#ffd9b0; border:1px solid rgba(255,150,90,.4); border-radius:6px;
+    padding:3px 9px; margin:2px 0; }
+  #roomPanel button:hover { background:#57291a; }
+  #roomCode { font-family:ui-monospace,monospace; letter-spacing:.1em; }
+  #callsign { background:rgba(20,8,4,.8); border:1px solid rgba(255,150,90,.4); color:#ffd9b0;
+    font:inherit; font-weight:700; letter-spacing:.15em; text-transform:uppercase;
+    padding:9px 14px; border-radius:8px; width:240px; text-align:center; margin:6px 0 14px;
+    outline:none; }
+  #callsign:focus { border-color:#ff9a5e; box-shadow:0 0 12px rgba(255,140,60,.3); }
+  #netStatus { font-size:11px; color:#7fd4ff; letter-spacing:.12em; text-transform:uppercase; margin-top:10px; }
 </style>
 </head>
 <body>
@@ -69,13 +88,19 @@
     <div class="row"><span class="label">Colony</span><span class="muted" id="colonyEl">11 / 11 intact</span></div>
     <div class="row"><span class="label">Kills</span><span class="muted" id="killsEl">0 saucers · 0 buildings</span></div>
   </div>
+  <div class="panel" id="scoreboard"><div id="sbRows" style="display:flex;flex-direction:column;gap:1px"></div></div>
   <div class="panel" id="alertPanel">
     <div class="row" style="justify-content:flex-end"><span class="label">Threat</span><span id="alertText" style="font-size:15px;font-weight:700">DORMANT</span></div>
     <div class="row" style="justify-content:flex-end"><div class="bar" style="flex:0 0 140px"><div class="fill" id="alertFill"></div></div></div>
     <div class="row" style="justify-content:flex-end"><span class="label">Saucers</span><span id="alienCount" class="muted">0</span></div>
   </div>
+  <div class="panel" id="roomPanel">
+    <div class="row"><span class="label">Room</span><span id="roomCode" class="muted" style="color:#7fd4ff">CONNECTING…</span></div>
+    <div class="row"><span class="label">Pilots</span><span id="pilotsCount" class="muted">1</span></div>
+    <div class="row" style="display:flex;flex-wrap:wrap;justify-content:flex-end" id="roomBtns"></div>
+  </div>
   <div id="messages"></div>
-  <div id="hint">WASD fly · Q/E up/down · Shift = afterburner (limited) · hold click to fire · Esc releases mouse</div>
+  <div id="hint">WASD fly · Q/E up/down · Shift = afterburner · hold click to fire · Esc releases mouse</div>
 </div>
 <div id="crosshair" class="hidden"></div>
 
@@ -93,8 +118,13 @@
       <div><b>Shift</b> — afterburner (drains fuel)</div>
       <div><b>Left click</b> — fire (hold)</div>
       <div><b>Esc</b> — release mouse</div>
+      <div><b>Multiplayer</b> — auto-join room</div>
     </div>
+    <input id="callsign" maxlength="14" placeholder="CALLSIGN" autocomplete="off" spellcheck="false">
+    <div style="font-size:11px;color:#c99a78;letter-spacing:.06em;margin-bottom:10px">
+      Fly in with friends — share this URL, or use <b>?room=CODE</b> for a private sky.</div>
     <div class="startbtn" id="startBtn">CLICK TO LAUNCH</div>
+    <div id="netStatus">CONNECTING…</div>
   </div>
 </div>
 
@@ -110,15 +140,17 @@
     <div class="title" style="font-size:34px">SHIP LOST</div>
     <div class="sub">The red dust claims another</div>
     <div id="finalStats"></div>
-    <div class="startbtn" id="retryBtn">RETRY &nbsp;[R]</div>
+    <div class="startbtn" id="retryBtn">REDEPLOY &nbsp;[R]</div>
   </div>
 </div>
 
+<script src="playroomkit.js"></script>
 <script type="importmap">
 { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
 </script>
 <script type="module">
 import * as THREE from 'three';
+const Playroom = window.Playroom || null;
 
 /* ================= helpers ================= */
 const rand  = (a, b) => a + Math.random() * (b - a);
@@ -142,7 +174,9 @@ const els = {
   kills: $('killsEl'), alertText: $('alertText'), alertFill: $('alertFill'),
   alienCount: $('alienCount'), messages: $('messages'), crosshair: $('crosshair'),
   dmg: $('dmg'), lowhp: $('lowhp'), menu: $('menu'), paused: $('paused'),
-  gameover: $('gameover'), finalStats: $('finalStats')
+  gameover: $('gameover'), finalStats: $('finalStats'),
+  sbRows: $('sbRows'), netStatus: $('netStatus'), roomCode: $('roomCode'),
+  pilotsCount: $('pilotsCount'), roomBtns: $('roomBtns')
 };
 
 /* ================= audio (synth, no assets) ================= */
@@ -308,13 +342,19 @@ let rockMesh;
     S.set(s, s * rand(0.35, 0.7), s);
     M.compose(P, Q, S);
     rockMesh.setMatrixAt(i, M);
-    rockData.push({ pos: new THREE.Vector3(x, y, z), r: s * 0.9, alive: true });
+    rockData.push({ pos: new THREE.Vector3(x, y, z), r: s * 0.9, alive: true, mat: M.clone() });
   }
   rockMesh.instanceMatrix.needsUpdate = true;
   scene.add(rockMesh);
 }
 const rockRubbleMat = new THREE.MeshStandardMaterial({ color: 0x5c2d1e, roughness: 1, flatShading: true });
 const _rockZero = new THREE.Matrix4().makeScale(0, 0, 0);
+function mpRockHit(i, ownerId, point) {
+  if (ownerId === myId) {
+    mpSend('rock', { i, x: point.x, y: point.y, z: point.z, who: myId, t: Date.now() });
+  }
+  destroyRock(i, point);
+}
 function destroyRock(i, hitPos) {
   const rk = rockData[i];
   if (!rk.alive) return;
@@ -324,6 +364,7 @@ function destroyRock(i, hitPos) {
   explosion(hitPos, 0xd9a06a, clamp(rk.r * 0.45, 0.5, 1.2), Math.round(rk.r * 5));
   Sfx.hit();
   const n = 3 + Math.floor(rand(0, 2));
+  rk.debris = rk.debris || [];
   for (let k = 0; k < n; k++) {
     const s = rand(0.25, 0.7) * rk.r;
     const m = new THREE.Mesh(new THREE.BoxGeometry(s, s * 0.7, s), rockRubbleMat);
@@ -331,6 +372,7 @@ function destroyRock(i, hitPos) {
     m.rotation.set(rand(0, 3), rand(0, 3), rand(0, 3));
     m.castShadow = true;
     scene.add(m);
+    rk.debris.push(m);
   }
 }
 
@@ -362,9 +404,9 @@ const MATS = {
 const FLASH_RED = new THREE.Color(0xff6a2a);
 const buildings = [];
 
-function addBuilding(type, x, z) {
+/** Build a building group at origin; metadata in g.userData = {mats, radius, hp, centerY} */
+function buildBuildingGroup(type) {
   const g = new THREE.Group();
-  const baseY = terrainHeight(x, z);
   const [metal, dark, glass] = [MATS.metal.clone(), MATS.dark.clone(), MATS.glass.clone()];
   let radius = 6, hp = 40, centerY = 4;
 
@@ -414,15 +456,23 @@ function addBuilding(type, x, z) {
   }
 
   g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-  g.position.set(x, baseY, z);
-  scene.add(g);
-
   const mats = [metal, dark, glass];
   mats.forEach(m => { m.userData.baseEmissive = m.emissive.clone(); m.userData.baseEI = m.emissiveIntensity; });
+  g.userData = { mats, radius, hp, centerY };
+  return g;
+}
+
+function addBuilding(type, x, z) {
+  const baseY = terrainHeight(x, z);
+  const g = buildBuildingGroup(type);
+  g.position.set(x, baseY, z);
+  scene.add(g);
+  const { mats, radius, hp, centerY } = g.userData;
   buildings.push({
-    group: g, type, radius, hp, maxHp: hp, mats,
+    group: g, type, radius, hp, maxHp: hp, mats, centerY,
+    origin: { type, x, z },
     center: new THREE.Vector3(x, baseY + centerY, z),
-    flash: 0, alive: true
+    flash: 0, alive: true, debris: []
   });
 }
 
@@ -438,15 +488,43 @@ addBuilding('tank',  -40, -28);
 addBuilding('hab',    44,  -6);
 addBuilding('antenna', 10,  44);
 
-function destroyBuilding(b) {
+/** local bullet hit on a building: apply damage, alert, broadcast */
+function mpBuildingHit(bd, ownerId, dmg, point) {
+  if (ownerId === myId) {
+    bd.hp -= dmg;
+    bd.flash = 0.12;
+    Sfx.hit();
+    explosion(point, 0xffd08a, 0.5, 14);
+    alertLevel = Math.min(100, alertLevel + 3);
+    if (!alertTriggered) {
+      alertTriggered = true;
+      alertLevel = Math.max(alertLevel, 25);
+      spawnTimer = 1.4;
+      mpSetAlert(alertLevel);
+      msg('⚠ THE COLONY IS UNDER FIRE — THE ALIEN FLEET IS AWAKENED', '#ffd24d', 5);
+      Sfx.alert();
+    }
+    if (bd.hp <= 0) {
+      mpDestroyBuilding(bd, ownerId);
+    } else {
+      mpSendBuildingHp(bd);
+    }
+  }
+}
+function mpDestroyBuilding(b, ownerId) {
   b.alive = false;
   scene.remove(b.group);
   explosion(b.center, 0xffa04d, 1.6, 60);
   Sfx.explosion(1.4);
-  score += 150;
-  stats.buildings++;
-  alertLevel = Math.min(100, alertLevel + 35);
-  msg('🔥 ' + b.type.toUpperCase() + ' DESTROYED — ALIEN FURY RISING', '#ff9c6a', 4);
+  if (ownerId === myId) {
+    score += 150;
+    stats.buildings++;
+    alertLevel = Math.min(100, alertLevel + 35);
+    mpSetAlert(alertLevel);
+    msg('🔥 ' + b.type.toUpperCase() + ' DESTROYED — ALIEN FURY RISING', '#ff9c6a', 4);
+    mpSendBuildingHp(b);
+    mpSend('bdestroy', { i: buildings.indexOf(b), x: b.center.x, y: b.center.y, z: b.center.z, who: myId, t: Date.now() });
+  }
 
   const rubbleMat = new THREE.MeshStandardMaterial({ color: 0x4a2a1e, roughness: 1, flatShading: true });
   for (let i = 0; i < 7; i++) {
@@ -458,6 +536,7 @@ function destroyBuilding(b) {
     m.rotation.set(rand(-0.5, 0.5), rand(0, 3), rand(-0.5, 0.5));
     m.castShadow = true;
     scene.add(m);
+    b.debris.push(m);
   }
   const crater = new THREE.Mesh(
     new THREE.CircleGeometry(b.radius * 0.9, 24),
@@ -466,16 +545,36 @@ function destroyBuilding(b) {
   crater.rotation.x = -Math.PI / 2;
   crater.position.set(b.center.x, terrainHeight(b.center.x, b.center.z) + 0.15, b.center.z);
   scene.add(crater);
+  b.debris.push(crater);
 }
 
-/* ================= player ship ================= */
-const ship = new THREE.Group();
-{
-  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xd8dee6, metalness: 0.7, roughness: 0.3 });
+/* ================= ship model (shared by local + remote pilots) ================= */
+function buildLabel(text, color) {
+  const cv = document.createElement('canvas');
+  cv.width = 512; cv.height = 64;
+  const ctx = cv.getContext('2d');
+  ctx.font = '700 44px system-ui, sans-serif';
+  const w = Math.min(480, ctx.measureText(text).width + 28);
+  ctx.fillStyle = 'rgba(18,7,3,0.65)';
+  ctx.beginPath(); ctx.roundRect((512 - w) / 2, 6, w, 52, 12); ctx.fill();
+  ctx.fillStyle = color;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, 256, 34);
+  const tex = new THREE.CanvasTexture(cv);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+  sp.scale.set(5.4, 0.68, 1);
+  sp.position.y = 2.4;
+  sp.renderOrder = 999;
+  return sp;
+}
+const createShip = (tint = 0xd8dee6) => {
+  const ship = new THREE.Group();
+  const bodyMat = new THREE.MeshStandardMaterial({ color: tint, metalness: 0.7, roughness: 0.3 });
   const wingMat = new THREE.MeshStandardMaterial({ color: 0x8f9aa5, metalness: 0.6, roughness: 0.4 });
   const glassMat = new THREE.MeshStandardMaterial({ color: 0x8fe8ff, metalness: 0.3, roughness: 0.1,
     transparent: true, opacity: 0.8, emissive: 0x36c8e8, emissiveIntensity: 0.5 });
   const body = new THREE.Mesh(new THREE.ConeGeometry(1.0, 4.4, 14), bodyMat);
+  body.name = 'body';
   body.rotation.x = -Math.PI / 2; body.position.z = -1.6;
   const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.62, 16, 12), glassMat);
   cockpit.position.set(0, 0.4, -1.4);
@@ -515,12 +614,26 @@ const ship = new THREE.Group();
   flameLight.name = 'flameLight'; flameLight.position.z = 4.4;
   ship.add(body, cockpit, wingL, wingR, fin, nozzle, flame, flameLight);
   ship.traverse(o => { if (o.isMesh) o.castShadow = true; });
-  ship.position.set(0, 60, 160);
-  scene.add(ship);
+  return ship;
 }
+
+/* ================= player ship ================= */
+const ship = createShip(0xd8dee6);
+ship.position.set(0, 60, 160);
+scene.add(ship);
 const shipFlame = ship.getObjectByName('flame');
 const shipFlameLight = ship.getObjectByName('flameLight');
 const shipVel = new THREE.Vector3();
+
+/* remote-pilot visuals */
+const PEER_TINTS = [0x7fd4ff, 0x9dff7f, 0xffd37f, 0xff9d7f, 0xd9a8ff, 0x7fffef];
+const peerShips = new Map();   // playerId -> { group, flame, flameLight, lastFlameT, label, labelKey }
+function tintFor(id) {
+  let i = peerOrder.indexOf(id);
+  if (i < 0) i = 0;
+  return PEER_TINTS[i % PEER_TINTS.length];
+}
+const tintHex = id => '#' + tintFor(id).toString(16).padStart(6, '0');
 
 /* ================= game state ================= */
 let state = 'menu';           // menu | playing | paused | over
@@ -530,10 +643,462 @@ let alertTriggered = false, aliensSpawnedMsg = false;
 let invuln = 0, fireCd = 0, spawnTimer = 0;
 let yaw = 0, pitch = 0, roll = 0;
 let firing = false, locked = false, everLocked = false;
-const stats = { shots: 0, saucers: 0, buildings: 0 };
+const stats = { shots: 0, saucers: 0, buildings: 0, deaths: 0 };
 const MAX_ALIENS = 12;
 const pendingSpawns = [];
 const messages = [];
+
+/* ================= multiplayer (PlayroomKit — auto-join room, per your control-room pattern) =================
+   - insertCoin({ skipLobby, roomCode }) — same-origin clients meet in one room, ?room=CODE for private
+   - host assigns nothing; pilots are ordered by join (peerOrder), tinted by slot
+   - pose published unreliable at 18Hz; events published reliable, deduped by timestamp
+   - shared world (buildings/rocks/alert/reset) synced via room state + events, late-joiners snap
+   - each client is authoritative for its own ship (hp/damage); world mutations broadcast
+============================================================================= */
+const PUBLISH_HZ = 18;
+const RECONCILE_HZ = 4;
+const MAX_PILOTS = 6;
+const SPAWN_POINTS = [];
+{
+  SPAWN_POINTS.push({ x: 0, y: 60, z: 160, yaw: 0 });
+  for (let i = 1; i < MAX_PILOTS; i++) {
+    const phi = i * (Math.PI * 2 / MAX_PILOTS);
+    SPAWN_POINTS.push({ x: 160 * Math.sin(phi), y: 50, z: 160 * Math.cos(phi), yaw: phi });
+  }
+}
+let mpReady = false;
+let myId = null;
+let callsign = 'RAIDER';
+const peerOrder = [];          // remote peer ids, join order
+const peers = new Map();       // id -> { player }
+const tracked = new Map();     // id -> player (onQuit wired)
+let lastPublish = 0, lastReconcile = 0;
+let lastNetStatus = '';
+
+const myPlayer = () => { try { return Playroom.myPlayer(); } catch { return null; } };
+const roomGetState = k => { try { return Playroom.getState(k); } catch { return undefined; } };
+const roomSetState = (k, v) => { try { Playroom.setState(k, v, true); } catch {} };
+
+function mpSend(type, payload = {}) {
+  const me = myPlayer();
+  if (!me) return;
+  try { me.setState('evt', Object.assign({ type }, payload, { who: myId, t: Date.now() }), true); } catch {}
+}
+function mpSetAlert(level) {
+  const t = Date.now();
+  roomSetState('world.alert', { level, t });
+  mpSend('alert', { level, t });
+}
+function mpSendBuildingHp(bd, point) {
+  const i = buildings.indexOf(bd);
+  const map = Object.assign({}, roomGetState('world.bhp') || {});
+  map[i] = { hp: Math.round(bd.hp), x: point ? point.x : 0, y: point ? point.y : 0, z: point ? point.z : 0, t: Date.now() };
+  roomSetState('world.bhp', map);
+  mpSend('bhp', { i, hp: Math.round(bd.hp), x: point ? point.x : 0, y: point ? point.y : 0, z: point ? point.z : 0, t: Date.now() });
+}
+function applyAlertLevel(level, fromId) {
+  alertLevel = Math.min(100, Math.max(alertLevel, level));
+  if (!alertTriggered) {
+    alertTriggered = true;
+    alertLevel = Math.max(alertLevel, 25);
+    spawnTimer = Math.min(spawnTimer, 1.4) || 1.4;
+    msg('⚠ THE ALIEN FLEET IS AWAKENED', '#ffd24d', 5);
+    Sfx.alert();
+  }
+}
+function nameOf(id) {
+  if (id === myId) return callsign;
+  const p = peers.get(id)?.player || tracked.get(id);
+  const n = p && p.getState ? p.getState('name') : null;
+  return n || 'PILOT';
+}
+function applyRemoteEvent(e, fromId) {
+  const v = (x, y, z) => new THREE.Vector3(x, y, z);
+  switch (e.type) {
+    case 'shot': {
+      if (fromId === myId) break;
+      spawnBullet(v(e.x, e.y, e.z), v(e.dx, e.dy, e.dz).normalize().multiplyScalar(95), fromId, e.dmg || 10);
+      break;
+    }
+    case 'hit': {
+      damagePlayer(e.dmg || 7, e.target);
+      break;
+    }
+    case 'alien': {
+      explosion(v(e.x, e.y, e.z), 0x8fd8ff, 1.3, 50);
+      Sfx.explosion(1);
+      const n = e.n || 1;
+      for (let k = 0; k < n; k++) pendingSpawns.push({ t: 1.1 + k * 0.5 + rand(0, 0.4) });
+      msg('💢 RETRIBUTION! ' + nameOf(fromId) + ' DOWNED A SAUCER — ' + n + ' MORE INBOUND', '#7fd4ff', 3.5);
+      break;
+    }
+    case 'rock': {
+      destroyRock(e.i, v(e.x, e.y, e.z));
+      break;
+    }
+    case 'bdestroy': {
+      const bd = buildings[e.i];
+      if (bd && bd.alive) mpDestroyBuilding(bd, e.who);
+      break;
+    }
+    case 'bhp': {
+      const bd = buildings[e.i];
+      if (bd && bd.alive && e.hp < bd.hp) {
+        bd.hp = e.hp;
+        bd.flash = 0.12;
+        if (e.x || e.y || e.z) explosion(v(e.x, e.y, e.z), 0xffd08a, 0.4, 10);
+      }
+      break;
+    }
+    case 'alert': {
+      applyAlertLevel(e.level || 0, fromId);
+      break;
+    }
+    case 'boom': {
+      explosion(v(e.x, e.y, e.z), e.c || 0xffb060, e.s || 2, 60);
+      Sfx.explosion(e.s || 1.5);
+      break;
+    }
+    case 'death': {
+      msg('☠ ' + nameOf(fromId) + "'S SHIP IS DOWN", '#ff7a5a', 4);
+      break;
+    }
+    case 'reset': {
+      mpResetWorld();
+      msg('🔄 WORLD RESET — ' + nameOf(fromId) + ' REBUILT THE COLONY', '#9dff7f', 4);
+      break;
+    }
+  }
+}
+
+/* ---- shared world reset (any pilot can trigger; late joiners get a fresh world) ---- */
+function mpResetWorld() {
+  for (const b of buildings) {
+    if (b.alive) continue;
+    for (const d of b.debris) scene.remove(d);
+    b.debris = [];
+    rebuildBuilding(b);
+  }
+  for (let i = 0; i < rockData.length; i++) {
+    const rk = rockData[i];
+    if (!rk.alive) {
+      rk.alive = true;
+      for (const d of rk.debris || []) scene.remove(d);
+      rk.debris = [];
+      rockMesh.setMatrixAt(i, rk.mat);
+    }
+  }
+  rockMesh.instanceMatrix.needsUpdate = true;
+  for (const a of [...aliens]) { scene.remove(a.group); }
+  aliens.length = 0;
+  pendingSpawns.length = 0;
+  alertLevel = 0;
+  alertTriggered = false;
+  aliensSpawnedMsg = false;
+  roomSetState('world.bhp', {});
+  roomSetState('world.alert', { level: 0, t: Date.now() });
+  /* respawn the local ship too */
+  if (state === 'over') redeploy();
+}
+function rebuildBuilding(b) {
+  const { type, x, z } = b.origin;
+  const oldIdx = buildings.indexOf(b);
+  /* re-create the group via the same builder path */
+  const g = buildBuildingGroup(type);
+  g.position.set(x, terrainHeight(x, z), z);
+  scene.add(g);
+  b.group = g;
+  b.alive = true;
+  b.hp = b.maxHp;
+  b.flash = 0;
+  b.mats = g.userData.mats;
+  b.center = new THREE.Vector3(x, terrainHeight(x, z) + b.centerY, z);
+}
+
+function trackPlayer(p) {
+  if (!p || !p.id || p.id === myId) return;
+  if (!tracked.has(p.id)) {
+    tracked.set(p.id, p);
+    try {
+      p.onQuit(() => {
+        tracked.delete(p.id);
+        peers.delete(p.id);
+        const oi = peerOrder.indexOf(p.id);
+        if (oi >= 0) peerOrder.splice(oi, 1);
+        dropPeerShip(p.id);
+        retintPeers();
+        msg(nameOf(p.id) + ' LEFT THE SKY', '#c99a78', 3);
+      });
+    } catch {}
+  }
+  tracked.set(p.id, p);
+  if (!peers.has(p.id)) peers.set(p.id, { player: p });
+}
+function dropPeerShip(id) {
+  const entry = peerShips.get(id);
+  if (entry) {
+    scene.remove(entry.group);
+    entry.group.traverse(o => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) {
+        if (o.material.map) o.material.map.dispose();
+        o.material.dispose();
+      }
+    });
+    peerShips.delete(id);
+  }
+}
+function ensurePeerShip(id, idx) {
+  let entry = peerShips.get(id);
+  if (entry) {
+    entry.group.getObjectByName('body').material.color.set(tintFor(id));
+    return entry;
+  }
+  const group = createShip(tintFor(id));
+  group.add(buildLabel('', tintHex(id)));
+  const sp = SPAWN_POINTS[(idx % (SPAWN_POINTS.length - 1)) + 1] || SPAWN_POINTS[1];
+  group.position.set(sp.x, sp.y, sp.z);
+  group.rotation.set(0, sp.yaw, 0, 'YXZ');
+  scene.add(group);
+  entry = { group, flame: group.getObjectByName('flame'), flameLight: group.getObjectByName('flameLight'),
+    lastEvt: 0, lastFlame: 0, flameT: 0, score: 0, label: group.children[group.children.length - 1], labelKey: '' };
+  peerShips.set(id, entry);
+  return entry;
+}
+function retintPeers() {
+  peerShips.forEach((entry, id) => {
+    entry.group.getObjectByName('body').material.color.set(tintFor(id));
+  });
+}
+function reconcile() {
+  if (!mpReady || !Playroom) return;
+  let live;
+  try { live = Playroom.getParticipants() || {}; } catch { live = {}; }
+  const liveIds = new Set(Object.keys(live).filter(id => id !== myId));
+  for (const id of liveIds) trackPlayer(live[id]);
+  /* join-order bookkeeping */
+  for (const id of liveIds) {
+    if (!peerOrder.includes(id)) {
+      peerOrder.push(id);
+      ensurePeerShip(id, peerOrder.indexOf(id));
+      msg('🚀 ' + nameOf(id) + ' JOINED THE SKY', '#7fd4ff', 3);
+    }
+  }
+  for (const id of [...peerOrder]) {
+    if (!liveIds.has(id)) {
+      peerOrder.splice(peerOrder.indexOf(id), 1);
+      dropPeerShip(id);
+    }
+  }
+  retintPeers();
+  /* late-joiner world snapshot */
+  const bhp = roomGetState('world.bhp') || {};
+  for (const k of Object.keys(bhp)) {
+    const bd = buildings[Number(k)];
+    if (bd && bd.alive && bhp[k].t && bhp[k].hp < bd.hp) { bd.hp = bhp[k].hp; }
+  }
+  const al = roomGetState('world.alert');
+  if (al && al.level > 0 && al.level > alertLevel) {
+    alertLevel = al.level;
+    if (!alertTriggered) { alertTriggered = true; msg('⚠ THE ALIEN FLEET IS ACTIVE', '#ffd24d', 4); }
+  }
+}
+
+function publishLocal() {
+  if (!mpReady) return;
+  const now = performance.now();
+  if (now - lastPublish < 1000 / PUBLISH_HZ) return;
+  lastPublish = now;
+  const me = myPlayer();
+  if (!me) return;
+  const r1 = v => Math.round(v * 10) / 10;
+  try {
+    me.setState('pos', { x: r1(ship.position.x), y: r1(ship.position.y), z: r1(ship.position.z) }, false);
+    me.setState('rot', { y: r1(ship.rotation.y), p: r1(ship.rotation.x), r: r1(ship.rotation.z) }, false);
+    me.setState('hp', Math.round(hp), false);
+    me.setState('alive', ship.visible, false);
+    me.setState('score', score, false);
+  } catch {}
+}
+function publishFlamePulse() {
+  const me = myPlayer();
+  if (!me) return;
+  try { me.setState('flameT', Date.now(), false); } catch {}
+}
+
+const _peerPos = new THREE.Vector3(), _peerRot = new THREE.Vector3();
+function updateRemoteShips(dt) {
+  if (!mpReady) return;
+  const now = performance.now();
+  if (now - lastReconcile > 1000 / RECONCILE_HZ) { lastReconcile = now; reconcile(); }
+  for (const [id, entry] of peerShips) {
+    const p = peers.get(id)?.player || tracked.get(id);
+    if (!p) continue;
+    const pos = p.getState('pos');
+    if (pos) {
+      _peerPos.set(pos.x, pos.y, pos.z);
+      entry.group.position.lerp(_peerPos, damp(dt, 14));
+    }
+    const rot = p.getState('rot');
+    if (rot) {
+      entry.group.rotation.set(rot.p, lerpAngle(entry.group.rotation.y, rot.y, damp(dt, 14)), rot.r, 'YXZ');
+    }
+    entry.group.visible = p.getState('alive') !== false;
+    entry.score = p.getState('score') || 0;
+    /* flame pulse on shot */
+    const ft = p.getState('flameT') || 0;
+    if (ft !== entry.lastFlame) { entry.lastFlame = ft; entry.flameT = 0.25; }
+    entry.flameT = Math.max(0, entry.flameT - dt);
+    const fs = 0.05 + entry.flameT * 5;
+    entry.flame.scale.set(0.8, 0.8, fs);
+    entry.flame.material.opacity = entry.flameT > 0.01 ? 0.9 : 0;
+    entry.flameLight.intensity = entry.flameT * 100;
+    /* name label (rebuild only when the name arrives/changes) */
+    const nm = nameOf(id);
+    const key = nm + '|' + tintHex(id);
+    if (nm && entry.labelKey !== key) {
+      entry.labelKey = key;
+      if (entry.label) {
+        entry.group.remove(entry.label);
+        if (entry.label.material.map) entry.label.material.map.dispose();
+        entry.label.material.dispose();
+      }
+      entry.label = buildLabel(nm, tintHex(id));
+      entry.group.add(entry.label);
+    }
+    /* events (reliable, timestamp-deduped) */
+    const e = p.getState('evt');
+    if (e && e.t && e.t !== entry.lastEvt && e.who !== myId) {
+      entry.lastEvt = e.t;
+      applyRemoteEvent(e, id);
+    }
+  }
+}
+
+function spawnFor(id) {
+  const idx = id === myId ? 0 : peerOrder.indexOf(id);
+  return SPAWN_POINTS[(idx < 0 ? 0 : idx) % SPAWN_POINTS.length];
+}
+function redeploy() {
+  const sp = spawnFor(myId);
+  ship.position.set(sp.x, sp.y, sp.z);
+  shipVel.set(0, 0, 0);
+  yaw = sp.yaw; pitch = 0; roll = 0;
+  ship.rotation.set(0, 0, 0, 'YXZ');
+  hp = 100; booster = 100;
+  ship.visible = true;
+  camera.position.set(sp.x, sp.y + 3, sp.z + 11);
+  camera.lookAt(ship.position);
+  state = 'playing';
+  els.gameover.classList.add('hidden');
+  els.crosshair.classList.remove('hidden');
+  lockPointer();
+  msg('REDEPLOYED', '#7fd4ff', 2.5);
+}
+
+async function bootMultiplayer() {
+  const net = els.netStatus;
+  if (!Playroom) { net.textContent = 'SOLO MODE (network lib missing)'; return; }
+  try {
+    const params = new URLSearchParams(location.search);
+    const roomCode = params.get('room') || 'mars-raid';
+    net.textContent = 'CONNECTING…';
+    await Playroom.insertCoin({
+      maxPlayersPerRoom: MAX_PILOTS,
+      skipLobby: true,
+      roomCode,
+      defaultPlayerStates: { name: '', pos: null, rot: null, hp: 100, alive: true, score: 0, flameT: 0, evt: null }
+    });
+    myId = myPlayer()?.id || null;
+    if (myId) {
+      const cs = ($('callsign').value || '').trim().toUpperCase() || 'RAIDER';
+      callsign = cs;
+      try { localStorage.setItem('mars-callsign', cs); } catch {}
+      try { myPlayer().setState('name', cs, true); } catch {}
+    }
+    mpReady = true;
+    try {
+      const code = Playroom.getRoomCode() || roomCode;
+      if (code && params.get('room') !== code) {
+        params.set('room', code);
+        history.replaceState(null, '', location.pathname + '?' + params.toString());
+      }
+    } catch {}
+    Playroom.onPlayerJoin(p => { trackPlayer(p); reconcile(); });
+    reconcile();
+    setInterval(() => { if (mpReady) reconcile(); }, 1000 / RECONCILE_HZ);
+    const code = (Playroom.getRoomCode() || roomCode).toUpperCase();
+    net.textContent = 'ROOM ' + code + (Playroom.isHost ? Playroom.isHost() ? ' · HOST' : '' : '');
+    buildRoomPanel(code);
+    msg('🛰 LINKED TO ROOM ' + code + ' — FLY WITH YOUR CREW', '#7fd4ff', 5);
+  } catch (err) {
+    console.warn('multiplayer unavailable — running solo', err);
+    mpReady = false;
+    net.textContent = 'SOLO — could not reach playroom. Check ad blockers / network, then RETRY.';
+    setRoomFailed();
+  }
+}
+function setRoomFailed() {
+  const rc = $('roomCode');
+  rc.textContent = 'SOLO';
+  rc.style.color = '#ff8a5e';
+  const btns = $('roomBtns');
+  btns.innerHTML = '';
+  const b = document.createElement('button');
+  b.textContent = 'RETRY LINK';
+  b.style.marginRight = '4px';
+  b.addEventListener('click', ev => {
+    ev.stopPropagation();
+    b.textContent = 'RETRYING…';
+    const rc = $('roomCode'); rc.textContent = 'CONNECTING…'; rc.style.color = '#7fd4ff';
+    els.netStatus.textContent = 'CONNECTING…';
+    bootMultiplayer();
+  });
+  btns.appendChild(b);
+}
+function buildRoomPanel(code) {
+  const btns = $('roomBtns');
+  btns.innerHTML = '';
+  const mk = (label, fn) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.addEventListener('click', ev => { ev.stopPropagation(); fn(); });
+    btns.appendChild(b);
+  };
+  mk('COPY ROOM LINK', () => {
+    const url = location.origin === 'null' ? location.href : location.href;
+    (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject())
+      .then(() => msg('🔗 ROOM LINK COPIED', '#7fd4ff', 3))
+      .catch(() => prompt('Copy this room link:', url));
+  });
+  mk('RESET WORLD', () => {
+    if (confirm('Rebuild the colony and clear all saucers for everyone in the room?')) {
+      mpResetWorld();
+      mpSend('reset', {});
+    }
+  });
+  $('roomCode').textContent = code;
+}
+const callsignEl = $('callsign');
+callsignEl.value = (localStorage.getItem('mars-callsign') || '').slice(0, 14);
+/* clicking to focus the input must NOT launch the game */
+callsignEl.addEventListener('click', e => e.stopPropagation());
+callsignEl.addEventListener('keydown', e => {
+  e.stopPropagation();
+  if (e.key === 'Enter') { commitCallsign(callsignEl.value); callsignEl.blur(); }
+  if (e.key === 'Escape') callsignEl.blur();
+});
+callsignEl.addEventListener('change', () => commitCallsign(callsignEl.value));
+callsignEl.addEventListener('blur', () => commitCallsign(callsignEl.value));
+function commitCallsign(val) {
+  const next = (val || '').trim().toUpperCase().slice(0, 14) || 'RAIDER';
+  if (next === callsign) return;
+  callsign = next;
+  callsignEl.value = next;
+  try { localStorage.setItem('mars-callsign', next); } catch {}
+  if (myId) { try { myPlayer().setState('name', next, true); } catch {} }
+}
+bootMultiplayer();
 
 /* ================= bullets ================= */
 const bullets = [];
@@ -548,10 +1113,13 @@ function spawnBullet(pos, vel, owner, dmg) {
       new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, depthWrite: false })
     );
     mesh.add(glow);
-    b = { mesh, glow, vel: new THREE.Vector3(), owner: '', dmg: 0, ttl: 0 };
+    b = { mesh, glow, vel: new THREE.Vector3(), owner: '', isPlayer: true, dmg: 0, ttl: 0 };
     b.mesh.visible = false;
   }
-  b.mesh.material.color.set(owner === 'player' ? 0x7df9ff : 0xff6a3d);
+  b.isPlayer = owner !== 'alien';
+  const isLocal = (owner === myId) || (!mpReady && owner === 'me');
+  const tint = owner === 'alien' ? 0xff6a3d : (isLocal ? 0x7df9ff : tintFor(owner));
+  b.mesh.material.color.set(tint);
   b.glow.material.color.copy(b.mesh.material.color);
   b.owner = owner; b.dmg = dmg; b.ttl = 2.5;
   b.vel.copy(vel);
@@ -561,8 +1129,11 @@ function spawnBullet(pos, vel, owner, dmg) {
   bullets.push(b);
 }
 
-function damagePlayer(dmg) {
-  if (state !== 'playing' || invuln > 0) return;
+function damagePlayer(dmg, targetId) {
+  // Only the owning client applies damage to itself (authoritative per-player)
+  if (targetId != null && targetId !== myId) return;
+  if (targetId == null && state !== 'playing') return;
+  if (invuln > 0) return;
   invuln = 0.35;
   hp = Math.max(0, hp - dmg);
   Sfx.hit();
@@ -581,27 +1152,15 @@ function updateBullets(dt) {
 
     /* ground impact */
     if (!dead && p.y <= terrainHeight(p.x, p.z) + 0.2) {
-      explosion(p, b.owner === 'player' ? 0xffc27a : 0xff7a4d, 0.45, 14);
+      explosion(p, b.isPlayer ? 0xffc27a : 0xff7a4d, 0.45, 14);
       dead = true;
     }
 
-    if (!dead && b.owner === 'player') {
+    if (!dead && b.isPlayer) {
       for (const bd of buildings) {
         if (!bd.alive) continue;
         if (p.distanceToSquared(bd.center) < (bd.radius + 0.4) * (bd.radius + 0.4)) {
-          bd.hp -= b.dmg;
-          bd.flash = 0.12;
-          Sfx.hit();
-          explosion(p, 0xffd08a, 0.5, 14);
-          alertLevel = Math.min(100, alertLevel + 3);
-          if (!alertTriggered) {
-            alertTriggered = true;
-            alertLevel = Math.max(alertLevel, 25);
-            spawnTimer = 1.4;
-            msg('⚠ YOU SHOT THE COLONY — THE ALIEN FLEET IS AWAKENED', '#ffd24d', 5);
-            Sfx.alert();
-          }
-          if (bd.hp <= 0) destroyBuilding(bd);
+          mpBuildingHit(bd, b.owner, b.dmg, p);
           dead = true;
           break;
         }
@@ -611,7 +1170,7 @@ function updateBullets(dt) {
           const rk = rockData[j];
           if (!rk.alive) continue;
           if (p.distanceToSquared(rk.pos) < (rk.r + 0.4) * (rk.r + 0.4)) {
-            destroyRock(j, p);
+            mpRockHit(j, b.owner, p);
             dead = true;
             break;
           }
@@ -624,7 +1183,7 @@ function updateBullets(dt) {
             a.hp -= b.dmg;
             Sfx.hit();
             explosion(p, 0x9fe8ff, 0.5, 14);
-            if (a.hp <= 0) killAlien(j);
+            if (a.hp <= 0) mpAlienKilled(j, b.owner);
             dead = true;
             break;
           }
@@ -632,7 +1191,7 @@ function updateBullets(dt) {
       }
     } else if (!dead) {
       if (p.distanceToSquared(ship.position) < 1.9 * 1.9) {
-        damagePlayer(7);
+        damagePlayer(7, b.owner);
         explosion(p, 0xff6a3d, 0.5, 14);
         dead = true;
       }
@@ -676,20 +1235,23 @@ function spawnAlien(pos, revenge) {
   });
 }
 
-function killAlien(idx) {
+function mpAlienKilled(idx, ownerId) {
   const a = aliens[idx];
   aliens.splice(idx, 1);
   scene.remove(a.group);
   explosion(a.pos, 0x8fd8ff, 1.3, 50);
   Sfx.explosion(1);
-  score += 100;
-  stats.saucers++;
-  /* retribution: shooting one down spawns MORE */
-  const n = 1 + (Math.random() < 0.35 ? 1 : 0);
-  if (aliens.length + pendingSpawns.length < MAX_ALIENS) {
-    for (let k = 0; k < n; k++) pendingSpawns.push({ t: 1.1 + k * 0.5 + rand(0, 0.4) });
-    msg('💢 RETRIBUTION! ' + n + ' MORE SAUCER' + (n > 1 ? 'S' : '') + ' INBOUND', '#7fd4ff', 3.5);
-    Sfx.alert();
+  if (ownerId === myId) {
+    score += 100;
+    stats.saucers++;
+    /* retribution: shooting one down spawns MORE */
+    const n = 1 + (Math.random() < 0.35 ? 1 : 0);
+    if (aliens.length + pendingSpawns.length < MAX_ALIENS) {
+      for (let k = 0; k < n; k++) pendingSpawns.push({ t: 1.1 + k * 0.5 + rand(0, 0.4) });
+      msg('💢 RETRIBUTION! ' + n + ' MORE SAUCER' + (n > 1 ? 'S' : '') + ' INBOUND', '#7fd4ff', 3.5);
+      Sfx.alert();
+    }
+    mpSend('alien', { x: a.pos.x, y: a.pos.y, z: a.pos.z, n, who: myId, t: Date.now() });
   }
 }
 
@@ -727,7 +1289,7 @@ function updateAliens(dt, t) {
       damagePlayer(22);
       a.hp -= 45;
       shipVel.addScaledVector(_v1.normalize(), 14);
-      if (a.hp <= 0) killAlien(i);
+      if (a.hp <= 0) mpAlienKilled(i, myId);
     }
   }
 }
@@ -895,6 +1457,30 @@ function updateHud() {
   els.alertText.textContent = alertLevel > 66 ? 'CRITICAL' : alertLevel > 33 ? 'ELEVATED' : alertLevel > 0 ? 'RAISED' : 'DORMANT';
   els.alertText.style.color = ac;
   els.lowhp.style.opacity = (hp <= 30 && state === 'playing') ? 1 : 0;
+
+  /* multiplayer scoreboard */
+  if (mpReady) {
+    const rows = [];
+    rows.push({ name: callsign, score, dead: hp <= 0, me: true, tint: 0xd8dee6 });
+    for (const id of peerOrder) {
+      const e = peerShips.get(id);
+      rows.push({ name: nameOf(id), score: e ? e.score : 0, dead: e ? !e.group.visible : false, me: false,
+        tint: tintFor(id) });
+    }
+    rows.sort((a, b) => b.score - a.score);
+    els.sbRows.innerHTML = rows.map((r, i) => {
+      const hex = '#' + r.tint.toString(16).padStart(6, '0');
+      return `<div class="sbrow${r.dead ? ' dead' : ''}">
+        <span style="width:14px;color:#c99a78;font-size:11px">${i + 1}</span>
+        <span class="sbdot${r.me ? ' me' : ''}" style="background:${hex}"></span>
+        <span class="sbname" style="color:${r.me ? '#ffe9d6' : hex}">${r.name}${r.me ? ' (you)' : ''}</span>
+        <span class="sbscore">${r.score}</span></div>`;
+    }).join('');
+    els.pilotsCount.textContent = (1 + peerOrder.length) + ' / ' + MAX_PILOTS;
+  } else {
+    els.sbRows.innerHTML = '';
+    els.pilotsCount.textContent = '1';
+  }
 }
 
 /* ================= input ================= */
@@ -903,8 +1489,9 @@ const mouseNDC = new THREE.Vector2(0, 0);
 const aimRay = new THREE.Raycaster();
 
 addEventListener('keydown', e => {
+  if (e.target === $('callsign')) return;
   keys.add(e.code);
-  if (e.code === 'KeyR' && state === 'over') location.reload();
+  if (e.code === 'KeyR' && state === 'over') redeployLocal();
   if (['ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
 });
 addEventListener('keyup', e => keys.delete(e.code));
@@ -973,8 +1560,8 @@ function resumeGame() {
 $('startBtn').addEventListener('click', e => { e.stopPropagation(); startGame(); });
 els.menu.addEventListener('click', startGame);
 els.paused.addEventListener('click', resumeGame);
-$('retryBtn').addEventListener('click', e => { e.stopPropagation(); location.reload(); });
-els.gameover.addEventListener('click', () => location.reload());
+$('retryBtn').addEventListener('click', e => { e.stopPropagation(); redeployLocal(); });
+els.gameover.addEventListener('click', e => { if (e.target === els.gameover) redeployLocal(); });
 
 /* ================= game over ================= */
 function gameOver() {
@@ -985,11 +1572,17 @@ function gameOver() {
   explosion(ship.position, 0xffb060, 2.6, 90);
   Sfx.explosion(2);
   ship.visible = false;
+  stats.deaths++;
+  if (mpReady) mpSend('death', { x: ship.position.x, y: ship.position.y, z: ship.position.z });
   els.finalStats.innerHTML =
     `Score: <b>${score}</b><br>` +
     `Buildings destroyed: ${stats.buildings} · Saucers downed: ${stats.saucers}<br>` +
-    `Shots fired: ${stats.shots} · Survived: ${Math.floor(tGame)}s`;
+    `Shots fired: ${stats.shots} · Deaths: ${stats.deaths}`;
   els.gameover.classList.remove('hidden');
+}
+function redeployLocal() {
+  if (state !== 'over') return;
+  if (typeof redeploy === 'function') redeploy();
 }
 
 /* ================= main update ================= */
@@ -1072,9 +1665,14 @@ function update(dt) {
     const f = new THREE.Vector3();
     ship.getWorldDirection(f);
     f.negate(); // fire from the nose
-    spawnBullet(ship.position.clone().addScaledVector(f, 5.5), f.clone().multiplyScalar(95), 'player', 10);
+    const origin = ship.position.clone().addScaledVector(f, 5.5);
+    spawnBullet(origin, f.clone().multiplyScalar(95), myId || 'me', 10);
     Sfx.laser();
     stats.shots++;
+    if (mpReady) {
+      mpSend('shot', { x: origin.x, y: origin.y, z: origin.z, dx: f.x, dy: f.y, dz: f.z });
+      publishFlamePulse();
+    }
   }
 
   updateBullets(dt);
@@ -1083,6 +1681,10 @@ function update(dt) {
   updateFx(dt);
   updateBuildingFlash(dt);
   updateHud();
+  if (mpReady) {
+    publishLocal();
+    updateRemoteShips(dt);
+  }
 }
 
 /* ================= debug console API (for automated play-testing) ================= */
@@ -1142,6 +1744,12 @@ function animate() {
     if (state === 'menu') {
       camera.position.set(Math.sin(t * 0.07) * 110, 55, Math.cos(t * 0.07) * 110);
       camera.lookAt(0, 6, 0);
+    }
+    if (mpReady) {
+      /* keep crew + shared world alive while paused / on the death screen */
+      updateRemoteShips(dt);
+      updateAliens(dt, t);
+      updateBullets(dt);
     }
   }
   updateMessages(dt);
