@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>m.js Calculator</title>
+  <script src="https://mikesmullin.github.io/m-js/dist/m.min.js"></script>
+  <style>
+    body {
+      background: #0f172a;
+      color: #f8fafc;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      font-family: system-ui, sans-serif;
+    }
+    .calculator {
+      background: #1e293b;
+      padding: 24px;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      width: 320px;
+    }
+    .display {
+      background: #0f172a;
+      padding: 20px;
+      border-radius: 8px;
+      text-align: right;
+      margin-bottom: 20px;
+      font-size: 2rem;
+      min-height: 40px;
+      word-break: break-all;
+      color: #38bdf8;
+      border: 1px solid #334155;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+    button {
+      padding: 15px;
+      border: none;
+      border-radius: 8px;
+      background: #334155;
+      color: white;
+      font-size: 1.2rem;
+      cursor: pointer;
+      transition: all 0.1s;
+    }
+    button:hover { background: #475569; }
+    button:active { transform: scale(0.95); }
+    .op { background: #7c3aed; }
+    .op:hover { background: #8b5cf6; }
+    .eq { background: #10b981; grid-column: span 2; }
+    .eq:hover { background: #059669; }
+    .clear { background: #ef4444; grid-column: span 2; }
+    .clear:hover { background: #dc2626; }
+  </style>
+</head>
+<body>
+
+<div class="calculator" x-data="calc()">
+  <div class="display" x-text="display"></div>
+  <div class="grid">
+    <button class="clear" @click="clear">C</button>
+    <button @click="append('(')">(</button>
+    <button @click="append(')')">)</button>
+    <button @click="append(' / ')">÷</button>
+    
+    <button @click="append('7')">7</button>
+    <button @click="append('8')">8</button>
+    <button @click="append('9')">9</button>
+    <button @click="append(' * ')">×</button>
+    
+    <button @click="append('4')">4</button>
+    <button @click="append('5')">5</button>
+    <button @click="append('6')">6</button>
+    <button @click="append(' - ')">-</button>
+    
+    <button @click="append('1')">1</button>
+    <button @click="append('2')">2</button>
+    <button @click="append('3')">3</button>
+    <button @click="append(' + ')">+</button>
+    
+    <button @click="append('0')">0</button>
+    <button @click="append('.')">.</button>
+    <button @click="calculate" class="eq">=</button>
+  </div>
+</div>
+
+<script type="module">
+  import M from 'https://mikesmullin.github.io/m-js/dist/m.min.js'
+
+  window.calc = () => ({
+    display: '0',
+    append(val) {
+      if (this.display === '0') this.display = val;
+      else this.display += val;
+    },
+    clear() {
+      this.display = '0';
+    },
+    calculate() {
+      try {
+        const result = eval(this.display.replace('×', '*').replace('÷', '/'));
+        this.display = String(Number.isInteger(result) ? result : result.toFixed(4));
+      } catch (e) {
+        this.display = 'Error';
+      }
+    }
+  });
+
+  M.start();
+</script>
+</body>
+</html>
