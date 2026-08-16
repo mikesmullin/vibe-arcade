@@ -936,7 +936,13 @@ function mpSendShot(kind, o, d, extra = {}) {
 }
 function mpSendFx(x, y, z, color, size) { evPush(EV.fx, { x, y, z, c: color, s: size || 1 }); }
 function mpSendCmd(c, payload) { evPush(EV.cmd, Object.assign({ c }, payload)); }
-function mpSendMsg(text, color) { evPush(EV.msg, { text, color: color || '#ffd9b0' }); }
+function mpSendMsg(text, color) {
+  /* the host's own evLog is never applied back locally (evApplyBlob only runs
+     for peers) — echo to the local HUD so the broadcaster sees its own
+     messages too (also fixes solo mode, where evPush bails on !mpReady) */
+  msg(text, color || '#ffd9b0', 4);
+  evPush(EV.msg, { text, color: color || '#ffd9b0' });
+}
 function mpSendScore(scorerId, amt, why) { evPush(EV.score, { scorer: scorerId, amt, why }); }
 
 let poseSeq = 0, lifeSeq = 0, worldEpoch = 0;
