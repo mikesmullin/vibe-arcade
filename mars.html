@@ -73,6 +73,14 @@
     outline:none; }
   #callsign:focus { border-color:#ff9a5e; box-shadow:0 0 12px rgba(255,140,60,.3); }
   #netStatus { font-size:11px; color:#7fd4ff; letter-spacing:.12em; text-transform:uppercase; margin-top:10px; }
+  /* debug overlay (Backspace): fps + net charts, docked below the threat panel */
+  #debug { position:fixed; top:126px; right:14px; z-index:40; pointer-events:none;
+    display:flex; flex-direction:column; gap:6px; align-items:flex-end; }
+  .dbg-chart { display:flex; align-items:center; gap:6px; padding:4px 6px;
+    background:rgba(10,5,3,.72); border:1px solid rgba(255,150,90,.25); border-radius:6px; }
+  .dbg-label { font-size:9px; letter-spacing:.15em; color:#c99a78; width:26px; text-align:right; }
+  #fpsChart, #netChart { display:block; background:rgba(0,0,0,.4); border-radius:2px; }
+  .dbg-net { font-size:9px; color:#9fd8ff; font-family:ui-monospace,monospace; min-width:74px; }
 </style>
 </head>
 <body>
@@ -100,7 +108,19 @@
     <div class="row" style="display:flex;flex-wrap:wrap;justify-content:flex-end" id="roomBtns"></div>
   </div>
   <div id="messages"></div>
-  <div id="hint">WASD fly · Q/E up/down · Shift = afterburner · hold click to fire · Esc releases mouse (click to re-lock)</div>
+  <div id="hint">WASD fly · Q/E up/down · Shift = afterburner · hold click to fire · Esc releases mouse (click to re-lock) · Backspace = debug</div>
+</div>
+<!-- debug overlay (Backspace to toggle): fps + network byte charts, top-right -->
+<div id="debug" class="hidden">
+  <div class="dbg-chart">
+    <span class="dbg-label">FPS</span>
+    <canvas id="fpsChart" width="120" height="24"></canvas>
+  </div>
+  <div class="dbg-chart">
+    <span class="dbg-label">NET</span>
+    <canvas id="netChart" width="120" height="24"></canvas>
+    <span class="dbg-net" id="netText">↑0 ↓0</span>
+  </div>
 </div>
 <div id="crosshair" class="hidden"></div>
 
@@ -146,6 +166,29 @@
 <script type="module">
 import * as THREE from 'three';
 const Playroom = window.Playroom || null;
+
+/* ---- network telemetry: wrap the global WebSocket BEFORE PlayroomKit connects,
+   so we can count bytes sent/received per frame for the debug overlay ---- */
+const _enc = new TextEncoder();
+let netSentAcc = 0, netRecvAcc = 0;
+function byteSize(d) {
+  if (d == null) return 0;
+  if (typeof d === 'string') return _enc.encode(d).length;
+  if (d instanceof ArrayBuffer) return d.byteLength;
+  if (ArrayBuffer.isView(d)) return d.byteLength;
+  if (typeof Blob !== 'undefined' && d instanceof Blob) return d.size;
+  return 0;
+}
+try {
+  const NativeWS = WebSocket;
+  window.WebSocket = class extends NativeWS {
+    constructor(...args) {
+      super(...args);
+      this.addEventListener('message', ev => { netRecvAcc += byteSize(ev.data); });
+    }
+    send(data) { netSentAcc += byteSize(data); super.send(data); }
+  };
+} catch (e) { /* if subclassing is unavailable, net chart just reads 0 */ }
 
 /* ================= helpers ================= */
 const rand  = (a, b) => a + Math.random() * (b - a);
@@ -1152,7 +1195,9 @@ function buildRoomPanel(code) {
   $('roomCode').textContent = code;
 }
 const callsignEl = $('callsign');
-callsignEl.value = (localStorage.getItem('mars-callsign') || '').slice(0, 14);
+/* per-tab callsign (sessionStorage) so two tabs in one browser can be named
+   differently; falls back to the last saved name (localStorage) */
+callsignEl.value = (sessionStorage.getItem('mars-callsign') || localStorage.getItem('mars-callsign') || '').slice(0, 14);
 /* clicking to focus the input must NOT launch the game */
 callsignEl.addEventListener('click', e => e.stopPropagation());
 callsignEl.addEventListener('keydown', e => {
@@ -1167,7 +1212,7 @@ function commitCallsign(val) {
   if (next === callsign) return;
   callsign = next;
   callsignEl.value = next;
-  try { localStorage.setItem('mars-callsign', next); } catch {}
+  try { sessionStorage.setItem('mars-callsign', next); localStorage.setItem('mars-callsign', next); } catch {}
   if (myId) { try { myPlayer().setState('name', next, true); } catch {} }
 }
 bootMultiplayer();
@@ -1593,6 +1638,7 @@ addEventListener('keydown', e => {
   if (e.target === $('callsign')) return;
   keys.add(e.code);
   if (e.code === 'KeyR' && state === 'over') redeployLocal();
+  if (e.code === 'Backspace') { e.preventDefault(); toggleDebug(); return; }
   if (['ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
 });
 addEventListener('keyup', e => keys.delete(e.code));
@@ -1833,13 +1879,84 @@ window.marsDebug = {
   hostFlag() { return isHostNow(); }
 };
 
+/* ================= debug overlay (Backspace toggle): fps + net charts ================= */
+let dbgOn = false;
+const DBG_N = 120;
+const dbgFps = new Float32Array(DBG_N);  let dbgFpsHead = 0;
+const dbgNetUp = new Float32Array(DBG_N); let dbgNetUpHead = 0;
+const dbgNetDown = new Float32Array(DBG_N); let dbgNetDownHead = 0;
+const fpsCtx = $('fpsChart').getContext('2d');
+const netCtx = $('netChart').getContext('2d');
+function dbgColdHot(t) { // blue (fast) → green → red (slow), copied from brain viz
+  t = Math.max(0, Math.min(1, t));
+  let r, g, b;
+  if (t < 0.5) { const s = t * 2; r = 0.20 + 0.75 * s; g = 0.45 + 0.40 * s; b = 0.95 - 0.70 * s; }
+  else { const s = (t - 0.5) * 2; r = 0.95; g = 0.85 - 0.60 * s; b = 0.25 - 0.05 * s; }
+  return 'rgb(' + (r * 255 | 0) + ',' + (g * 255 | 0) + ',' + (b * 255 | 0) + ')';
+}
+function dbgDrawFpsCanvas() {
+  fpsCtx.clearRect(0, 0, 120, 24);
+  let sum = 0, cnt = 0;
+  for (let i = 0; i < DBG_N; i++) {
+    const v = dbgFps[(dbgFpsHead + i) % DBG_N]; // oldest → newest left→right
+    if (v <= 0.01) continue;
+    const t = Math.min(1, v / 33.3);
+    fpsCtx.fillStyle = dbgColdHot(t);
+    fpsCtx.fillRect(i, 24 - Math.max(1, 24 * t), 1, Math.max(1, 24 * t));
+    sum += v; cnt++;
+  }
+  if (cnt) {
+    fpsCtx.fillStyle = '#fff'; fpsCtx.font = '11px ui-sans-serif';
+    fpsCtx.textAlign = 'center'; fpsCtx.textBaseline = 'middle';
+    fpsCtx.shadowColor = 'rgba(0,0,0,.8)'; fpsCtx.shadowBlur = 3;
+    fpsCtx.fillText(Math.round(1000 / (sum / cnt)) + 'fps', 60, 12);
+    fpsCtx.shadowBlur = 0;
+  }
+}
+function dbgDrawNetCanvas() {
+  let maxV = 16;
+  for (let i = 0; i < DBG_N; i++) { maxV = Math.max(maxV, dbgNetUp[i], dbgNetDown[i]); }
+  maxV = Math.max(16, maxV * 1.1);
+  netCtx.clearRect(0, 0, 120, 24);
+  for (let i = 0; i < DBG_N; i++) {
+    const u = dbgNetUp[(dbgNetUpHead + i) % DBG_N];
+    const d = dbgNetDown[(dbgNetDownHead + i) % DBG_N];
+    if (u > 0) { const h = Math.max(1, 24 * Math.min(1, u / maxV)); netCtx.fillStyle = 'rgba(130,230,130,.95)'; netCtx.fillRect(i, 24 - h, 1, h); }
+    if (d > 0) { const h = Math.max(1, 24 * Math.min(1, d / maxV)); netCtx.fillStyle = 'rgba(130,190,255,.95)'; netCtx.fillRect(i, 24 - h, 1, h); }
+  }
+  const last = dbgNetDown[(dbgNetDownHead - 1 + DBG_N) % DBG_N] + dbgNetUp[(dbgNetUpHead - 1 + DBG_N) % DBG_N];
+  const fmt = b => b >= 1024 ? (b / 1024).toFixed(1) + 'K' : Math.round(b) + '';
+  $('netText').textContent = '↑↓ ' + fmt(last) + 'B';
+}
+function dbgSample(dtMs) {
+  const sent = netSentAcc, recv = netRecvAcc;
+  netSentAcc = 0; netRecvAcc = 0;
+  // always keep the ring buffers warm so history is present the moment it's shown
+  dbgFps[dbgFpsHead] = dtMs;
+  dbgNetUp[dbgNetUpHead] = sent;
+  dbgNetDown[dbgNetDownHead] = recv;
+  dbgFpsHead = (dbgFpsHead + 1) % DBG_N;
+  dbgNetUpHead = (dbgNetUpHead + 1) % DBG_N;
+  dbgNetDownHead = (dbgNetDownHead + 1) % DBG_N;
+  if (dbgOn) { dbgDrawFpsCanvas(); dbgDrawNetCanvas(); }
+}
+function toggleDebug() {
+  dbgOn = !dbgOn;
+  $('debug').classList.toggle('hidden', !dbgOn);
+  if (dbgOn) { dbgDrawFpsCanvas(); dbgDrawNetCanvas(); }
+}
+
 /* ================= loop ================= */
 const clock = new THREE.Clock();
 function animate() {
   requestAnimationFrame(animate);
+  const now = performance.now();
+  const dtMs = animate._t ? now - animate._t : 16.7;
+  animate._t = now;
   const dt = Math.min(clock.getDelta(), 0.05);
   const t = clock.elapsedTime;
 
+  dbgSample(Math.max(1, dtMs));
   dust.rotation.y += dt * 0.012;
 
   if (state === 'playing') {
