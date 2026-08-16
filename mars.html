@@ -694,18 +694,29 @@ const messages = [];
 const PUBLISH_HZ = 18;
 const RECONCILE_HZ = 4;
 const MAX_PILOTS = 6;
+/* eight spawn locations around the colony, at varied altitudes, each yawed
+   to face the colony (nose toward origin). Picked at random on join/deploy. */
 const SPAWN_POINTS = [];
 {
-  SPAWN_POINTS.push({ x: 0, y: 60, z: 160, yaw: 0 });
-  for (let i = 1; i < MAX_PILOTS; i++) {
-    const phi = i * (Math.PI * 2 / MAX_PILOTS);
-    SPAWN_POINTS.push({ x: 160 * Math.sin(phi), y: 50, z: 160 * Math.cos(phi), yaw: phi });
+  for (let i = 0; i < 8; i++) {
+    const phi = (i / 8) * Math.PI * 2 + 0.4;   // 45° apart, offset from the axes
+    const r = 150 + (i % 2) * 40;             // alternate 150 / 190 radius
+    const x = r * Math.sin(phi), z = r * Math.cos(phi);
+    const y = [70, 45, 95, 55, 85, 40, 110, 65][i];  // varied sky heights
+    SPAWN_POINTS.push({ x, y, z, yaw: Math.atan2(x, z) });
   }
+}
+function randomSpawn(excludeIdx = -1) {
+  let idx;
+  do { idx = Math.floor(Math.random() * SPAWN_POINTS.length); }
+  while (SPAWN_POINTS.length > 1 && idx === excludeIdx);  // avoid respawning on the same pad
+  return SPAWN_POINTS[idx];
 }
 let mpReady = false;
 let myId = null;
 let wasHost = false;
 let callsign = 'RAIDER';
+let lastSpawnIdx = -1;
 const peerOrder = [];          // remote peer ids, join order
 const peers = new Map();       // id -> { player }
 const tracked = new Map();     // id -> player (onQuit wired)
@@ -982,7 +993,7 @@ function ensurePeerShip(id, idx) {
   }
   const group = createShip(tintFor(id));
   group.add(buildLabel('', tintHex(id)));
-  const sp = SPAWN_POINTS[(idx % (SPAWN_POINTS.length - 1)) + 1] || SPAWN_POINTS[1];
+  const sp = SPAWN_POINTS[idx % SPAWN_POINTS.length];   // until their first pose arrives
   group.position.set(sp.x, sp.y, sp.z);
   group.rotation.set(0, sp.yaw, 0, 'YXZ');
   scene.add(group);
@@ -1106,19 +1117,16 @@ function updateRemoteShips(dt) {
   }
 }
 
-function spawnFor(id) {
-  const idx = id === myId ? 0 : peerOrder.indexOf(id);
-  return SPAWN_POINTS[(idx < 0 ? 0 : idx) % SPAWN_POINTS.length];
-}
 function redeploy() {
-  const sp = spawnFor(myId);
+  const sp = randomSpawn(lastSpawnIdx);   // random pad, not the one we just died on
+  lastSpawnIdx = SPAWN_POINTS.indexOf(sp);
   ship.position.set(sp.x, sp.y, sp.z);
   shipVel.set(0, 0, 0);
   yaw = sp.yaw; pitch = 0; roll = 0;
   ship.rotation.set(0, 0, 0, 'YXZ');
   hp = 100; booster = 100;
   ship.visible = true;
-  camera.position.set(sp.x, sp.y + 3, sp.z + 11);
+  camera.position.set(sp.x + Math.sin(sp.yaw) * 11, sp.y + 3, sp.z + Math.cos(sp.yaw) * 11);
   camera.lookAt(ship.position);
   state = 'playing';
   els.gameover.classList.add('hidden');
@@ -1699,10 +1707,13 @@ function startGame() {
   state = 'playing';
   els.menu.classList.add('hidden');
   els.crosshair.classList.remove('hidden');
-  yaw = 0; pitch = 0; roll = 0;
+  const sp = randomSpawn();   // random sky spawn on first launch
+  lastSpawnIdx = SPAWN_POINTS.indexOf(sp);
+  ship.position.set(sp.x, sp.y, sp.z);
   shipVel.set(0, 0, 0);
+  yaw = sp.yaw; pitch = 0; roll = 0;
   ship.rotation.set(0, 0, 0, 'YXZ');
-  camera.position.set(ship.position.x, ship.position.y + 3, ship.position.z + 11);
+  camera.position.set(sp.x + Math.sin(sp.yaw) * 11, sp.y + 3, sp.z + Math.cos(sp.yaw) * 11);
   camera.lookAt(ship.position);
   lockPointer();
   msg('Burn the colony. Wake the fleet. Survive.', '#ffd9b0', 4);
