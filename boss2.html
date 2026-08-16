@@ -50,17 +50,20 @@
   .startbtn{margin-top:8px;font-size:15px;font-weight:700;letter-spacing:.22em;color:#1a0c06;background:linear-gradient(180deg,#ffc38a,#ff8f4d);padding:12px 26px;border-radius:10px;display:inline-block;animation:pulse 1.6s ease-in-out infinite;cursor:pointer}
   @keyframes pulse{50%{box-shadow:0 0 26px rgba(255,150,70,.65)}}
   .hidden{display:none!important}
-  /* off-screen target indicator: brackets when the scorpion is in view, an edge arrow
-     sliding round the border pointing at him when he isn't */
-  #bossMark{position:absolute;transform:translate(-50%,-50%);pointer-events:none;
-    border:2px solid rgba(255,90,50,.9);border-radius:4px;box-shadow:0 0 12px rgba(255,90,50,.35), inset 0 0 12px rgba(255,90,50,.12)}
-  #bossMark::after{content:'';position:absolute;inset:-7px;border:1px solid rgba(255,90,50,.28);border-radius:7px}
-  #bossEdge{position:absolute;pointer-events:none;width:0;height:0}
-  #bossEdge i{display:block;position:absolute;left:0;top:0;transform:translate(-50%,-50%);
-    width:0;height:0;border-left:13px solid transparent;border-right:13px solid transparent;
-    border-bottom:23px solid rgba(255,70,45,.95);filter:drop-shadow(0 0 7px rgba(255,90,50,.8));
-    animation:threatPulse 1.1s ease-in-out infinite}
-  @keyframes threatPulse{50%{opacity:.5}}
+  /* Off-screen target indicator. In view: a diamond reticle locked on him. Out of view:
+     edge lines — a bar on each border whose direction component is live, sliding along
+     that border to show the exact bearing and converging on a corner for diagonals.
+     Bar length encodes proximity: short = far, long = close. */
+  #bossMark{position:absolute;transform:translate(-50%,-50%) rotate(45deg);pointer-events:none;
+    border:2px solid rgba(255,90,50,.9);box-shadow:0 0 12px rgba(255,90,50,.3), inset 0 0 12px rgba(255,90,50,.1)}
+  #bossMark::after{content:'';position:absolute;inset:-7px;border:1px solid rgba(255,90,50,.25)}
+  #bossEdge{position:absolute;inset:0;pointer-events:none}
+  #bossEdge b{display:block;position:absolute;background:rgba(255,70,45,.95);border-radius:2px;
+    box-shadow:0 0 12px rgba(255,90,50,.8);opacity:0;animation:threatPulse 1.2s ease-in-out infinite}
+  #bossEdge b.on{opacity:1}
+  #bossEdge b.v{width:6px}
+  #bossEdge b.h{height:6px}
+  @keyframes threatPulse{50%{opacity:.55}}
   #finalStats{margin:18px 0;font-size:15px;line-height:1.9;color:#f2d9c4}
 </style>
 </head>
@@ -83,7 +86,7 @@
   </div>
   <div id="messages"></div>
   <div id="bossMark" class="hidden"></div>
-  <div id="bossEdge" class="hidden"><i></i></div>
+  <div id="bossEdge" class="hidden"><b class="v" id="eiL"></b><b class="v" id="eiR"></b><b class="h" id="eiT"></b><b class="h" id="eiB"></b></div>
   <div id="hint">WASD fly · Q/E up/down · Shift afterburner · hold click to fire · <b>G = wake the scorpion</b> · Esc releases mouse</div>
 </div>
 <div id="crosshair" class="hidden"></div>
@@ -641,7 +644,7 @@ function destroyTail(){
   tip.visible=false;
   // tail segments droop
   for(let i=2;i<bossTail.length;i++){bossTail[i].rotation.x+=0.6;}
-  msg('TAIL GUN DESTROYED — AIM FOR THE HEAD!', '#ffd24d', 4); Sfx.alert();
+  msg('TAIL GUN DESTROYED', '#ffd24d', 3); Sfx.alert();   // what you did, never what to hit next
   score+=400;
   bossHitShake=1.2;
   triggerRage(1.9);
@@ -661,12 +664,14 @@ function killBoss(){
 function checkPhaseTransition(){
   if(bossPhase==='claws' && bossHP.clawL<=0 && bossHP.clawR<=0){
     bossPhase='tail';
-    msg('CLAWS DESTROYED — TARGET THE TAIL GUN!', '#ffd24d', 4); Sfx.alert();
+    /* No "target the X" prompts — working out the order is the puzzle, and the glow and
+       animation on each part are the intended clues. The phase change still gets a sting. */
+    Sfx.alert();
     // make tail glow vulnerable
     const tip=bossTail[bossTail.length-1]; tip.userData.gunMat.emissive.set(0xff3300); tip.userData.gunMat.emissiveIntensity=0.5;
   } else if(bossPhase==='tail' && bossHP.tail<=0){
     bossPhase='head';
-    msg('TAIL GUN DESTROYED — AIM FOR THE HEAD!', '#ff6a2a', 4); Sfx.alert();
+    Sfx.alert();
     bossHead.material.emissive.set(0xff3300); bossHead.material.emissiveIntensity=0.3;
   }
 }
@@ -1000,7 +1005,7 @@ function updateBoss(dt,t){
     if(bossState==='active' && bossAttackCd<=0){
       bossState='charging'; bossChargeT=0.9; bossAttackCd=3.5+rand(-0.8,0.8);
       Sfx.charge();
-      msg('⚡ SCORPION CHARGING LASER!', '#ff3b2f', 1.5);
+      // the tail glowing and the charge whine already telegraph this — no caption needed
       // telegraph: tail tip glows
       const tip=bossTail[bossTail.length-1];
       tip.userData.gunGlow.material.opacity=0.9; tip.userData.gunGlow.material.color.set(0xff3b2f);
@@ -1101,24 +1106,42 @@ function updateBossMarker(){
   let nx=_mv.x, ny=_mv.y;
   if(behind){nx=-nx; ny=-ny;}
   const W=innerWidth, H=innerHeight;
+  const dist=camera.position.distanceTo(bossGroup.position);
   if(!behind && Math.abs(nx)<=1 && Math.abs(ny)<=1){
     setHidden(els.bossEdge,true); setHidden(els.bossMark,false);
-    const dist=camera.position.distanceTo(bossGroup.position);
-    const size=clamp(2600/Math.max(dist,1),44,300);
+    const size=clamp(1900/Math.max(dist,1),34,210);   // diamond is a square turned 45°
     els.bossMark.style.left=((nx*0.5+0.5)*W)+'px';
     els.bossMark.style.top=((-ny*0.5+0.5)*H)+'px';
-    els.bossMark.style.width=size+'px'; els.bossMark.style.height=(size*0.72)+'px';
+    els.bossMark.style.width=size+'px'; els.bossMark.style.height=size+'px';
   } else {
     setHidden(els.bossMark,true); setHidden(els.bossEdge,false);
-    let dx=nx, dy=-ny; const len=Math.hypot(dx,dy)||1; dx/=len; dy/=len;
-    const pad=38, hw=W/2-pad, hh=H/2-pad;
+    let dx=nx, dy=-ny; const m=Math.hypot(dx,dy)||1; dx/=m; dy/=m;   // screen-space bearing, y down
+    const pad=8, hw=W/2-pad, hh=H/2-pad;
+    /* where the bearing ray leaves the screen. Clamping that exit point per axis gives each
+       border its own slide position, so a diagonal drives two bars that meet at the corner
+       while a pure left/right bearing drives one bar centred on that edge. */
     const t=Math.min(hw/Math.max(Math.abs(dx),1e-6), hh/Math.max(Math.abs(dy),1e-6));
-    els.bossEdge.style.left=(W/2+dx*t)+'px';
-    els.bossEdge.style.top=(H/2+dy*t)+'px';
-    els.bossEdge.querySelector('i').style.transform=
-      `translate(-50%,-50%) rotate(${Math.atan2(dx,-dy)}rad)`;
+    const ex=clamp(W/2+dx*t, pad, W-pad), ey=clamp(H/2+dy*t, pad, H-pad);
+    /* length by proximity: full-length up close, shrinking to a stub out at long range.
+       An inverse-distance curve bottoms out almost immediately at this game's ranges. */
+    const near=Math.min(W,H)*0.5, far=44;
+    const len=lerp(near, far, clamp((dist-60)/380, 0, 1));
+    const EPS=0.06, TH=6;
+    /* Clamp each bar's span to the border it lives on so it stops AT the corner instead of
+       running past it — two bars meeting then read as one 90° corner rather than crossing
+       in an X. */
+    const put=(el,on,css)=>{el.classList.toggle('on',on); if(on)Object.assign(el.style,css);};
+    const vSpan=()=>{const a=clamp(ey-len/2,pad,H-pad), b=clamp(ey+len/2,pad,H-pad);
+                     return {top:a+'px', height:Math.max(TH,b-a)+'px'};};
+    const hSpan=()=>{const a=clamp(ex-len/2,pad,W-pad), b=clamp(ex+len/2,pad,W-pad);
+                     return {left:a+'px', width:Math.max(TH,b-a)+'px'};};
+    put(eiR, dx>EPS,  Object.assign({left:(W-pad-TH)+'px'}, vSpan()));
+    put(eiL, dx<-EPS, Object.assign({left:pad+'px'},        vSpan()));
+    put(eiB, dy>EPS,  Object.assign({top:(H-pad-TH)+'px'},  hSpan()));
+    put(eiT, dy<-EPS, Object.assign({top:pad+'px'},         hSpan()));
   }
 }
+const eiL=$('eiL'), eiR=$('eiR'), eiT=$('eiT'), eiB=$('eiB');
 
 /* input */
 const keys=new Set(); const mouseNDC=new THREE.Vector2(0,0); const aimRay=new THREE.Raycaster();
@@ -1318,6 +1341,14 @@ window.dbg={
             crosshairOnBoss:!!(hits.length&&hits[0].distance>6),
             range:hits.length?+hits[0].distance.toFixed(1):null};},
   boost:()=>({booster:+booster.toFixed(1), on:boosterOn, lock:boosterLock}),
+  marker:()=>{const v=bossGroup.position.clone(); v.y+=10;
+    v.applyMatrix4(camera.matrixWorldInverse); const behind=v.z>0;
+    v.applyMatrix4(camera.projectionMatrix);
+    let nx=v.x, ny=v.y; if(behind){nx=-nx; ny=-ny;}
+    let dx=nx, dy=-ny; const m=Math.hypot(dx,dy)||1;
+    return {behind, ndc:[+nx.toFixed(2),+ny.toFixed(2)], bearing:[+(dx/m).toFixed(2),+(dy/m).toFixed(2)],
+            dist:+camera.position.distanceTo(bossGroup.position).toFixed(0),
+            bars:['eiL','eiR','eiT','eiB'].filter(id=>document.getElementById(id).classList.contains('on')).map(s=>s.slice(2))};},
   /* audio(): confirms the 3D path — listener glued to the camera, and what a panner placed
      at the boss would report for bearing/range. */
   audio:()=>{const c=Sfx.ctx; if(!c) return {ctx:false};

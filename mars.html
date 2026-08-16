@@ -55,6 +55,26 @@
     display:inline-block; animation:pulse 1.6s ease-in-out infinite; cursor:pointer; }
   @keyframes pulse { 50% { box-shadow:0 0 26px rgba(255,150,70,.65); } }
   .hidden { display:none !important; }
+  /* Off-screen target indicator. In view: a diamond reticle locked on him. Out of view:
+     edge lines — a bar on each border whose direction component is live, sliding along
+     that border to show the exact bearing and converging on a corner for diagonals.
+     Bar length encodes proximity: short = far, long = close. */
+  #bossMark{position:absolute;transform:translate(-50%,-50%) rotate(45deg);pointer-events:none;
+    border:2px solid rgba(255,90,50,.9);box-shadow:0 0 12px rgba(255,90,50,.3), inset 0 0 12px rgba(255,90,50,.1)}
+  #bossMark::after{content:'';position:absolute;inset:-7px;border:1px solid rgba(255,90,50,.25)}
+  #bossEdge{position:absolute;inset:0;pointer-events:none}
+  #bossEdge b{display:block;position:absolute;background:rgba(255,70,45,.95);border-radius:2px;
+    box-shadow:0 0 12px rgba(255,90,50,.8);opacity:0;animation:threatPulse 1.2s ease-in-out infinite}
+  #bossEdge b.on{opacity:1}
+  #bossEdge b.v{width:6px}
+  #bossEdge b.h{height:6px}
+  @keyframes threatPulse{50%{opacity:.55}}
+  #bossPanel { position:absolute; top:64px; left:50%; transform:translateX(-50%); min-width:420px;
+    text-align:center; padding:8px 16px; }
+  #bossName { font-size:11px; letter-spacing:.28em; color:#ff9a5e; text-transform:uppercase }
+  #bossBar { height:12px; border-radius:6px; background:rgba(255,255,255,.12); overflow:hidden; margin-top:6px }
+  #bossFill { height:100%; width:100%; background:linear-gradient(90deg,#ff3b2f,#ff9c2e); transition:width .15s }
+  #bossHpText { font-size:11px; color:#ffd9b0; margin-top:3px; letter-spacing:.08em }
   #finalStats { margin:18px 0; font-size:15px; line-height:1.9; color:#f2d9c4; }
   #scoreboard { top:14px; left:50%; transform:translateX(-50%); min-width:230px; }
   .sbrow { display:flex; align-items:center; gap:8px; padding:2px 0; font-size:13px; }
@@ -63,6 +83,8 @@
   .sbscore { font-weight:700; font-variant-numeric:tabular-nums; }
   .sbhost { font-size:9px; letter-spacing:.12em; color:#7fd4ff; flex:none; }
   .sbhost:empty { display:none; }
+  .sbwp { font-size:9px; flex:none; }
+  .sbwp:empty { display:none; }
   .sbdot.me { box-shadow:0 0 8px 1px rgba(255,255,255,.8); }
   .dead { opacity:.45; text-decoration:line-through; }
   #roomPanel { top:auto; bottom:14px; right:14px; min-width:210px; }
@@ -91,6 +113,7 @@
     <div class="row"><span class="label">Booster</span><div class="bar"><div class="fill" id="boosterFill"></div></div><span id="boosterText" class="muted">100</span></div>
     <div class="row"><span class="label">Colony</span><span class="muted" id="colonyEl">11 / 11 intact</span></div>
     <div class="row"><span class="label">Kills</span><span class="muted" id="killsEl">0 saucers · 0 buildings</span></div>
+    <div class="row"><span class="label">Weapon</span><span class="muted" id="weaponEl">CANNON</span></div>
   </div>
   <div class="panel" id="scoreboard"><div id="sbRows" style="display:flex;flex-direction:column;gap:1px"></div></div>
   <div class="panel" id="alertPanel">
@@ -103,6 +126,13 @@
     <div class="row"><span class="label">Pilots</span><span id="pilotsCount" class="muted">1</span></div>
     <div class="row" style="display:flex;flex-wrap:wrap;justify-content:flex-end" id="roomBtns"></div>
   </div>
+  <div class="panel hidden" id="bossPanel">
+    <div id="bossName">▲ MECHA-SCORPION — ARES-7 ANCIENT</div>
+    <div id="bossBar"><div id="bossFill"></div></div>
+    <div id="bossHpText"></div>
+  </div>
+  <div id="bossMark" class="hidden"></div>
+  <div id="bossEdge" class="hidden"><b class="v" id="eiL"></b><b class="v" id="eiR"></b><b class="h" id="eiT"></b><b class="h" id="eiB"></b></div>
   <div id="messages"></div>
   <div id="hint">WASD fly · Q/E up/down · Shift = afterburner · hold click to fire · Esc releases mouse (click to re-lock) · Backspace = debug</div>
 </div>
@@ -113,7 +143,8 @@
     <div class="title">MARS RAID</div>
     <div class="sub">Ares-7 Colony · Sol 2187</div>
     <p>You are a lone raider ship above a quiet Mars colony. Burn their buildings to the ground — but every shot
-    you fire wakes the alien fleet. They will hunt you. Shoot them down, and <b>more will come for retribution</b>.</p>
+    you fire wakes the alien fleet. They will hunt you. Shoot them down, and <b>more will come for retribution</b>.
+    Raze the <b>entire</b> colony and it drops a <b>⚡ TWIN LASER</b> — first ship there keeps it.</p>
     <div class="controls">
       <div><b>Mouse</b> — aim</div>
       <div><b>W / S</b> — thrust / brake</div>
@@ -191,9 +222,10 @@ window.__errors = [];
 window.addEventListener('error', e => window.__errors.push(e.message));
 
 const els = {
+  bossMark: $('bossMark'), bossEdge: $('bossEdge'), bossPanel: $('bossPanel'), bossFill: $('bossFill'), bossHpText: $('bossHpText'),
   score: $('scoreEl'), hpFill: $('hpFill'), hpText: $('hpText'),
   boosterFill: $('boosterFill'), boosterText: $('boosterText'), colony: $('colonyEl'),
-  kills: $('killsEl'), alertText: $('alertText'), alertFill: $('alertFill'),
+  kills: $('killsEl'), weapon: $('weaponEl'), alertText: $('alertText'), alertFill: $('alertFill'),
   alienCount: $('alienCount'), messages: $('messages'), crosshair: $('crosshair'),
   dmg: $('dmg'), lowhp: $('lowhp'), menu: $('menu'),
   gameover: $('gameover'), finalStats: $('finalStats'),
@@ -216,7 +248,7 @@ const Sfx = {
   /* every sound funnels through blip()/noise() — stay silent unless this tab
      has focus, so only the window being played actually emits audio */
   live() { return !!(this.ctx && document.hasFocus()); },
-  blip(f0, f1, dur, type = 'square', vol = 0.12) {
+  blip(f0, f1, dur, type = 'square', vol = 0.12, dest = null) {
     if (!this.live()) return;
     try {
       const t = this.ctx.currentTime;
@@ -226,11 +258,11 @@ const Sfx = {
       o.frequency.exponentialRampToValueAtTime(Math.max(1, f1), t + dur);
       g.gain.setValueAtTime(vol, t);
       g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-      o.connect(g).connect(this.ctx.destination);
+      o.connect(g).connect(dest || this.ctx.destination);
       o.start(t); o.stop(t + dur + 0.02);
     } catch (e) {}
   },
-  noise(dur, freq, vol = 0.3) {
+  noise(dur, freq, vol = 0.3, dest = null) {
     if (!this.live()) return;
     try {
       const t = this.ctx.currentTime;
@@ -245,15 +277,112 @@ const Sfx = {
       const g = this.ctx.createGain();
       g.gain.setValueAtTime(vol, t);
       g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-      src.connect(f).connect(g).connect(this.ctx.destination);
+      src.connect(f).connect(g).connect(dest || this.ctx.destination);
       src.start(t);
     } catch (e) {}
   },
   laser()      { this.blip(950, 180, 0.13, 'square', 0.10); },
+  rail()       { this.blip(1700, 220, 0.10, 'sawtooth', 0.10); },
   alienLaser() { this.blip(240, 980, 0.16, 'sawtooth', 0.09); },
   explosion(b = 1) { this.noise(0.5 * b + 0.2, 700 * b + 200, 0.35); this.blip(90, 35, 0.5, 'sine', 0.25 * b); },
   hit()        { this.noise(0.08, 2500, 0.12); },
-  alert()      { this.blip(660, 660, 0.12, 'square', 0.08); setTimeout(() => this.blip(880, 880, 0.12, 'square', 0.08), 140); }
+  alert()      { this.blip(660, 660, 0.12, 'square', 0.08); setTimeout(() => this.blip(880, 880, 0.12, 'square', 0.08), 140); },
+ /* ---- 3D audio ----
+    listener rides the camera; panner() places a source at a world point so it is heard
+    from that bearing and falls off with range. Sounds routed through a panner must NOT
+    also connect to ctx.destination or the dry copy drowns the spatialised one. */
+ listener(cam){if(!this.ctx)return; try{
+   const L=this.ctx.listener,t=this.ctx.currentTime;
+   const p=cam.position;
+   _sfxF.set(0,0,-1).applyQuaternion(cam.quaternion);
+   _sfxU.set(0,1,0).applyQuaternion(cam.quaternion);
+   if(L.positionX){
+     L.positionX.setTargetAtTime(p.x,t,0.02); L.positionY.setTargetAtTime(p.y,t,0.02); L.positionZ.setTargetAtTime(p.z,t,0.02);
+     L.forwardX.setTargetAtTime(_sfxF.x,t,0.02); L.forwardY.setTargetAtTime(_sfxF.y,t,0.02); L.forwardZ.setTargetAtTime(_sfxF.z,t,0.02);
+     L.upX.setTargetAtTime(_sfxU.x,t,0.02); L.upY.setTargetAtTime(_sfxU.y,t,0.02); L.upZ.setTargetAtTime(_sfxU.z,t,0.02);
+   } else { L.setPosition(p.x,p.y,p.z); L.setOrientation(_sfxF.x,_sfxF.y,_sfxF.z,_sfxU.x,_sfxU.y,_sfxU.z); }
+ }catch{}},
+ panner(pos){if(!this.ctx)return null; try{
+   const p=this.ctx.createPanner();
+   p.panningModel='HRTF'; p.distanceModel='inverse';
+   p.refDistance=45; p.maxDistance=1400; p.rolloffFactor=1.1;
+   if(p.positionX){p.positionX.value=pos.x; p.positionY.value=pos.y; p.positionZ.value=pos.z;}
+   else p.setPosition(pos.x,pos.y,pos.z);
+   p.connect(this.ctx.destination); return p;
+ }catch{ return null; }},
+ /* roar: two detuned voices sweeping down through a closing lowpass, wobbled by a fast LFO
+    for a growl, with a breath of noise over the top. Layered rather than a single blip so
+    it carries as a monster and not a beep. */
+ roar(pos=null){if(!this.live())return; try{
+   const c=this.ctx,t=c.currentTime;
+   const out=pos?this.panner(pos):null;   // heard from his bearing, quieter with range
+   const g=c.createGain();
+   g.gain.setValueAtTime(0.0001,t);
+   g.gain.exponentialRampToValueAtTime(0.5,t+0.12);
+   g.gain.exponentialRampToValueAtTime(0.3,t+0.7);
+   g.gain.exponentialRampToValueAtTime(0.0001,t+1.5);
+   const lp=c.createBiquadFilter(); lp.type='lowpass'; lp.Q.value=4;
+   lp.frequency.setValueAtTime(1400,t); lp.frequency.exponentialRampToValueAtTime(250,t+1.4);
+   const o1=c.createOscillator(); o1.type='sawtooth';
+   o1.frequency.setValueAtTime(150,t); o1.frequency.exponentialRampToValueAtTime(46,t+1.3);
+   const o2=c.createOscillator(); o2.type='square';
+   o2.frequency.setValueAtTime(74,t); o2.frequency.exponentialRampToValueAtTime(30,t+1.3);
+   const lfo=c.createOscillator(); lfo.type='sine'; lfo.frequency.value=23;   // growl
+   const lfoG=c.createGain(); lfoG.gain.value=14; lfo.connect(lfoG); lfoG.connect(o1.frequency);
+   o1.connect(lp); o2.connect(lp); lp.connect(g); g.connect(out||c.destination);
+   o1.start(t); o2.start(t); lfo.start(t);
+   o1.stop(t+1.6); o2.stop(t+1.6); lfo.stop(t+1.6);
+   this.noise(1.1,900,0.3,out);   // breath layer through the same panner
+ }catch{}}, charge(){this.blip(300,900,0.7,'sine',0.12)}, bossHit(){this.blip(180,90,0.15,'square',0.15); this.noise(0.12,1800,0.15)},
+ /* sustained subsonic rumble for the emergence — a detuned pair under looping filtered
+    noise, with a slow LFO so it churns rather than drones. Level is driven by how close
+    the player is, so it swells as you fly toward the thing clawing its way out. */
+ _rum:null,
+ rumbleStart(){if(!this.live()||this._rum)return; try{
+   const c=this.ctx,t=c.currentTime;
+   const o1=c.createOscillator(); o1.type='sawtooth'; o1.frequency.value=34;
+   const o2=c.createOscillator(); o2.type='square';   o2.frequency.value=25.5;
+   const lfo=c.createOscillator(); lfo.type='sine'; lfo.frequency.value=4.2;
+   const lfoG=c.createGain(); lfoG.gain.value=7; lfo.connect(lfoG); lfoG.connect(o1.frequency);
+   const n=Math.floor(c.sampleRate*2), buf=c.createBuffer(1,n,c.sampleRate), d=buf.getChannelData(0);
+   for(let i=0;i<n;i++)d[i]=Math.random()*2-1;
+   const nz=c.createBufferSource(); nz.buffer=buf; nz.loop=true;
+   const nzG=c.createGain(); nzG.gain.value=0.5;
+   const lp=c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=170; lp.Q.value=6;
+   const g=c.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(0.16,t+0.5);
+   o1.connect(lp); o2.connect(lp); nz.connect(nzG); nzG.connect(lp); lp.connect(g); g.connect(c.destination);
+   o1.start(t); o2.start(t); lfo.start(t); nz.start(t);
+   this._rum={o1,o2,lfo,nz,g};
+ }catch{}},
+ /* sustained subsonic rumble for the emergence — a detuned pair under looping filtered
+    noise, with a slow LFO so it churns rather than drones. Level is driven by how close
+    the player is, so it swells as you fly toward the thing clawing its way out. */
+ _rum:null,
+ rumbleStart(){if(!this.live()||this._rum)return; try{
+   const c=this.ctx,t=c.currentTime;
+   const o1=c.createOscillator(); o1.type='sawtooth'; o1.frequency.value=34;
+   const o2=c.createOscillator(); o2.type='square';   o2.frequency.value=25.5;
+   const lfo=c.createOscillator(); lfo.type='sine'; lfo.frequency.value=4.2;
+   const lfoG=c.createGain(); lfoG.gain.value=7; lfo.connect(lfoG); lfoG.connect(o1.frequency);
+   const n=Math.floor(c.sampleRate*2), buf=c.createBuffer(1,n,c.sampleRate), d=buf.getChannelData(0);
+   for(let i=0;i<n;i++)d[i]=Math.random()*2-1;
+   const nz=c.createBufferSource(); nz.buffer=buf; nz.loop=true;
+   const nzG=c.createGain(); nzG.gain.value=0.5;
+   const lp=c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=170; lp.Q.value=6;
+   const g=c.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(0.16,t+0.5);
+   o1.connect(lp); o2.connect(lp); nz.connect(nzG); nzG.connect(lp); lp.connect(g); g.connect(c.destination);
+   o1.start(t); o2.start(t); lfo.start(t); nz.start(t);
+   this._rum={o1,o2,lfo,nz,g};
+ }catch{}},
+ rumbleLevel(v){const r=this._rum; if(!r||!this.ctx)return; try{
+   r.g.gain.setTargetAtTime(clamp(v,0,1)*0.30+0.05, this.ctx.currentTime, 0.15);}catch{}},
+ rumbleStop(){const r=this._rum; if(!r)return; this._rum=null; try{
+   const t=this.ctx.currentTime;
+   r.g.gain.cancelScheduledValues(t); r.g.gain.setValueAtTime(r.g.gain.value,t);
+   r.g.gain.linearRampToValueAtTime(0.0001,t+0.45);
+   setTimeout(()=>{try{r.o1.stop();r.o2.stop();r.lfo.stop();r.nz.stop();}catch{}},650);
+ }catch{}}
+
 };
 
 /* ================= renderer / scene ================= */
@@ -324,6 +453,11 @@ function terrainHeight(x, z) {
   const f = clamp((d - 60) / 130, 0, 1);
   return h * f * f * (3 - 2 * f);
 }
+
+/* The colony pad is a raised disc laid on top of the terrain, so terrainHeight() is NOT the
+   surface under the boss inside it. Anything that plants on the ground must use this. */
+const PAD_R = 78, PAD_TOP = 1.0;
+function groundHeight(x, z) { const t = terrainHeight(x, z); return Math.hypot(x, z) <= PAD_R ? Math.max(t, PAD_TOP) : t; }
 {
   const geo = new THREE.PlaneGeometry(1600, 1600, 140, 140);
   geo.rotateX(-Math.PI / 2);
@@ -347,6 +481,228 @@ function terrainHeight(x, z) {
   scene.add(pad);
   freezeStatic(pad);
 }
+
+/* ================= MECHA-SCORPION BOSS ================= */
+let bossGroup, bossRoot, bossBody, bossHead, bossTail=[], bossLegs=[], bossClaws={L:null,R:null}, bossMats=[];
+/* 'dormant' = buried and waiting for the player to wake it with [G]. Everything downstream
+   (emergence camera, rumble, shake) keys off 'emerging', so it all fires on the keypress
+   wherever the player happens to be, instead of at spawn before he has his bearings. */
+let bossState='dormant', bossT=0, bossWalkPhase=0, bossAttackCd=2.5, bossChargeT=0, bossShake=0;
+let bossDeath=null;   // snapshot taken at death: start height, ground, tail pose, list direction
+let bossPrevYaw=0;    // previous frame heading, for the turn rate the gait needs
+/* rage: losing a claw or the tail gun is a big beat, so he rears up and rocks side to side
+   like a sumo stamping in — and can't shoot while he's doing it. */
+let bossRage=0, bossRageDur=1, bossRageT=0;
+function triggerRage(dur=1.5){
+  bossRage=dur; bossRageDur=dur; bossRageT=0;
+  bossAttackCd=Math.max(bossAttackCd, dur+0.5);   // no shooting mid-tantrum
+  Sfx.roar(_roarAt.copy(bossGroup.position).setY(bossGroup.position.y+10));   // 3D, from his head
+}
+let bossPos=new THREE.Vector3(0,0,0), bossYaw=0, bossVel=new THREE.Vector3();
+let bossFlash=0, bossHitShake=0;
+let bossAlive=true;
+let inspectFrozen=false;
+// vulnerable HP
+const bossHP={clawL:90, clawR:90, tail:110, head:130};
+const bossMax={clawL:90, clawR:90, tail:110, head:130};
+let bossPhase='claws'; // claws -> tail -> head -> dead
+let bossEmergingY=-36, bossTargetY=0;
+
+function buildScorpion(){
+  bossGroup=new THREE.Group();
+  bossRoot=new THREE.Group();
+  bossGroup.add(bossRoot);
+  const bodyMat=new THREE.MeshStandardMaterial({color:0x5a3a2a,metalness:0.5,roughness:0.6});
+  const bellyMat=new THREE.MeshStandardMaterial({color:0x3a2214,metalness:0.3,roughness:0.8});
+  const armorMat=new THREE.MeshStandardMaterial({color:0x8a6a4a,metalness:0.7,roughness:0.35});
+  const darkMat=new THREE.MeshStandardMaterial({color:0x2a1a0f,metalness:0.4,roughness:0.7});
+  bossMats.push(bodyMat,bellyMat,armorMat,darkMat);
+  // main body — 2x size, all boxes (mecha)
+  bossBody=new THREE.Mesh(new THREE.BoxGeometry(14,6.4,26), bodyMat); bossBody.position.y=6.4; bossBody.castShadow=true; bossBody.receiveShadow=true;
+  const carapace=new THREE.Mesh(new THREE.BoxGeometry(12,1.6,24), armorMat); carapace.position.y=10.2; carapace.castShadow=true;
+  // rivet detail on carapace
+  for(let i=0;i<4;i++){const plate=new THREE.Mesh(new THREE.BoxGeometry(10.4-i*0.6,0.9,4.4), armorMat); plate.position.set(0,10.8, -8 + i*5.6); plate.castShadow=true; bossRoot.add(plate);}
+  // side armor skirts (boxy)
+  const skirtL=new THREE.Mesh(new THREE.BoxGeometry(1.2,3.2,22), darkMat); skirtL.position.set(-7.6,6.8,0); skirtL.castShadow=true;
+  const skirtR=skirtL.clone(); skirtR.position.x=7.6;
+  bossRoot.add(bossBody,carapace,skirtL,skirtR);
+  // head — boxy, 2x
+  bossHead=new THREE.Mesh(new THREE.BoxGeometry(8.4,4.8,6.4), bodyMat); bossHead.position.set(0,7.2,14.4); bossHead.castShadow=true;
+  /* eyes must sit ON the face (head front is z=3.2) — at z=2.4 with 0.5 depth they were
+     entirely inside the skull and never visible. Emissive alone reads flat at distance,
+     so a short-range point light sells the glow against the surrounding armour. */
+  /* unlit: renders flat red whatever the lighting does — no shading, no shadow, no falloff,
+     so the eyes stay the same red on the dark side of the boss as on the sunlit side */
+  const eyeMat=new THREE.MeshBasicMaterial({color:0xff0000});
+  const eyeL=new THREE.Mesh(new THREE.BoxGeometry(1.7,1.2,0.7), eyeMat); eyeL.position.set(-2.4,1.1,3.1);
+  const eyeR=eyeL.clone(); eyeR.position.x=2.4;
+  const browL=new THREE.Mesh(new THREE.BoxGeometry(2.3,0.5,0.5), darkMat); browL.position.set(-2.4,2.0,3.1);
+  const browR=browL.clone(); browR.position.x=2.4;
+  bossHead.add(eyeL,eyeR,browL,browR);
+  const mandL=new THREE.Mesh(new THREE.BoxGeometry(1.2,1.0,2.8), darkMat); mandL.position.set(-2.4,-1.2,3.2); mandL.rotation.y=0.3;
+  const mandR=mandL.clone(); mandR.position.x=2.4; mandR.rotation.y=-0.3;
+  bossHead.add(mandL,mandR);
+  bossHead.userData.eyeMat=eyeMat;
+  bossRoot.add(bossHead);
+  // claws — thick meaty lobster/crab style, all boxes
+  function makeClaw(side){
+    const g=new THREE.Group();
+    const armMat=new THREE.MeshStandardMaterial({color:0x6b4a2e,metalness:0.5,roughness:0.5});
+    const clawMat=new THREE.MeshStandardMaterial({color:0x9a7a4a,metalness:0.6,roughness:0.4});
+    bossMats.push(armMat,clawMat);
+    // upper arm — thick box
+    const upper=new THREE.Mesh(new THREE.BoxGeometry(3.2,3.2,5.4), armMat); upper.position.set(0,0, -0.6); upper.castShadow=true;
+    const joint=new THREE.Group(); joint.add(upper);
+    // forearm — thick box
+    const fore=new THREE.Mesh(new THREE.BoxGeometry(3.0,3.0,4.6), armMat); fore.position.set(0,0, 1.4); fore.castShadow=true;
+    const foreG=new THREE.Group(); foreG.position.set(0,0,2.8); foreG.add(fore);
+    // pincer — meaty crab claw: wide base + two thick fingers
+    const base=new THREE.Mesh(new THREE.BoxGeometry(6.2,3.9,6.4), clawMat); base.position.set(0,0,3.8); base.castShadow=true;
+    // fixed finger (lower)
+    const f1=new THREE.Mesh(new THREE.BoxGeometry(1.8,1.6,6.2), darkMat); f1.position.set(-1.5,0.2,5.2); f1.castShadow=true;
+    // movable finger (upper) — slightly angled
+    const f2=new THREE.Mesh(new THREE.BoxGeometry(1.8,1.6,6.2), darkMat); f2.position.set(1.5,0.2,5.2); f2.castShadow=true;
+    f1.rotation.y=-0.20; f2.rotation.y=0.20;   // pincer gapes open
+    // claw tip highlight
+    const tip1=new THREE.Mesh(new THREE.BoxGeometry(0.9,0.9,1.4), new THREE.MeshStandardMaterial({color:0x1a0f08})); tip1.position.set(0,0,3.2); f1.add(tip1);
+    const tip2=tip1.clone(); f2.add(tip2);
+    base.add(f1,f2);
+    foreG.add(base);
+    joint.add(foreG);
+    g.add(joint);
+    g.userData={armMat,clawMat,upper,fore,base,f1,f2,joint,foreG,side};
+    return g;
+  }
+  const clawL=makeClaw('L'), clawR=makeClaw('R');
+  /* yaw is negative on the left / positive on the right so the pincers open outward —
+     the other way round they cross over each other in front of the head */
+  clawL.position.set(-9.2,7.4,10.5); clawL.rotation.set(-0.42,-0.40,0.16); clawL.scale.setScalar(1.15);
+  clawR.position.set(9.2,7.4,10.5); clawR.rotation.set(-0.42,0.40,-0.16); clawR.scale.setScalar(1.15);
+  bossClaws.L=clawL; bossClaws.R=clawR;
+  bossRoot.add(clawL,clawR);
+  // legs — 8 legs, 3 box segments each, Y-down (vertical), functional
+  const legMat=new THREE.MeshStandardMaterial({color:0x4a3320,metalness:0.4,roughness:0.7});
+  const jointMat=new THREE.MeshStandardMaterial({color:0x6b4a2e,metalness:0.6,roughness:0.5});
+  bossMats.push(legMat,jointMat);
+  const legOffsets=[[-7.2,3.8,7.5],[-8.0,3.8,1.0],[-8.0,3.8,-5.5],[-6.8,3.8,-11.0],[7.2,3.8,7.5],[8.0,3.8,1.0],[8.0,3.8,-5.5],[6.8,3.8,-11.0]];
+  const SEG1=6.5, SEG2=7.0, SEG3=4.2;
+  for(let i=0;i<8;i++){
+    const lg=new THREE.Group(); lg.position.set(legOffsets[i][0],legOffsets[i][1],legOffsets[i][2]);
+    const hipBox=new THREE.Mesh(new THREE.BoxGeometry(1.4,1.4,1.4), jointMat); hipBox.castShadow=true; lg.add(hipBox);
+    const thigh=new THREE.Mesh(new THREE.BoxGeometry(1.6,SEG1,1.6), legMat); thigh.position.set(0,-SEG1/2,0); thigh.castShadow=true;
+    const thighG=new THREE.Group(); thighG.add(thigh);
+    const kneeBox=new THREE.Mesh(new THREE.BoxGeometry(1.3,1.3,1.3), jointMat); kneeBox.position.set(0,-SEG1,0); kneeBox.castShadow=true; thighG.add(kneeBox);
+    const shin=new THREE.Mesh(new THREE.BoxGeometry(1.4,SEG2,1.4), legMat); shin.position.set(0,-SEG2/2,0); shin.castShadow=true;
+    const shinG=new THREE.Group(); shinG.position.set(0,-SEG1,0); shinG.add(shin);
+    const ankleBox=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.1,1.1), jointMat); ankleBox.position.set(0,-SEG2,0); ankleBox.castShadow=true; shinG.add(ankleBox);
+    /* ZYX so the pad can be levelled (z) AND aimed (y) independently — with the default
+       XYZ order the yaw would be applied before the roll and skew the pad off the ground */
+    const foot=new THREE.Mesh(new THREE.BoxGeometry(FOOT_W,FOOT_H,FOOT_L), legMat); foot.position.set(0,-SEG2-FOOT_H/2,0); foot.rotation.order='ZYX'; foot.castShadow=true;
+    const footTip=new THREE.Mesh(new THREE.BoxGeometry(1.4,0.6,1.4), new THREE.MeshStandardMaterial({color:0x1a0f08})); footTip.position.set(0,-0.15,FOOT_L/2+0.3); foot.add(footTip);
+    shinG.add(foot);
+    thighG.add(shinG);
+    lg.add(thighG);
+    const sideStr=i<4?'L':'R';
+    const gaitGroup=([0,5,2,7].includes(i)?0:1);
+    const homeOffset=new THREE.Vector3(lg.position.x + (sideStr==='L'?-1:1)*4.2, 0, lg.position.z + (1.5-(i%4))*2.6);
+    const plantPos=new THREE.Vector3(homeOffset.x, groundHeight(homeOffset.x,homeOffset.z)+REST_FOOT_Y, homeOffset.z);
+    lg.userData={thighG,shinG,foot,hipBox,kneeBox,ankleBox,side:sideStr,idx:i,basePos:new THREE.Vector3().copy(lg.position),seg1:SEG1,seg2:SEG2,seg3:SEG3,phaseOffset:(i%2===0?0:Math.PI)+(i<4?0:0.35),gaitGroup,homeOffset,plantPosition:plantPos,plantNormal:new THREE.Vector3(0,1,0),isStepping:false,stepT:0,stepStart:plantPos.clone(),stepEnd:plantPos.clone()};
+    bossLegs.push(lg); bossRoot.add(lg);
+  }
+  // tail — 6 boxy segments, Y-up, arching forward over body
+  const tailSegMats=[];
+  const tailSizes=[[4.2,4.2,5.8],[3.8,3.8,5.4],[3.4,3.4,5.0],[2.8,2.8,4.6],[2.2,2.2,4.2],[1.8,1.8,3.8]];
+  for(let i=0;i<6;i++){
+    const [w,h,d]=tailSizes[i];
+    const seg=new THREE.Mesh(new THREE.BoxGeometry(w,d,h), armorMat); seg.position.set(0,d/2,0); seg.castShadow=true;
+    const g=new THREE.Group();
+    /* YXZ so the base segment's yaw swings the whole bend PLANE before the segments pitch
+       within it. Under the default XYZ the yaw is applied to the chain's own +Y axis and
+       does nothing, leaving the tail curling on a fixed plane no matter where the target is. */
+    g.rotation.order='YXZ';
+    g.add(seg);
+    if(i<4){const plate=new THREE.Mesh(new THREE.BoxGeometry(w*1.15, d*0.7, 0.6), darkMat); plate.position.set(0,d/2, h/2+0.3); g.add(plate);}
+    if(i<5){const pistL=new THREE.Mesh(new THREE.BoxGeometry(0.5, d*0.8, 0.5), darkMat); pistL.position.set(-w/2-0.3,d/2,0); g.add(pistL);
+             const pistR=pistL.clone(); pistR.position.x=w/2+0.3; g.add(pistR);}
+    g.userData={seg,idx:i,sz:[w,h,d]};
+    tailSegMats.push(g);
+  }
+  let parent=bossRoot;
+  const tailBasePos=new THREE.Vector3(0,7.6,-13.0);
+  for(let i=0;i<6;i++){
+    const g=tailSegMats[i];
+    if(i===0){g.position.copy(tailBasePos);}
+    else {const prevLen=tailSizes[i-1][2]; g.position.set(0,prevLen,0);}
+    parent.add(g);
+    parent=g;
+    bossTail.push(g);
+  }
+  const tip=bossTail[bossTail.length-1];
+  const gunMat=new THREE.MeshStandardMaterial({color:0x2a2a2a,metalness:0.8,roughness:0.3,emissive:0x331100,emissiveIntensity:0});
+  const gun=new THREE.Mesh(new THREE.BoxGeometry(2.2,4.8,2.2), gunMat); gun.position.set(0,2.4,0); gun.castShadow=true;
+  const barb=new THREE.Mesh(new THREE.ConeGeometry(1.1,2.4,4), new THREE.MeshStandardMaterial({color:0x1a1a1a,metalness:0.7,roughness:0.4})); barb.position.set(0,6.0,0);
+  const gunGlow=new THREE.Mesh(new THREE.BoxGeometry(1.6,1.6,1.6), new THREE.MeshBasicMaterial({color:0xff3b2f,transparent:true,opacity:0})); gunGlow.position.set(0,6.0,0);
+  const gunLight=new THREE.PointLight(0xff3b2f,0,28,1.5); gunLight.position.set(0,6.0,0);
+  tip.add(gun,barb,gunGlow,gunLight);
+  tip.userData.gun=gun; tip.userData.barb=barb; tip.userData.gunMat=gunMat; tip.userData.gunGlow=gunGlow; tip.userData.gunLight=gunLight;
+  bossMats.push(gunMat);
+
+  bossGroup.position.set(0,bossEmergingY,0);
+  scene.add(bossGroup);
+  // sand mound covering boss initially — scaled for 2x boss
+  const sandMound=new THREE.Mesh(new THREE.SphereGeometry(26,24,12,0,Math.PI*2,0,Math.PI/2), new THREE.MeshStandardMaterial({color:0xa34a32,roughness:1}));
+  sandMound.scale.set(1,0.45,1); sandMound.position.y=0.1; sandMound.receiveShadow=true; sandMound.name='sandMound';
+  bossGroup.add(sandMound);
+  poseBossRest();
+}
+const TAIL_REST_X=[0.16,0.30,0.46,0.62,0.72,0.60];
+/* ---- leg IK — planar 2-bone solve inside the leg's own vertical plane.
+   The knee bends OUTWARD and UP the way a real scorpion's does, so each leg reads as a
+   tall inverted V: femur rising out to a knee above the belly line, tibia dropping
+   near-vertical onto a flat pad. Bending it the other way is what made the old rig
+   look like it was crawling on its knees. Target is in bossRoot-local space. ---- */
+/* Foot pad. It has to out-read the 1.4×1.4 shin or it just looks like more leg —
+   the old 1.4×0.6×2.2 pad was invisible in-world even when correctly planted. */
+const FOOT_W=2.4, FOOT_H=0.9, FOOT_L=3.4;
+const LEG_PAD=FOOT_H/2;   // knee→pad-centre offset beyond the tibia
+function solveLeg(leg, tx, ty, tz){
+  const d=leg.userData, hip=d.basePos;
+  const dx=tx-hip.x, dy=ty-hip.y, dz=tz-hip.z;
+  const h=Math.max(0.001, Math.hypot(dx,dz));
+  const L1=d.seg1, L2=d.seg2+LEG_PAD;
+  const r=clamp(Math.hypot(h,dy), Math.abs(L1-L2)+0.8, L1+L2-0.6);
+  const beta=Math.atan2(h, Math.max(0.001,-dy));               // hip→foot line, off straight down
+  const a1=Math.acos(clamp((L1*L1+r*r-L2*L2)/(2*L1*r),-1,1));  // femur off that line
+  const femur=beta+a1;                                         // + swings the knee out and up
+  const a2=Math.acos(clamp((L1*L1+L2*L2-r*r)/(2*L1*L2),-1,1)); // interior knee angle
+  const shin=femur-(Math.PI-a2);
+  /* rotation.y aims the leg's bend plane outward; rotation.z is the femur angle off
+     straight down. Euler XYZ applies Z first, then Y — so the whole V stays planar. */
+  leg.rotation.set(0, Math.atan2(-dz/h, dx/h), femur);
+  d.thighG.rotation.set(0,0,0);
+  d.shinG.rotation.set(0,0,shin-femur);
+  /* pad flat on the ground (z) and toe aimed along the leg's own outward direction (y).
+     Without the yaw the toe inherits the leg frame's +Z, which sits 90° off the leg —
+     pointing forward on the right side and backward on the left. */
+  d.foot.rotation.set(0, Math.PI/2, -shin);
+  return {femur, shin, kneeY: hip.y - L1*Math.cos(femur)};
+}
+const REST_OUT=4.2, REST_FAN=2.6, REST_FOOT_Y=FOOT_H/2+0.10;   // pad bottom ~0.1 over the sand
+function legHomeTarget(leg, out=REST_OUT){
+  const d=leg.userData, hip=d.basePos, row=d.idx%4;
+  return { x: hip.x + (d.side==='L'?-1:1)*out, y: REST_FOOT_Y, z: hip.z + (1.5-row)*REST_FAN };
+}
+function poseBossRest(){
+  if(!bossRoot) return;
+  for(const leg of bossLegs){
+    const tgt=legHomeTarget(leg);
+    solveLeg(leg, tgt.x, tgt.y, tgt.z);
+  }
+  for(let i=0;i<bossTail.length;i++){
+    bossTail[i].rotation.set(TAIL_REST_X[i]||0.4, 0, 0);
+  }
+}
+buildScorpion();
 
 /* mountains on the horizon */
 {
@@ -564,6 +920,29 @@ function destroyBuildingVisual(b) {
   mpSendFx(b.center.x, b.center.y, b.center.z, 0xffa04d, 1.6);
   Sfx.explosion(1.4);
 }
+/* ---- power-up: TWIN LASER drop (spawned when the last building falls) ----
+   Host-authoritative shared object: alive/pos ride the world snapshot; any
+   pilot within POW_R sends the 'pow' command and the host verifies + grants. */
+const powerup = { alive: false, pos: new THREE.Vector3(), group: null, t: 0 };
+const POW_R = 4.5;
+let aliensPassive = false;   // test cheat (host-side): fleet hovers, never hunts/fires
+function spawnPowerupVisual() {
+  const g = new THREE.Group();
+  const core = new THREE.Mesh(new THREE.OctahedronGeometry(1.3, 0),
+    new THREE.MeshStandardMaterial({ color: 0x59e8ff, emissive: 0x2ad8ff, emissiveIntensity: 1.8, metalness: 0.3, roughness: 0.2 }));
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(2.3, 0.12, 8, 40),
+    new THREE.MeshBasicMaterial({ color: 0xbff6ff, transparent: true, opacity: 0.75, blending: THREE.AdditiveBlending, depthWrite: false }));
+  ring.rotation.x = Math.PI / 2;
+  g.add(core, ring, new THREE.PointLight(0x59e8ff, 55, 55, 1.8));
+  g.position.copy(powerup.pos);
+  scene.add(g);
+  powerup.group = g;
+  powerup.t = 0;
+}
+function removePowerupVisual() {
+  if (powerup.group) { scene.remove(powerup.group); powerup.group = null; }
+}
+
 /** a local player bullet struck a building (client detection → route to host authority) */
 function mpBuildingHit(bd, ownerId, dmg, point) {
   if (ownerId !== myId) return;
@@ -576,6 +955,14 @@ function mpDestroyBuilding(b, ownerId) {
   alertLevel = Math.min(100, alertLevel + 35);
   mpSendMsg('🔥 ' + b.type.toUpperCase() + ' DESTROYED — ALIEN FURY RISING', '#ff9c6a');
   if (ownerId) awardScore(ownerId, 150, 'bld');
+  if (buildings.every(x => !x.alive) && !powerup.alive) {
+    powerup.alive = true;
+    powerup.pos.copy(b.center);
+    spawnPowerupVisual();
+    mpSendMsg('💥 THE COLONY IS LOST — TWIN LASER DROPPED!', '#ffd24d');
+    /* razing the colony is what wakes the thing under it — no debug key here */
+    if (startEmerge()) mpSendMsg('☠ SOMETHING VAST STIRS BENEATH THE RUINS…', '#ff3b2f');
+  }
   publishWorldSnapshot(true);
 }
 
@@ -674,6 +1061,7 @@ let score = 0, hp = 100, alertLevel = 0, tGame = 0;
 let booster = 100, boosterOn = false;
 let alertTriggered = false, aliensSpawnedMsg = false;
 let invuln = 0, fireCd = 0, spawnTimer = 0, boosterMsgCd = 0;
+let laser = false;    // TWIN LASER (power-up) — PERMANENT for now: kept across death/redeploy/reset
 
 /* ---- Mars flight physics: real gravity + inertial glide ----
    1 unit ≈ 1 m. Mars surface gravity is 3.71 m/s² (~38% of Earth's).
@@ -741,9 +1129,10 @@ const roomSetState = (k, v) => { try { Playroom.setState(k, v, true); } catch {}
    Several events are packed into one blob (sliding window) so later sends don't drop earlier ones. */
 const r1 = v => Math.round((v || 0) * 10) / 10;
 const rArr = a => [r1(a[0]), r1(a[1]), r1(a[2])];
-const EV = { shot: 1, fx: 2, cmd: 3, msg: 4, score: 5, death: 6, hit: 7 };
-const CMD = { bhit: 1, rock: 2, ahit: 3, reset: 4 };
-const CMD_NAME = { 1: 'bhit', 2: 'rock', 3: 'ahit', 4: 'reset' };
+const EV = { shot: 1, fx: 2, cmd: 3, msg: 4, score: 5, death: 6, hit: 7, pow: 8, beam: 9 };
+const BOSS_PARTS = ['clawL', 'clawR', 'tail', 'head', 'body'];
+const CMD = { bhit: 1, rock: 2, ahit: 3, reset: 4, pow: 5, bosshit: 6 };
+const CMD_NAME = { 1: 'bhit', 2: 'rock', 3: 'ahit', 4: 'reset', 5: 'pow', 6: 'bosshit' };
 const EV_WIN = 12;
 
 const teUtf8 = new TextEncoder();
@@ -828,6 +1217,10 @@ function writeEvent(w, ev) {
     w.u8(d.dmg || 10);
     w.u32(colorToU32(d.color));
     w.str(d.target || '');
+  } else if (ev.t === EV.beam) {
+    w.q10(d.o[0]); w.q10(d.o[1]); w.q10(d.o[2]);
+    w.q10(d.e[0]); w.q10(d.e[1]); w.q10(d.e[2]);
+    w.u32(colorToU32(d.color));
   } else if (ev.t === EV.fx) {
     w.q10(d.x); w.q10(d.y); w.q10(d.z);
     w.u32(colorToU32(d.c));
@@ -837,6 +1230,10 @@ function writeEvent(w, ev) {
     if (d.c === 'bhit') { w.u8(d.i); w.u8(d.dmg || 10); w.q10(d.p[0]); w.q10(d.p[1]); w.q10(d.p[2]); }
     else if (d.c === 'rock') { w.u8(d.i); }
     else if (d.c === 'ahit') { w.u16(d.uid || 0); w.u8(d.dmg || 10); }
+    else if (d.c === 'pow') { /* no payload — the taker is the sender */ }
+    else if (d.c === 'bosshit') { w.u8(Math.max(0, BOSS_PARTS.indexOf(d.part))); w.u8(d.dmg || 10); w.q10(d.p[0]); w.q10(d.p[1]); w.q10(d.p[2]); }
+  } else if (ev.t === EV.pow) {
+    w.str(d.id || '');
   } else if (ev.t === EV.msg) {
     w.str(d.text);
     w.u32(colorToU32(d.color || '#ffd9b0'));
@@ -859,6 +1256,10 @@ function readEvent(r) {
     ev.dmg = r.u8();
     const col = r.u32(); ev.color = col || undefined;
     ev.target = r.str() || null;
+  } else if (t === EV.beam) {
+    ev.o = [r.q10(), r.q10(), r.q10()];
+    ev.e = [r.q10(), r.q10(), r.q10()];
+    ev.c = r.u32();
   } else if (t === EV.fx) {
     ev.p = [r.q10(), r.q10(), r.q10()];
     ev.c = r.u32(); ev.s = r.u8() / 10;
@@ -867,6 +1268,9 @@ function readEvent(r) {
     if (ev.c === 'bhit') { ev.i = r.u8(); ev.dmg = r.u8(); ev.p = [r.q10(), r.q10(), r.q10()]; }
     else if (ev.c === 'rock') { ev.i = r.u8(); }
     else if (ev.c === 'ahit') { ev.uid = r.u16(); ev.dmg = r.u8(); }
+    else if (ev.c === 'bosshit') { ev.part = BOSS_PARTS[r.u8()] || 'body'; ev.dmg = r.u8(); ev.p = [r.q10(), r.q10(), r.q10()]; }
+  } else if (t === EV.pow) {
+    ev.id = r.str() || null;
   } else if (t === EV.msg) {
     ev.text = r.str(); ev.color = u32ToHex(r.u32());
   } else if (t === EV.score) {
@@ -916,6 +1320,8 @@ function evApplyBlob(raw, entry, fromId) {
     else if (ev.t === EV.score) handleNetEvent('e_score', ev, fromId);
     else if (ev.t === EV.death) handleNetEvent('e_death', ev, fromId);
     else if (ev.t === EV.hit) handleNetEvent('e_hit', ev, fromId);
+    else if (ev.t === EV.pow) handleNetEvent('e_pow', ev, fromId);
+    else if (ev.t === EV.beam) handleNetEvent('e_beam', ev, fromId);
   }
 }
 
@@ -927,12 +1333,142 @@ function mpSendEvent(key, payload = {}) {
   else if (key === 'e_cmd') evPush(EV.cmd, payload);
   else if (key === 'e_msg') evPush(EV.msg, payload);
   else if (key === 'e_score') evPush(EV.score, payload);
+  else if (key === 'e_pow') evPush(EV.pow, {});
 }
 function mpSendShot(kind, o, d, extra = {}) {
   evPush(EV.shot, {
     k: kind, o: [o.x, o.y, o.z], dir: [d.x, d.y, d.z],
     dmg: extra.dmg, color: extra.color, target: extra.target
   });
+}
+function mpSendPow() { evPush(EV.cmd, { c: 'pow' }); }
+function mpSendBeam(o, e, color) { evPush(EV.beam, { o: [o.x, o.y, o.z], e: [e.x, e.y, e.z], color }); }
+
+/* ---- TWIN LASER: hitscan beams ----
+   Each trigger pulls ONE beam from each wingtip, drawn instantly as a line
+   segment from the wing to the first thing it touches (Quake 3 railgun feel).
+   Damage is applied at cast time — no projectile in flight. */
+const beamRay = new THREE.Raycaster();
+const _beamHit = new THREE.Vector3();
+const _beamDir = new THREE.Vector3();
+const _beamSphere = new THREE.Sphere();
+const beamFx = [], beamPool = [];
+function spawnBeamVisual(o, e, color) {
+  const len = o.distanceTo(e);
+  if (len < 0.5) return;
+  let rec = beamPool.pop();
+  if (!rec) {
+    const geo = new THREE.CylinderGeometry(0.06, 0.16, 1, 6, 1, true);
+    geo.translate(0, 0.5, 0);   // base at origin, extends +Y → orient toward target
+    rec = { obj: new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+      color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })) };
+    rec.obj.frustumCulled = false;
+  }
+  rec.obj.position.copy(o);
+  _beamDir.copy(e).sub(o).normalize();
+  rec.obj.quaternion.setFromUnitVectors(UP, _beamDir);
+  rec.obj.scale.set(1, len, 1);
+  rec.obj.material.color.set(color);
+  rec.obj.material.opacity = 0.9;
+  rec.obj.visible = true;
+  scene.add(rec.obj);
+  beamFx.push({ rec, life: 0.09, max: 0.09 });
+}
+function updateBeams(dt) {
+  for (let i = beamFx.length - 1; i >= 0; i--) {
+    const f = beamFx[i];
+    f.life -= dt;
+    if (f.life <= 0) {
+      f.rec.obj.visible = false;
+      scene.remove(f.rec.obj);
+      beamPool.push(f.rec);
+      beamFx.splice(i, 1);
+    } else {
+      f.rec.obj.material.opacity = 0.9 * (f.life / f.max);
+    }
+  }
+}
+function twinLaserHit(origin, dir) {
+  beamRay.set(origin, dir);
+  beamRay.far = 2000;
+  let best = null, bestT = Infinity;
+  const consider = (obj, center, r) => {
+    _beamSphere.center.copy(center);
+    _beamSphere.radius = r;
+    const t = beamRay.ray.intersectSphere(_beamSphere, _beamHit);
+    if (t) {
+      const d = t.distanceTo(origin);
+      if (d < bestT) { bestT = d; best = { point: t.clone(), obj }; }
+    }
+  };
+  for (const b of buildings) if (b.alive) consider({ kind: 'bld', bd: b }, b.center, b.radius + 0.4);
+  for (let i = 0; i < rockData.length; i++) { const rk = rockData[i]; if (rk.alive) consider({ kind: 'rock', i }, rk.pos, rk.r); }
+  for (const a of aliens) consider({ kind: 'ufo', a }, a.pos, 3.2);
+  /* the scorpion: test each part so the beam reports which one it struck, exactly as the
+     cannon does through bossHitTest — without this the laser passed straight through him */
+  if (bossGroup && bossAlive && bossState !== 'dormant' && bossState !== 'dead') {
+    const P = [['clawL', 6.5], ['clawR', 6.5], ['tail', 5.0], ['head', 5.5], ['body', 11.0]];
+    for (const [part, r] of P) {
+      if (part === 'clawL' && (!bossClaws.L || !bossClaws.L.visible)) continue;
+      if (part === 'clawR' && (!bossClaws.R || !bossClaws.R.visible)) continue;
+      const c = getBossPartWorldPos(part); if (!c) continue;
+      consider({ kind: 'boss', part }, c, r);
+    }
+  }
+  /* ground fallback */
+  if (dir.y < -0.02) {
+    const t = (terrainHeight(origin.x, origin.z) - origin.y) / dir.y;
+    if (t > 0 && t < bestT) {
+      const p = _beamHit.copy(origin).addScaledVector(dir, t);
+      p.y = terrainHeight(p.x, p.z);
+      best = { point: p, obj: null }; bestT = t;
+    }
+  }
+  if (!best) best = { point: origin.clone().addScaledVector(dir, 2000), obj: null };
+  return best;
+}
+function fireTwinLaser(fwd, right) {
+  /* BUG HISTORY: oL/oR must be SEPARATE vectors — _fireOrigin was shared, so
+     computing oR overwrote oL and the second beam (and its net send) fired
+     from the same wingtip, leaving only the left wing visible. */
+  /* each wing aims at a far point ON THE AIM AXIS so the two beams converge
+     ("cross at infinity") exactly where the crosshair points — parallel wing
+     beams would never pass through the screen center */
+  const owner = myId || 'me';
+  _aimPoint.copy(ship.position).addScaledVector(fwd, LASER_AIM_DIST);
+  const side = _side.copy(right).multiplyScalar(1.85);
+  const oL = _wingL.copy(ship.position).add(side);
+  const oR = _wingR.copy(ship.position).sub(side);
+  fireBeamWing(oL, _wingDirL.copy(_aimPoint).sub(oL).normalize(), owner);
+  fireBeamWing(oR, _wingDirR.copy(_aimPoint).sub(oR).normalize(), owner);
+  Sfx.rail();
+  stats.shots += 2;
+  if (mpReady) publishFlamePulse();
+}
+function fireBeamWing(o, fwd, owner) {
+  const hit = twinLaserHit(o, fwd);
+  spawnBeamVisual(o, hit.point, 0x59e8ff);
+  if (mpReady) mpSendBeam(o, hit.point, 0x59e8ff);
+  if (!hit.obj) return;
+  if (hit.obj.kind === 'bld') mpBuildingHit(hit.obj.bd, owner, 14, hit.point);
+  else if (hit.obj.kind === 'rock') mpRockHit(hit.obj.i, owner, hit.point);
+  else if (hit.obj.kind === 'boss') { mpBossHit({ part: hit.obj.part }, owner, 14, hit.point); Sfx.hit(); }
+  else if (hit.obj.kind === 'ufo') {
+    if (isHostNow()) hostAlienHit(hit.obj.a, 14, owner);
+    else mpSendCmd('ahit', { uid: hit.obj.a.uid, dmg: 14 });
+    Sfx.hit();
+  }
+}
+function grantLaser(id) {
+  if (!id || laser && id === myId) return;
+  laser = true;
+  if (id === myId) {
+    msg('⚡ TWIN LASER ACQUIRED', '#59e8ff', 3.5);
+    Sfx.rail();
+  } else {
+    const e = peerShips.get(id); if (e) e.netWeapon = 1;
+  }
+  publishLocal(true);
 }
 function mpSendFx(x, y, z, color, size) { evPush(EV.fx, { x, y, z, c: color, s: size || 1 }); }
 function mpSendCmd(c, payload) { evPush(EV.cmd, Object.assign({ c }, payload)); }
@@ -954,6 +1490,7 @@ function encodePose() {
   w.u8(inWorld() ? 1 : 0);
   w.u16(score & 65535);
   w.u8(flameSeq);
+  w.u8(laser ? 1 : 0);
   w.u16(poseSeq);
   w.u8(lifeSeq);
   return u8ToB64(w.bytes());
@@ -966,6 +1503,7 @@ function decodePose(raw) {
     x: r.q10(), y: r.q10(), z: r.q10(),
     yaw: r.q100(), pitch: r.q100(), roll: r.q100(),
     hp: r.u8(), alive: !!r.u8(), score: r.u16(), flame: r.u8(),
+    weapon: r.ok(1) ? r.u8() : 0,
     seq: r.ok(2) ? r.u16() : 0,
     life: r.ok(1) ? r.u8() : 0
   };
@@ -989,6 +1527,8 @@ function encodeWorld(withPresence) {
   w.u8(Math.min(255, dead.length));
   for (let i = 0; i < dead.length && i < 255; i++) w.u8(dead[i]);
   w.u16(worldEpoch & 65535);
+  w.u8(powerup.alive ? 1 : 0);
+  if (powerup.alive) { w.q10(powerup.pos.x); w.q10(powerup.pos.y); w.q10(powerup.pos.z); }
   if (withPresence) {
     const live = hostLiveIds(heartbeatLiveIds());
     w.u8(Math.min(255, live.length));
@@ -1001,7 +1541,7 @@ function decodeWorld(raw) {
   const u8 = b64ToU8(raw);
   if (!u8 || u8.length < 6) return null;
   const r = new BinR(u8);
-  const s = { v: r.u32(), h: r.str(), a: r.u8(), u: [], b: [], r: [], ids: null };
+  const s = { v: r.u32(), h: r.str(), a: r.u8(), u: [], b: [], r: [], ids: null, pw: null };
   const nu = r.u8();
   for (let i = 0; i < nu; i++) s.u.push([r.u16(), r.q10(), r.q10(), r.q10(), r.q100(), r.u8()]);
   const nb = r.u8();
@@ -1009,6 +1549,7 @@ function decodeWorld(raw) {
   const nr = r.u8();
   for (let i = 0; i < nr; i++) s.r.push(r.u8());
   if (r.ok(2)) s.epoch = r.u16();
+  if (r.ok(1) && r.u8()) s.pw = [r.q10(), r.q10(), r.q10()];
   if (r.ok(1)) {
     s.ids = [];
     const ni = r.u8();
@@ -1071,6 +1612,15 @@ function syncBuildings(hpArr) {
 function syncRocks(idxArr) {
   for (const i of idxArr) { const rk = rockData[i]; if (rk && rk.alive) destroyRock(i, rk.pos); }
 }
+function syncPowerup(s) {
+  if (!s.pw) {
+    if (powerup.alive) { powerup.alive = false; removePowerupVisual(); }
+  } else if (!powerup.alive) {
+    powerup.alive = true;
+    powerup.pos.set(s.pw[0], s.pw[1], s.pw[2]);
+    spawnPowerupVisual();
+  }
+}
 function applyWorldEpoch(s) {
   if (s.epoch == null) return;
   if (s.epoch !== worldEpoch) {
@@ -1082,7 +1632,7 @@ function adoptSnapshot() {
   const s = readWorldSnap();
   if (!s) return;
   applyWorldEpoch(s);
-  syncUfos(s.u || []); syncBuildings(s.b || []); syncRocks(s.r || []);
+  syncUfos(s.u || []); syncBuildings(s.b || []); syncRocks(s.r || []); syncPowerup(s);
   alertLevel = s.a || 0;
   if (alertLevel === 0) alertTriggered = false;
   lastSnapV = s.v;
@@ -1093,7 +1643,7 @@ function applyWorldSnapshot() {
   if (!s || s.v === lastSnapV) return;
   lastSnapV = s.v;
   applyWorldEpoch(s);
-  syncUfos(s.u || []); syncBuildings(s.b || []); syncRocks(s.r || []);
+  syncUfos(s.u || []); syncBuildings(s.b || []); syncRocks(s.r || []); syncPowerup(s);
   alertLevel = s.a || 0;
   if (alertLevel === 0) alertTriggered = false;
   if (!alertTriggered && alertLevel > 0) { alertTriggered = true; msg('⚠ THE ALIEN FLEET IS ACTIVE', '#ffd24d', 4); }
@@ -1136,6 +1686,12 @@ function handleNetEvent(key, e, fromId) {
       if (ent) { ent.alive = false; ent.dead = true; ent.group.visible = false; }
       break;
     }
+    case 'e_pow': grantLaser(e.id || fromId); break;   // host confirms the pickup to the whole room (incl. the picker)
+    case 'e_beam': {
+      spawnBeamVisual(new THREE.Vector3(e.o[0], e.o[1], e.o[2]), new THREE.Vector3(e.e[0], e.e[1], e.e[2]), e.c || 0x59e8ff);
+      Sfx.rail();
+      break;
+    }
     case 'e_cmd':
       if (e.c === 'reset') {
         if (!isHostNow()) mpResetWorld();
@@ -1156,12 +1712,66 @@ function applyHostCommand(e, fromId) {
     case 'bhit': { const b = buildings[e.i]; if (b && b.alive) hostBuildingHit(b, e.dmg || 10, e.p ? new THREE.Vector3(e.p[0], e.p[1], e.p[2]) : null, fromId); break; }
     case 'rock': { const rk = rockData[e.i]; if (rk && rk.alive) hostRockHit(e.i); break; }
     case 'ahit': { const a = aliens.find(x => x.uid === e.uid); if (a) hostAlienHit(a, e.dmg || 10, fromId); break; }
+    case 'pow': { hostPowerupPickup(fromId); break; }
+    case 'bosshit': { hostBossHit({ part: e.part }, e.dmg || 10, e.p ? new THREE.Vector3(e.p[0], e.p[1], e.p[2]) : null, fromId); break; }
     case 'reset':
       mpResetWorld();
       mpSendMsg('🔄 WORLD RESET — ' + nameOf(fromId) + ' REBUILT THE COLONY', '#9dff7f');
       break;
   }
 }
+/* ---- boss multiplayer ----
+   The host owns the scorpion: it alone runs the AI, movement and attacks, and publishes a
+   compact transform + HP block on its own room key (kept off the binary world snapshot so
+   the existing wire format is untouched). Everyone derives legs, tail and rage locally from
+   that transform — those are procedural, so they cost nothing to reproduce and need no sync. */
+function mpBossHit(hit, ownerId, dmg, point) {
+  if (ownerId !== myId) return;                       // only the firing client reports
+  if (isHostNow()) hostBossHit(hit, dmg, point, myId);
+  else mpSendCmd('bosshit', { part: hit.part, dmg, p: rArr([point.x, point.y, point.z]) });
+}
+function hostBossHit(hit, dmg, point, fromId) {
+  if (!bossAlive || bossState === 'dormant') return;
+  const before = bossPhase;
+  handleBossHit(hit, dmg, point || getBossPartWorldPos(hit.part));
+  if (bossPhase !== before || !bossAlive) publishBossState(true);
+}
+let lastBossPub = 0;
+function publishBossState(force) {
+  if (!isHostNow() || !mpReady || !bossGroup) return;
+  const now = performance.now();
+  if (!force && now - lastBossPub < 100) return;      // ~10Hz, same cadence as the world snapshot
+  lastBossPub = now;
+  roomSetState('boss', {
+    s: bossState, ph: bossPhase, a: bossAlive ? 1 : 0,
+    p: rArr([bossGroup.position.x, bossGroup.position.y, bossGroup.position.z]),
+    y: r1(bossRoot ? bossRoot.rotation.y : 0),
+    h: [Math.ceil(bossHP.clawL), Math.ceil(bossHP.clawR), Math.ceil(bossHP.tail), Math.ceil(bossHP.head)],
+  });
+}
+function applyBossState() {
+  if (!mpReady || isHostNow() || !bossGroup) return;
+  const s = roomGetState('boss');
+  if (!s || !s.p) return;
+  /* non-hosts follow the published transform; the walk cycle, tail aim and rage all run
+     locally off it, so a 10Hz feed still looks continuous */
+  bossNetPos.set(s.p[0], s.p[1], s.p[2]);
+  bossNetYaw = s.y || 0;
+  bossHasNet = true;
+  if (s.s && s.s !== bossState) {
+    if (s.s === 'emerging' && bossState === 'dormant') startEmerge();
+    else if (s.s === 'dying' && bossState !== 'dying' && bossState !== 'dead') killBoss();
+    else bossState = s.s;
+  }
+  bossPhase = s.ph || bossPhase;
+  bossAlive = !!s.a;
+  if (s.h) { bossHP.clawL = s.h[0]; bossHP.clawR = s.h[1]; bossHP.tail = s.h[2]; bossHP.head = s.h[3]; }
+  if (bossHP.clawL <= 0 && bossClaws.L && bossClaws.L.visible) bossClaws.L.visible = false;
+  if (bossHP.clawR <= 0 && bossClaws.R && bossClaws.R.visible) bossClaws.R.visible = false;
+  if (bossHP.tail <= 0 && bossTail.length) bossTail[bossTail.length - 1].visible = false;
+}
+let bossNetPos = new THREE.Vector3(), bossNetYaw = 0, bossHasNet = false;
+
 /* host-side world mutation (single authority) */
 function hostBuildingHit(b, dmg, point, fromId) {
   b.hp -= dmg; b.flash = 0.12;
@@ -1192,6 +1802,19 @@ function hostAlienHit(a, dmg, fromId) {
   if (a.hp <= 0) hostAlienKilled(a, fromId);
   publishWorldSnapshot(true);
 }
+/* TWIN LASER pickup (host authority): first live ship to reach the drop keeps it */
+function hostPowerupPickup(id) {
+  if (!powerup.alive || !id) return;
+  const pos = getShipPos(id);
+  if (!pos || pos.distanceToSquared(powerup.pos) > POW_R * POW_R) return;
+  powerup.alive = false;
+  removePowerupVisual();
+  explosion(powerup.pos, 0x59e8ff, 1.2, 40);
+  mpSendFx(powerup.pos.x, powerup.pos.y, powerup.pos.z, 0x59e8ff, 1.2);
+  grantLaser(id);
+  mpSendMsg('⚡ ' + nameOf(id) + ' TAKES THE TWIN LASER', '#59e8ff');
+  publishWorldSnapshot(true);
+}
 function hostAlienKilled(a, fromId) {
   const idx = aliens.indexOf(a);
   if (idx >= 0) aliens.splice(idx, 1);
@@ -1216,6 +1839,7 @@ function clearWorldSim() {
   alertLevel = 0;
   alertTriggered = false;
   aliensSpawnedMsg = false;
+  powerup.alive = false; removePowerupVisual();   // epoch change clears the drop too
   for (let i = bullets.length - 1; i >= 0; i--) {
     const b = bullets[i];
     if (b.isPlayer) continue;
@@ -1243,6 +1867,7 @@ function mpResetWorld() {
     }
   }
   rockMesh.instanceMatrix.needsUpdate = true;
+  powerup.alive = false; removePowerupVisual();
   clearWorldSim();
   if (state === 'over') redeploy();
   if (isHostNow()) {
@@ -1494,6 +2119,7 @@ function updateRemoteShips(dt) {
           entry.alive = pose.alive;
           entry.dead = !pose.alive;
           entry.score = pose.score;
+          entry.netWeapon = pose.weapon || 0;
           entry.group.visible = pose.alive;
           if (pose.flame !== entry.lastFlame) { entry.lastFlame = pose.flame; entry.flameT = 0.25; }
         }
@@ -1672,6 +2298,10 @@ function spawnBullet(pos, vel, owner, dmg, extras = {}) {
     b = { mesh, glow, vel: new THREE.Vector3(), owner: '', isPlayer: true, dmg: 0, ttl: 0, ghost: false, target: null };
     b.mesh.visible = false;
   }
+  /* seek: steers toward the player only while he is inside a narrow forward cone; outside
+     it the round is blind and holds its trajectory, so a hard break loses it for good */
+  b.seek = !!extras.seek; b.seekCone = extras.cone != null ? extras.cone : 0.35; b.seekTurn = extras.turn != null ? extras.turn : 1.2;
+  b.mesh.scale.setScalar(extras.scale || 1);
   b.isPlayer = owner !== 'alien';
   const isLocal = (owner === myId) || (!mpReady && owner === 'me');
   b.ghost = !!extras.ghost && owner !== 'alien';       // someone else's player-shot (no local collision)
@@ -1679,17 +2309,19 @@ function spawnBullet(pos, vel, owner, dmg, extras = {}) {
   const tint = extras.color != null ? extras.color : (owner === 'alien' ? 0xff6a3d : (isLocal ? 0x7df9ff : tintFor(owner)));
   b.mesh.material.color.set(tint);
   b.glow.material.color.copy(b.mesh.material.color);
-  b.owner = owner; b.dmg = dmg; b.ttl = 2.5;
+  b.owner = owner; b.dmg = dmg; b.ttl = extras.ttl || 2.5;
   b.vel.copy(vel);
   b.mesh.position.copy(pos);
   b.mesh.visible = true;
   scene.add(b.mesh);
   bullets.push(b);
+  return b;
 }
 
 /* I am authoritative for my own hull — any caller passing to me applies damage */
 function damagePlayer(dmg) {
   if (state !== 'playing' || invuln > 0) return;
+  if (hp <= 0) return;
   invuln = 0.35;
   hp = Math.max(0, hp - dmg);
   Sfx.hit();
@@ -1703,6 +2335,27 @@ function updateBullets(dt) {
   for (let i = bullets.length - 1; i >= 0; i--) {
     const b = bullets[i];
     b.ttl -= dt;
+    if (b.seek && state === 'playing' && hp > 0) {
+      /* turn the velocity toward the player at a capped rate, never changing speed —
+         the cap is what keeps it dodgeable */
+      const sp = b.vel.length();
+      if (sp > 1e-4) {
+        const cur = _sv1.copy(b.vel).divideScalar(sp);
+        const want = _sv2.copy(ship.position).sub(b.mesh.position);
+        if (want.lengthSq() > 1e-4) {
+          want.normalize();
+          const ang = Math.acos(clamp(cur.dot(want), -1, 1));
+          if (ang <= b.seekCone && ang > 1e-4) {
+            const axis = _sv3.crossVectors(cur, want);
+            if (axis.lengthSq() > 1e-8) {
+              axis.normalize();
+              cur.applyAxisAngle(axis, Math.min(ang, b.seekTurn * dt));
+              b.vel.copy(cur).multiplyScalar(sp);
+            }
+          }
+        }
+      }
+    }
     b.mesh.position.addScaledVector(b.vel, dt);
     const p = b.mesh.position;
     let dead = b.ttl <= 0;
@@ -1713,6 +2366,10 @@ function updateBullets(dt) {
       dead = true;
     }
 
+    if (!dead && b.isPlayer && !b.ghost && bossAlive && bossState !== 'dormant') {
+      const bh = bossHitTest(p);
+      if (bh) { mpBossHit(bh, b.owner, b.dmg, p); dead = true; }
+    }
     if (!dead && b.isPlayer && !b.ghost) {
       for (const bd of buildings) {
         if (!bd.alive) continue;
@@ -1770,10 +2427,26 @@ const aliens = [];
 let ufoUid = 1;
 const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _zero3 = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
+/* ---- ported from the scorpion standalone: boss scratch vectors, chase-camera spring,
+   airframe attitude (lags the aim input), emergence cinematic and screen shake ---- */
+const _bossFace = new THREE.Vector3(), _tailTip = new THREE.Vector3(), _tailAim = new THREE.Vector3();
+const _sv1 = new THREE.Vector3(), _sv2 = new THREE.Vector3(), _sv3 = new THREE.Vector3();
+const _roarAt = new THREE.Vector3(), _camLookBoss = new THREE.Vector3(), _camOff = new THREE.Vector3();
+const _aimDir = new THREE.Vector3(), _aimPt = new THREE.Vector3(), _shotDir = new THREE.Vector3();
+const _sfxF = new THREE.Vector3(), _sfxU = new THREE.Vector3(), _mv = new THREE.Vector3();
+let camShake = 0, bossCam = 0, bossCamWant = 0;
+let craftYaw = 0, craftPitch = 0;
+const camPos = new THREE.Vector3();
+let boosterLock = false;
 const _fwd = new THREE.Vector3(), _right = new THREE.Vector3(), _accel = new THREE.Vector3();
 const _camTarget = new THREE.Vector3(), _lookAt = new THREE.Vector3();
 const _n = new THREE.Vector3(), _p = new THREE.Vector3();
 const _fireDir = new THREE.Vector3(), _fireOrigin = new THREE.Vector3(), _fireVel = new THREE.Vector3();
+const _side = new THREE.Vector3();   // wingtip offset for TWIN LASER
+const _wingL = new THREE.Vector3(), _wingR = new THREE.Vector3();   // separate wing origins (aliasing fix)
+const _wingDirL = new THREE.Vector3(), _wingDirR = new THREE.Vector3();
+const _aimPoint = new THREE.Vector3();
+const LASER_AIM_DIST = 2000;   // both beams converge here on the aim axis (crosshair)
 
 function mergedBalls(offsets, radius, wSeg, hSeg) {
   const proto = new THREE.SphereGeometry(radius, wSeg, hSeg);
@@ -1853,7 +2526,7 @@ function updateAliens(dt, t) {
   for (let i = aliens.length - 1; i >= 0; i--) {
     const a = aliens[i];
     if (host) {
-      const tgt = nearestLiveShip(a.pos);
+      const tgt = aliensPassive ? null : nearestLiveShip(a.pos);
       if (tgt) {
         const toP = _v1.copy(tgt.pos).sub(a.pos);
         const dist = toP.length();
@@ -1891,6 +2564,10 @@ function updateAliens(dt, t) {
           if (a.hp <= 0) hostAlienKilled(a, tgt.id);
         }
       }
+    } else if (aliensPassive) {
+      /* passive (test cheat): hover in place, no pursuit, no fire */
+      a.group.position.copy(a.pos);
+      a.group.rotation.z = Math.sin(t * 2.4 + a.phase) * 0.14;
     } else {
       /* client: interpolate toward host-published netPos */
       a.pos.lerp(a.netPos, damp(dt, 8));
@@ -2111,7 +2788,7 @@ function syncScoreboard(rows) {
     row.className = 'sbrow';
     row.innerHTML = '<span style="width:14px;color:#c99a78;font-size:11px"></span>' +
       '<span class="sbdot"></span><span class="sbname"></span>' +
-      '<span class="sbhost"></span><span class="sbscore"></span>';
+      '<span class="sbwp"></span><span class="sbhost"></span><span class="sbscore"></span>';
     els.sbRows.appendChild(row);
     sbPool.push(row);
   }
@@ -2124,19 +2801,595 @@ function syncScoreboard(rows) {
     const cls = 'sbrow' + (r.dead ? ' dead' : '');
     if (row.className !== cls) row.className = cls;
     const rank = row.children[0], dot = row.children[1], name = row.children[2];
-    const hostEl = row.children[3], sc = row.children[4];
+    const wpEl = row.children[3], hostEl = row.children[4], sc = row.children[5];
     setText(rank, String(i + 1));
     const dotCls = 'sbdot' + (r.me ? ' me' : '');
     if (dot.className !== dotCls) dot.className = dotCls;
     setBg(dot, hex);
     setText(name, r.name + (r.me ? ' (you)' : ''));
     setColor(name, r.me ? '#ffe9d6' : hex);
+    setText(wpEl, r.wp ? '⚡' : '');
     setText(hostEl, r.host ? 'HOST' : '');
     setText(sc, String(r.score));
   }
 }
 
+const _bossWorldPos = new THREE.Vector3();
+function getBossPartWorldPos(part){
+  if(part==='clawL') bossClaws.L.getWorldPosition(_bossWorldPos);
+  else if(part==='clawR') bossClaws.R.getWorldPosition(_bossWorldPos);
+  else if(part==='tail') bossTail[bossTail.length-1].getWorldPosition(_bossWorldPos);
+  else if(part==='head') bossHead.getWorldPosition(_bossWorldPos);
+  else bossGroup.getWorldPosition(_bossWorldPos);
+  // offset to center of part
+  if(part==='clawL'||part==='clawR') _bossWorldPos.y+=2;
+  if(part==='tail') _bossWorldPos.y+=1;
+  if(part==='head') _bossWorldPos.y+=0.5;
+  return _bossWorldPos.clone();
+}
+function bossHitTest(p){
+  if(!bossAlive||bossState==='emerging'||bossState==='dead') return null;
+  const rClaw=6.5, rTail=4.2, rHead=5.6, rBody=14;
+  // check vulnerable parts first
+  if(bossPhase==='claws'){
+    const cL=getBossPartWorldPos('clawL'), cR=getBossPartWorldPos('clawR');
+    if(p.distanceTo(cL)<rClaw) return {part:'clawL'};
+    if(p.distanceTo(cR)<rClaw) return {part:'clawR'};
+    // hit elsewhere = armored
+    const head=getBossPartWorldPos('head'), tail=getBossPartWorldPos('tail');
+    if(p.distanceTo(head)<rHead || p.distanceTo(tail)<rTail || p.distanceTo(bossPos)<rBody) return {part:'armored'};
+    return null;
+  } else if(bossPhase==='tail'){
+    const t=getBossPartWorldPos('tail');
+    if(p.distanceTo(t)<rTail+0.8) return {part:'tail'};
+    const head=getBossPartWorldPos('head');
+    if(p.distanceTo(head)<rHead || p.distanceTo(bossPos)<rBody) return {part:'armored'};
+    return null;
+  } else if(bossPhase==='head'){
+    const h=getBossPartWorldPos('head');
+    if(p.distanceTo(h)<rHead) return {part:'head'};
+    if(p.distanceTo(bossPos)<rBody) return {part:'armored'};
+    return null;
+  }
+  return null;
+}
+function handleBossHit(hit,dmg,pos){
+  if(hit.part==='armored'){
+    explosion(pos,0x888888,0.35,10);
+    // hint removed — player must discover weak points via boss colors/telegraph (was msg 'ARMORED — FIND THE WEAK POINT!')
+    // no red flash on armored hits — only spark
+    bossHitShake=0.3;
+    return;
+  }
+  bossFlash=0.18; bossHitShake=0.6;
+  if(hit.part==='clawL'){
+    bossHP.clawL=Math.max(0,bossHP.clawL-dmg);
+    // flash claw
+    const m=bossClaws.L.userData.clawMat; m.emissive.set(0xff4422); m.emissiveIntensity=0.9; setTimeout(()=>{m.emissive.set(0x000000); m.emissiveIntensity=0;},120);
+    if(bossHP.clawL<=0 && bossClaws.L.visible){
+      destroyClaw('L');
+    }
+  } else if(hit.part==='clawR'){
+    bossHP.clawR=Math.max(0,bossHP.clawR-dmg);
+    const m=bossClaws.R.userData.clawMat; m.emissive.set(0xff4422); m.emissiveIntensity=0.9; setTimeout(()=>{m.emissive.set(0x000000); m.emissiveIntensity=0;},120);
+    if(bossHP.clawR<=0 && bossClaws.R.visible){
+      destroyClaw('R');
+    }
+  } else if(hit.part==='tail'){
+    bossHP.tail=Math.max(0,bossHP.tail-dmg);
+    const tip=bossTail[bossTail.length-1]; tip.userData.gunMat.emissive.set(0xff4422); tip.userData.gunMat.emissiveIntensity=0.8; setTimeout(()=>{tip.userData.gunMat.emissive.set(0x331100); tip.userData.gunMat.emissiveIntensity=0;},120);
+    if(bossHP.tail<=0) destroyTail();
+  } else if(hit.part==='head'){
+    bossHP.head=Math.max(0,bossHP.head-dmg);
+    bossHead.material.emissive.set(0xff4422); bossHead.material.emissiveIntensity=0.6; setTimeout(()=>{bossHead.material.emissive.set(0x000000); bossHead.material.emissiveIntensity=0;},120);
+    if(bossHP.head<=0) killBoss();
+  }
+  checkPhaseTransition();
+  if (mpReady && isHostNow()) publishBossState(true);   // damage is worth an immediate push
+  updateBossHud();
+}
+function destroyClaw(side){
+  const claw=bossClaws[side];
+  const pos=getBossPartWorldPos(side==='L'?'clawL':'clawR');
+  explosion(pos,0xff9a5e,1.4,45); Sfx.explosion(1.2);
+  // claw falls off — hide and spawn debris
+  claw.visible=false;
+  // debris
+  for(let i=0;i<4;i++){const s=rand(0.6,1.4); const m=new THREE.Mesh(new THREE.BoxGeometry(s,s*0.7,s), new THREE.MeshStandardMaterial({color:0x6b4a2e})); m.position.copy(pos).add(new THREE.Vector3(rand(-1,1),rand(0,1),rand(-1,1))); m.rotation.set(rand(0,3),rand(0,3),rand(0,3)); scene.add(m);}
+  msg((side==='L'?'LEFT':'RIGHT')+' CLAW DESTROYED!', '#ff9c6a', 3);
+  score+=250;
+  // shake
+  bossHitShake=1.0;
+  triggerRage(1.5);
+}
+function destroyTail(){
+  const tip=bossTail[bossTail.length-1];
+  const pos=getBossPartWorldPos('tail');
+  explosion(pos,0xff6a2a,1.6,55); Sfx.explosion(1.4);
+  tip.visible=false;
+  // tail segments droop
+  for(let i=2;i<bossTail.length;i++){bossTail[i].rotation.x+=0.6;}
+  msg('TAIL GUN DESTROYED', '#ffd24d', 3); Sfx.alert();   // what you did, never what to hit next
+  score+=400;
+  bossHitShake=1.2;
+  triggerRage(1.9);
+}
+function killBoss(){
+  bossAlive=false; bossState='dying'; bossT=0;
+  /* snapshot where it died — the collapse is relative to that, not to y=0. The boss
+     stands on the raised pad, so animating from a hardcoded 0 snaps it down first. */
+  bossDeath={ y0:bossGroup.position.y, gnd:groundHeight(bossGroup.position.x,bossGroup.position.z),
+              tail:bossTail.map(s=>s.rotation.x), roll:(Math.random()<0.5?-1:1), fx:0 };
+  const pos=getBossPartWorldPos('head');
+  explosion(pos,0xffb060,2.2,70); Sfx.explosion(1.6);
+  msg('HEAD DESTROYED — SCORPION SLAIN!', '#7cff6b', 5); Sfx.alert();
+  score+=1000;
+  // death handled in updateBoss dying state
+}
+function checkPhaseTransition(){
+  if(bossPhase==='claws' && bossHP.clawL<=0 && bossHP.clawR<=0){
+    bossPhase='tail';
+    /* No "target the X" prompts — working out the order is the puzzle, and the glow and
+       animation on each part are the intended clues. The phase change still gets a sting. */
+    Sfx.alert();
+    // make tail glow vulnerable
+    const tip=bossTail[bossTail.length-1]; tip.userData.gunMat.emissive.set(0xff3300); tip.userData.gunMat.emissiveIntensity=0.5;
+  } else if(bossPhase==='tail' && bossHP.tail<=0){
+    bossPhase='head';
+    Sfx.alert();
+    bossHead.material.emissive.set(0xff3300); bossHead.material.emissiveIntensity=0.3;
+  }
+}
+
+/* boss update */
+/* wake the buried scorpion — [G] in game, window.dbg.emerge() from the console */
+function startEmerge(){
+  if(bossState!=='dormant') return false;
+  bossState='emerging'; bossT=0;
+  const mound=bossGroup.getObjectByName('sandMound'); if(mound) mound.visible=true;
+  msg('THE SAND IS MOVING…','#ffd24d',2.5);
+  return true;
+}
+function updateBoss(dt,t){
+  bossT+=dt;
+  if(bossState==='dormant'){
+    bossGroup.position.y=bossEmergingY;   // stay buried, no rumble, no cinematic
+    updateBossHud();
+    return;
+  }
+  if(bossState==='emerging'){
+    const dur=2.8;
+    const k=clamp(bossT/dur,0,1);
+    /* ground rumble: audible everywhere, but both the volume and the camera shake scale
+       with how close the player is, and build as it breaks the surface */
+    bossCamWant=1;                      // swing the player's view onto him while he digs out
+    {if(!Sfx._rum) Sfx.rumbleStart();   // lazily, so it still starts if audio woke up late
+     const d=ship.position.distanceTo(bossGroup.position);
+     const prox=clamp(1-(d-26)/150, 0, 1);
+     Sfx.rumbleLevel(prox);
+     camShake=Math.max(camShake, prox*0.95*(0.4+0.6*k));}
+    const eased=1-Math.pow(1-k,3);
+    bossGroup.position.y=lerp(bossEmergingY,bossTargetY,eased);
+    bossShake=(1-k)*2.5;
+    bossGroup.position.x+=rand(-bossShake, bossShake)*0.3;
+    bossGroup.position.z+=rand(-bossShake, bossShake)*0.3;
+    // sand mound shrinks
+    const mound=bossGroup.getObjectByName('sandMound');
+    if(mound){mound.scale.set(1-k*0.9, 0.45*(1-k), 1-k*0.9); mound.position.y=lerp(0.1,-2,k);}
+    // dust burst - scaled for 2x boss (mound r26, body 14x26) so distribute around perimeter so it remains visible outside larger carapace
+    if(Math.random()<0.62){
+      const a=rand(0,Math.PI*2), r=rand(13,25);
+      const px=Math.cos(a)*r + bossGroup.position.x, pz=Math.sin(a)*r + bossGroup.position.z;
+      explosion(new THREE.Vector3(px, 0.6, pz),0xd9a06a,1.25,22);
+      if(Math.random()<0.45) explosion(new THREE.Vector3(rand(-9,9)+bossGroup.position.x, 0.9, rand(-9,9)+bossGroup.position.z),0xc6865a,0.95,16);
+    }
+    if(k>=1){
+      bossState='active';
+      bossT=0;
+      if(mound) mound.visible=false;
+      bossCamWant=0;                    // hand the view back to the player
+      Sfx.rumbleStop();
+      /* announce himself with the same tantrum he throws when wounded — rear up, rock,
+         stamp. triggerRage plays the roar, so it isn't fired separately here. */
+      triggerRage(2.0);
+      msg('☠ THE SCORPION HAS AWAKENED', '#ff3b2f', 4);
+      // shake camera
+      bossHitShake=1.5;
+    }
+    updateBossHud();
+    return;
+  }
+  if(bossState==='dead' || bossState==='dying'){
+    if(bossState==='dying'){
+      /* Death is a staged collapse that stays ON the ground — rear up, legs buckle
+         outward, belly hits the sand, tail crashes down behind. The body must never
+         sink below the surface: the whole point is that you get to watch it fall. */
+      const DUR=3.6;
+      const k=clamp(bossT/DUR,0,1);
+      const D=bossDeath;
+      // eyes stutter out over the first ~1.2s, well before the head tips away
+      {const em=bossHead.userData.eyeMat;
+       if(em){const f=clamp(bossT/1.2,0,1);
+        const flick=f<0.7 ? (Math.sin(bossT*34)>0.1?1:0.3) : 1;   // failing power, then a clean drain
+        em.color.setRGB(Math.max(0,1-f*f)*flick,0,0);}}
+      const lurch=k<0.18 ? Math.sin((k/0.18)*Math.PI)*0.9 : 0;     // one last rear before the legs go
+      const col=clamp((k-0.14)/0.62,0,1), colE=col*col*(3-2*col);  // collapse progress
+      bossGroup.position.y = D.y0 + lurch - 2.9*colE;              // ends belly-down, not buried
+      bossRoot.position.y = 0;
+      bossRoot.rotation.z = D.roll*0.20*colE;                      // lists to one side
+      bossRoot.rotation.x = -0.12*(1-colE) + 0.14*colE;            // nose up, then down
+      /* legs buckle one after another, feet skating outward as the weight comes down.
+         Driven through the same IK as the walk, so they stay planted while they splay. */
+      const gLocal = D.gnd - bossGroup.position.y + REST_FOOT_Y;
+      for(const leg of bossLegs){
+        const d=leg.userData, row=d.idx%4, side=(d.side==='L'?-1:1);
+        const t2=clamp((col-0.06*d.idx)/0.55,0,1), e2=t2*t2*(3-2*t2);
+        solveLeg(leg, d.basePos.x + side*(REST_OUT+6.0*e2), gLocal, d.basePos.z + (1.5-row)*REST_FAN*(1+e2*0.5));
+      }
+      // tail whips up as it staggers, then falls straight out behind it
+      const tk=clamp((k-0.42)/0.46,0,1), tE=tk*tk*(3-2*tk);
+      const whip=k<0.22 ? Math.sin((k/0.22)*Math.PI)*0.30 : 0;
+      for(let i=0;i<bossTail.length;i++){
+        bossTail[i].rotation.x=lerp((D.tail[i]||0)-whip, i===0?-1.35:0.06, tE);
+        bossTail[i].rotation.z=lerp(bossTail[i].rotation.z, D.roll*0.12, damp(dt,2));
+      }
+      // secondary blasts walking along the hull while it goes down
+      if(bossT>D.fx && k<0.92){
+        D.fx=bossT+rand(0.16,0.36);
+        explosion(new THREE.Vector3(bossGroup.position.x+rand(-8,8), D.gnd+rand(2,8), bossGroup.position.z+rand(-13,13)), 0xff8a3a, rand(0.7,1.3), 26);
+        if(Math.random()<0.45) Sfx.explosion(0.7);
+      }
+      if(k>=1){
+        bossState='dead';
+        bossT=0;
+        Sfx.explosion(1.8);
+        // final detonation — the wreck stays put afterwards
+        for(let i=0;i<4;i++) setTimeout(()=>explosion(bossGroup.position.clone().add(new THREE.Vector3(rand(-7,7),rand(1,7),rand(-11,11))),0xff6a2a,1.5,36), i*260);
+        setTimeout(()=>gameOver(true), 1900);
+      }
+    }
+    return;
+  }
+  // active
+  if(inspectFrozen){
+    bossGroup.position.set(0,0,0);
+    bossRoot.position.set(0,0,0);
+    bossRoot.rotation.set(0,0,0);
+    bossPos.set(0,0,0);
+    return;
+  }
+  /* Multiplayer: the host is the only authority on where he is and what he does. Everyone
+     else lerps onto the published transform and still runs the gait, tail and rage locally,
+     so a 10Hz feed animates smoothly. */
+  const bossHost = !mpReady || isHostNow();
+  if (!bossHost) {
+    applyBossState();
+    if (bossHasNet) {
+      bossGroup.position.lerp(bossNetPos, damp(dt, 6));
+      bossRoot.rotation.y = lerpAngle(bossRoot.rotation.y, bossNetYaw, damp(dt, 6));
+    }
+  }
+  bossPos.copy(bossGroup.position);
+  const toPlayer=new THREE.Vector3().copy(ship.position).sub(bossPos);
+  const dist=toPlayer.length();
+  /* Facing comes from the direction TO the player and is updated EVERY frame, never
+     from the movement vector: backing away made that vector point away from the player,
+     so he turned his back, and gating it on movement froze his heading at hold range.
+     The damp is deliberately slack — circle him and he takes about half a second to
+     come round, rather than tracking like a turret. */
+  const face=_bossFace.set(toPlayer.x,0,toPlayer.z);
+  if(face.lengthSq()>1e-4){
+    face.normalize();
+    bossYaw=Math.atan2(face.x,face.z);
+    if (bossHost) bossRoot.rotation.y=lerpAngle(bossRoot.rotation.y, bossYaw, damp(dt,1.8));
+  }
+  /* Turning counts as locomotion. Plants are world-space, so a body rotation sweeps every
+     foot backwards in body-local terms just as surely as walking does — but the gait used
+     to see turn-in-place as "idle" and switched to its slow, short-stride settings, so the
+     feet fell behind the body and the legs ended up reaching across the belly. */
+  let yawRate=0;
+  {let dy=bossRoot.rotation.y-bossPrevYaw;
+   while(dy>Math.PI)dy-=Math.PI*2; while(dy<-Math.PI)dy+=Math.PI*2;
+   yawRate=dy/Math.max(dt,1e-4); bossPrevYaw=bossRoot.rotation.y;}
+  const wantDist=62;
+  let moveSpeed=0;
+  if(dist>wantDist+8) moveSpeed=6;
+  else if(dist>wantDist) moveSpeed=2.5;
+  else if(dist<wantDist-12) moveSpeed=-3; // back up if too close — still facing him
+  if(moveSpeed!==0 && bossHost) bossGroup.position.addScaledVector(face, moveSpeed*dt);
+  // walk — procedural tetrapod IK (GrokHeavy): body moves, legs plant/step via raycast
+  const moving=Math.abs(moveSpeed)>0.1 || Math.abs(yawRate)>0.3;
+  bossWalkPhase+=dt*(moving ? 5.2 : 0.9);
+  // group stepping allowances (alternating tetrapod)
+  const _groupStepping=[0,0];
+  for(const leg of bossLegs) if(leg.userData.isStepping) _groupStepping[leg.userData.gaitGroup]++;
+  const canGroupStep=[_groupStepping[0]===0, _groupStepping[1]===0];
+  function neighborStepping(idx){
+    const neighbors=[];
+    if(idx%4!==0) neighbors.push(idx-1);
+    if(idx%4!==3) neighbors.push(idx+1);
+    const mirror= idx<4 ? idx+4 : idx-4;
+    neighbors.push(mirror);
+    for(const n of neighbors){ if(bossLegs[n] && bossLegs[n].userData.isStepping) return true; }
+    return false;
+  }
+  const velocity=new THREE.Vector3().copy(toPlayer).normalize().multiplyScalar(moveSpeed||0);
+  if(!moving) velocity.set(0,0,0);
+  const stepDistance = moving ? 2.8 : 1.4;
+  const stepHeight = moving ? 1.6 : 0.6;
+  const stepDuration = moving ? 0.24 : 0.34;
+  const prediction = 0.15;
+  for(const leg of bossLegs){
+    const d=leg.userData;
+    const yawC2=Math.cos(bossRoot.rotation.y), yawS2=Math.sin(bossRoot.rotation.y);
+    /* body-local → world. three.js makeRotationY is [c,0,s / 0,1,0 / -s,0,c], so this is
+       X = x·c + z·s, Z = -x·s + z·c. It was written with both signs flipped, i.e. rotating
+       by MINUS the yaw, which mirrored every foot target the moment the boss turned. */
+    const rotX =  d.homeOffset.x*yawC2 + d.homeOffset.z*yawS2;
+    const rotZ = -d.homeOffset.x*yawS2 + d.homeOffset.z*yawC2;
+    const ideal=new THREE.Vector3(bossGroup.position.x + rotX + velocity.x*prediction, 0, bossGroup.position.z + rotZ + velocity.z*prediction);
+    const gY=groundHeight(ideal.x, ideal.z);
+    /* IK drives the pad's CENTRE, so plant a half-pad above the surface — planting at
+       surface+0.02 buries the bottom half of every foot. */
+    ideal.y = gY + REST_FOOT_Y;
+    const dist=ideal.distanceTo(d.plantPosition);
+    const groupOk = canGroupStep[d.gaitGroup];
+    const neighborOk = !neighborStepping(d.idx);
+    /* The gait rules keep four feet down, but a leg that is badly out of place has to be
+       allowed to recover even if its group or a neighbour is mid-step — otherwise it waits
+       its turn while the body keeps rotating away from it, and that is what produced the
+       crossed-under legs. Normal steps still obey the tetrapod ordering. */
+    const urgent = dist > stepDistance*2.2;
+    if(!d.isStepping){
+      if(dist > stepDistance && ((groupOk && neighborOk) || urgent)){
+        d.isStepping=true; d.stepT=0; d.stepStart.copy(d.plantPosition); d.stepEnd.copy(ideal);
+        canGroupStep[d.gaitGroup]=false;
+        _groupStepping[d.gaitGroup]++;
+      }
+    }
+    let targetPos;
+    if(d.isStepping){
+      d.stepT += dt / stepDuration;
+      const t=clamp(d.stepT,0,1);
+      const smooth = t<0.5 ? 2*t*t : -1+(4-2*t)*t;
+      targetPos=new THREE.Vector3().lerpVectors(d.stepStart, d.stepEnd, smooth);
+      targetPos.y += Math.sin(t*Math.PI) * stepHeight;
+      if(t>0.2 && t<0.8){
+        const fwdY=groundHeight(targetPos.x, targetPos.z)+REST_FOOT_Y;
+        if(fwdY > targetPos.y - 0.2) targetPos.y = fwdY + Math.sin(t*Math.PI)*stepHeight;
+      }
+      if(d.stepT >= 1){
+        d.isStepping=false; d.plantPosition.copy(d.stepEnd); d.plantNormal.set(0,1,0);
+        targetPos.copy(d.plantPosition);
+      }
+    } else {
+      targetPos=d.plantPosition;
+    }
+    /* world plant target → bossRoot-local, then the same solver the rest pose uses,
+       so the walk and the inspection rig can never drift apart again */
+    const wx2=targetPos.x - bossGroup.position.x, wz2=targetPos.z - bossGroup.position.z;
+    const lx2= wx2*yawC2 - wz2*yawS2;   // world → body-local: the transpose of the above
+    const lz2= wx2*yawS2 + wz2*yawC2;
+    const ly2= targetPos.y - bossGroup.position.y - bossRoot.position.y;
+    /* Safety net: hold the foot inside its own wedge of the body. Even with the recovery
+       step above, a plant can be stale for a frame or two mid-turn, and solveLeg will
+       happily aim the leg wherever the target is — including under the belly or past the
+       centreline. Clamping the angle off the leg's home direction (and the reach) means
+       a lagging foot slides within its wedge instead of folding under the body. */
+    const hx=d.basePos.x, hz=d.basePos.z;
+    const homeA=Math.atan2(d.homeOffset.x-hx, d.homeOffset.z-hz);
+    let ang=Math.atan2(lx2-hx, lz2-hz);
+    let da=ang-homeA;
+    while(da>Math.PI)da-=Math.PI*2; while(da<-Math.PI)da+=Math.PI*2;
+    const LEG_WEDGE=0.85;
+    if(Math.abs(da)>LEG_WEDGE) ang=homeA+(da>0?LEG_WEDGE:-LEG_WEDGE);
+    d.dbgDa=da; d.dbgAng=ang; d.dbgHomeA=homeA;   // gait() reads these
+    const reach=clamp(Math.hypot(lx2-hx, lz2-hz), 3.0, 11.0);
+    if(!d.dbgTgt) d.dbgTgt=[0,0,0];   // reused, not reallocated per frame
+    d.dbgTgt[0]=hx+Math.sin(ang)*reach; d.dbgTgt[1]=ly2; d.dbgTgt[2]=hz+Math.cos(ang)*reach;
+    solveLeg(leg, d.dbgTgt[0], d.dbgTgt[1], d.dbgTgt[2]);
+  }
+  // body adaptation: average planted Y + subtle bob
+  let avgY=0, cnt=0;
+  for(const leg of bossLegs) if(!leg.userData.isStepping){ avgY+=leg.userData.plantPosition.y; cnt++; }
+  if(cnt>0){
+    avgY/=cnt;
+    // keep hips ~3.6 above avg foot without floating - lerp slowly
+    const targetBodyY = avgY - REST_FOOT_Y;   // hips ride ~3.45 above the planted feet
+    bossGroup.position.y = lerp(bossGroup.position.y, targetBodyY, damp(dt,4));
+  }
+  bossRoot.position.y = Math.sin(bossWalkPhase)*0.22 + (moving?0.15:0);
+  /* rage: rear up, then rock weight from one side to the other and stamp back down.
+     Envelope peaks fast and tails off so it lands as one deliberate outburst. */
+  if(bossRage>0){
+    bossRage=Math.max(0,bossRage-dt); bossRageT+=dt;
+    const k=1-bossRage/bossRageDur;                       // 0..1 through the tantrum
+    const env=Math.sin(Math.min(1,k*1.15)*Math.PI);       // rise and fall
+    const rock=Math.sin(bossRageT*9.5);
+    bossRoot.rotation.z = rock*0.16*env;                  // sway side to side
+    bossRoot.rotation.x = -0.26*env;                      // reared back on the hind legs
+    bossRoot.position.y += (0.9 + Math.abs(rock)*0.7)*env; // heaved up, stamping
+    // claws thrown up and out, tail hauled back over the head
+    if(bossClaws.L.visible) bossClaws.L.rotation.x=-0.42-0.5*env;
+    if(bossClaws.R.visible) bossClaws.R.rotation.x=-0.42-0.5*env;
+    if(bossRage<=0){ bossRoot.rotation.z=0; bossRoot.rotation.x=0;
+      if(bossClaws.L.visible) bossClaws.L.rotation.x=-0.42;
+      if(bossClaws.R.visible) bossClaws.R.rotation.x=-0.42; }
+  }
+  /* tail — idle sway at rest; while charging or firing the barb is aimed at the player.
+     The aim is measured FROM THE BARB in body-local space and re-solved every frame, so
+     the chain converges on genuinely pointing at him rather than being nudged by a fudge
+     factor. The old version scaled the raw world-space offset into rotation.z/.y, which is
+     why the tail ended up pointing behind him or into the ground. */
+  const aiming=(bossState==='charging'||bossState==='firing');
+  if(aiming){
+    const tip=bossTail[bossTail.length-1];
+    tip.userData.barb.getWorldPosition(_tailTip);
+    _tailAim.copy(ship.position).sub(_tailTip);
+    const yc=Math.cos(bossRoot.rotation.y), ys=Math.sin(bossRoot.rotation.y);
+    const ax=_tailAim.x*yc - _tailAim.z*ys, az=_tailAim.x*ys + _tailAim.z*yc, ay=_tailAim.y;
+    const azimuth=Math.atan2(ax,az);
+    const pitch=Math.atan2(Math.hypot(ax,az), ay);   // 0 = straight up, π/2 = level
+    /* Spread that total down the chain — most of the bend near the base, the last
+       segments nearly straight, so the barb reads as a barrel lined up on the target. */
+    const W=[0.34,0.26,0.18,0.12,0.07,0.03];
+    for(let i=0;i<bossTail.length;i++){
+      const seg=bossTail[i], sway=Math.sin(t*2.4+i*0.5)*0.02;
+      seg.rotation.x=lerp(seg.rotation.x, pitch*(W[i]||0)+sway, damp(dt,6));
+      seg.rotation.y=lerp(seg.rotation.y, i===0?azimuth:0, damp(dt,6));
+      seg.rotation.z=lerp(seg.rotation.z, 0, damp(dt,6));
+    }
+  } else {
+    for(let i=0;i<bossTail.length;i++){
+      const seg=bossTail[i], sway=Math.sin(t*1.2+i*0.6)*0.12;
+      seg.rotation.x=lerp(seg.rotation.x, (TAIL_REST_X[i]||0.4)+sway*0.35, damp(dt,4));
+      seg.rotation.y=lerp(seg.rotation.y, 0, damp(dt,3));
+      seg.rotation.z=lerp(seg.rotation.z, sway, damp(dt,4));
+    }
+  }
+  // claw idle animation
+  const clawSway=Math.sin(t*1.6)*0.08;
+  if(bossClaws.L.visible) bossClaws.L.rotation.y=-0.40+clawSway;
+  if(bossClaws.R.visible) bossClaws.R.rotation.y=0.40-clawSway;
+  // hit flash — only the struck part flashes (handled in handleBossHit), global flash only for valid hits
+  if(bossFlash>0){bossFlash=Math.max(0,bossFlash-dt); if(bossFlash<=0){for(const m of bossMats){if(m.emissive){m.emissive.set(0x000000); m.emissiveIntensity=0;}}}}
+  if(bossHitShake>0){bossHitShake=Math.max(0,bossHitShake-dt*3); bossRoot.position.x+=rand(-bossHitShake,bossHitShake)*0.15; bossRoot.position.z+=rand(-bossHitShake,bossHitShake)*0.15;}
+  // attack logic - tail gun disabled after destroyed (no shooting without gun)
+  const tailTipAlive = bossHP.tail>0 && bossTail.length && bossTail[bossTail.length-1].visible;
+  if(!tailTipAlive && bossState==='charging'){
+    // abort charge if tail destroyed mid-charge
+    bossState='active';
+    try{
+      const tip=bossTail[bossTail.length-1];
+      if(tip && tip.userData.gunGlow) tip.userData.gunGlow.material.opacity=0;
+      if(tip && tip.userData.gunLight) tip.userData.gunLight.intensity=0;
+      if(tip && tip.userData.gunMat){ tip.userData.gunMat.emissive.set(0x331100); tip.userData.gunMat.emissiveIntensity=0; }
+    }catch{}
+  }
+  if(bossPhase!=='dead' && bossAlive && tailTipAlive && bossHost){
+    bossAttackCd-=dt;
+    if(bossState==='active' && bossAttackCd<=0){
+      bossState='charging'; bossChargeT=0.9; bossAttackCd=3.5+rand(-0.8,0.8);
+      Sfx.charge();
+      // the tail glowing and the charge whine already telegraph this — no caption needed
+      // telegraph: tail tip glows
+      const tip=bossTail[bossTail.length-1];
+      tip.userData.gunGlow.material.opacity=0.9; tip.userData.gunGlow.material.color.set(0xff3b2f);
+      tip.userData.gunLight.intensity=60;
+      tip.userData.gunMat.emissive.set(0xff1a0a); tip.userData.gunMat.emissiveIntensity=1.2;
+    } else if(bossState==='charging'){
+      bossChargeT-=dt;
+      const tip=bossTail[bossTail.length-1];
+      const pulse=0.7+Math.sin(t*18)*0.3;
+      tip.userData.gunGlow.scale.set(pulse,pulse,pulse);
+      tip.userData.gunLight.intensity=40+Math.sin(t*22)*20;
+      if(bossChargeT<=0){
+        bossState='firing';
+        // fire laser burst — proper intercept (was under-leading with fixed 0.18)
+        const bulletSpeed=68;
+        const origin=new THREE.Vector3(); tip.getWorldPosition(origin);
+        // tip gun is Box 2.2×4.8 at top of tip — fire from barb center
+        origin.y+=0.2;
+        const toShip=new THREE.Vector3().copy(ship.position).sub(origin);
+        const dist=toShip.length();
+        const time=Math.max(0, dist / bulletSpeed);
+        /* Only a partial lead now that the round steers. A full intercept lead can put the
+           player 30° off the muzzle line — outside the seeker's cone — so the shot would
+           launch blind and never acquire him. Half-lead starts him inside the cone and lets
+           the seeking do the rest. */
+        const lead=new THREE.Vector3().copy(shipVel).multiplyScalar(time * 0.45);
+        const aimPos=new THREE.Vector3().copy(ship.position).add(lead);
+        aimPos.y+=0.35; // cockpit
+        const dir=new THREE.Vector3().copy(aimPos).sub(origin).normalize();
+        // tighter spread that scales with distance — was fixed 0.02 and felt random
+        const spread=clamp(dist/380, 0.006, 0.014);
+        dir.x+=rand(-spread,spread); dir.y+=rand(-spread,spread); dir.z+=rand(-spread,spread); dir.normalize();
+        for(let k=0;k<2;k++){
+          const o=origin.clone().addScaledVector(dir, k*1.2);
+          spawnBullet(o, dir.clone().multiplyScalar(bulletSpeed), 'alien', 14,
+            /* ttl 9s at 68 u/s ≈ 610 units of reach, ~3.5× the old 2.5s default — outrunning
+               him by simply flying away shouldn't put you out of his range. cone 0.35rad ≈ 40° wide. */
+            {color:0xff3b2f, scale:1.9, seek:true, cone:0.35, turn:1.2, ttl:9});
+          if (mpReady) mpSendShot('u', o, dir, { dmg: 14, color: 0xff3b2f });   // clients render the round
+        }
+        Sfx.alienLaser();
+        tip.userData.gunGlow.material.opacity=0.2; tip.userData.gunLight.intensity=0;
+        setTimeout(()=>{if(bossState==='firing') bossState='active';}, 400);
+      }
+    }
+  }
+  if (bossHost && mpReady) publishBossState(false);
+  updateBossHud();
+}
+
+/* Off-screen target indicator. In view: brackets sized by range, locked on him. Out of
+   view: an arrow riding the screen edge, pointing the shortest way to turn. Points behind
+   the camera project mirrored, so their NDC is negated before use — without that the arrow
+   points the wrong way exactly when he's behind you and you need it most. */
+function updateBossMarker(){
+  if(!(state==='playing'&&bossAlive&&bossState!=='dormant'&&bossState!=='dead')){
+    setHidden(els.bossMark,true); setHidden(els.bossEdge,true); return; }
+  _mv.copy(bossGroup.position); _mv.y+=10;
+  _mv.applyMatrix4(camera.matrixWorldInverse);
+  const behind=_mv.z>0;
+  _mv.applyMatrix4(camera.projectionMatrix);
+  let nx=_mv.x, ny=_mv.y;
+  if(behind){nx=-nx; ny=-ny;}
+  const W=innerWidth, H=innerHeight;
+  const dist=camera.position.distanceTo(bossGroup.position);
+  if(!behind && Math.abs(nx)<=1 && Math.abs(ny)<=1){
+    setHidden(els.bossEdge,true); setHidden(els.bossMark,false);
+    const size=clamp(1900/Math.max(dist,1),34,210);   // diamond is a square turned 45°
+    els.bossMark.style.left=((nx*0.5+0.5)*W)+'px';
+    els.bossMark.style.top=((-ny*0.5+0.5)*H)+'px';
+    els.bossMark.style.width=size+'px'; els.bossMark.style.height=size+'px';
+  } else {
+    setHidden(els.bossMark,true); setHidden(els.bossEdge,false);
+    let dx=nx, dy=-ny; const m=Math.hypot(dx,dy)||1; dx/=m; dy/=m;   // screen-space bearing, y down
+    const pad=8, hw=W/2-pad, hh=H/2-pad;
+    /* where the bearing ray leaves the screen. Clamping that exit point per axis gives each
+       border its own slide position, so a diagonal drives two bars that meet at the corner
+       while a pure left/right bearing drives one bar centred on that edge. */
+    const t=Math.min(hw/Math.max(Math.abs(dx),1e-6), hh/Math.max(Math.abs(dy),1e-6));
+    const ex=clamp(W/2+dx*t, pad, W-pad), ey=clamp(H/2+dy*t, pad, H-pad);
+    /* length by proximity: full-length up close, shrinking to a stub out at long range.
+       An inverse-distance curve bottoms out almost immediately at this game's ranges. */
+    const near=Math.min(W,H)*0.5, far=44;
+    const len=lerp(near, far, clamp((dist-60)/380, 0, 1));
+    const EPS=0.06, TH=6;
+    /* Clamp each bar's span to the border it lives on so it stops AT the corner instead of
+       running past it — two bars meeting then read as one 90° corner rather than crossing
+       in an X. */
+    const put=(el,on,css)=>{el.classList.toggle('on',on); if(on)Object.assign(el.style,css);};
+    const vSpan=()=>{const a=clamp(ey-len/2,pad,H-pad), b=clamp(ey+len/2,pad,H-pad);
+                     return {top:a+'px', height:Math.max(TH,b-a)+'px'};};
+    const hSpan=()=>{const a=clamp(ex-len/2,pad,W-pad), b=clamp(ex+len/2,pad,W-pad);
+                     return {left:a+'px', width:Math.max(TH,b-a)+'px'};};
+    put(eiR, dx>EPS,  Object.assign({left:(W-pad-TH)+'px'}, vSpan()));
+    put(eiL, dx<-EPS, Object.assign({left:pad+'px'},        vSpan()));
+    put(eiB, dy>EPS,  Object.assign({top:(H-pad-TH)+'px'},  hSpan()));
+    put(eiT, dy<-EPS, Object.assign({top:pad+'px'},         hSpan()));
+  }
+}
+const eiL=$('eiL'), eiR=$('eiR'), eiT=$('eiT'), eiB=$('eiB');
+
+function updateBossHud() {
+  /* The panel only exists once he is out of the ground, and deliberately shows a single
+     generic health bar — no phase name, no per-part labels. Working out the order of
+     attack is the puzzle; the glow and animation on each part are the intended clues. */
+  const show = bossGroup && bossAlive && bossState !== 'dormant';
+  setHidden(els.bossPanel, !show);
+  if (!show) return;
+  let total = 0, cur = 0;
+  if (bossPhase === 'claws') { total = bossMax.clawL + bossMax.clawR; cur = Math.max(0, bossHP.clawL) + Math.max(0, bossHP.clawR); }
+  else if (bossPhase === 'tail') { total = bossMax.tail; cur = Math.max(0, bossHP.tail); }
+  else if (bossPhase === 'head') { total = bossMax.head; cur = Math.max(0, bossHP.head); }
+  const pct = total ? (cur / total * 100) : 0;
+  setWidth(els.bossFill, (bossState === 'emerging' ? 100 : pct) + '%');
+  setText(els.bossHpText, bossState === 'emerging' ? 'EMERGING…' : Math.ceil(cur) + ' / ' + total);
+}
 function updateHud() {
+  updateBossMarker(); updateBossHud();
   setText(els.score, String(score));
   setWidth(els.hpFill, hp + '%');
   setBg(els.hpFill, hp > 55
@@ -2152,6 +3405,7 @@ function updateHud() {
   const alive = buildings.filter(b => b.alive).length;
   setText(els.colony, alive + ' / ' + buildings.length + ' intact');
   setText(els.kills, stats.saucers + ' saucers · ' + stats.buildings + ' buildings');
+  setText(els.weapon, laser ? '⚡ TWIN LASER' : 'CANNON');
   setText(els.alienCount, aliens.length + (pendingSpawns.length ? ' (+' + pendingSpawns.length + ')' : ''));
   setWidth(els.alertFill, alertLevel + '%');
   const ac = alertLevel > 66 ? '#ff3b2f' : alertLevel > 33 ? '#ff9c2e' : '#ffd24d';
@@ -2164,11 +3418,11 @@ function updateHud() {
     const snap = readWorldSnap();
     const hid = isHostNow() ? myId : (snap && snap.h);
     const rows = [];
-    rows.push({ name: callsign, score, dead: hp <= 0, me: true, tint: 0xd8dee6, host: hid === myId });
+    rows.push({ name: callsign, score, dead: hp <= 0, me: true, tint: 0xd8dee6, host: hid === myId, wp: laser });
     for (const id of peerOrder) {
       const e = peerShips.get(id);
       rows.push({ name: nameOf(id), score: e ? e.score : 0, dead: !!(e && e.dead), me: false,
-        tint: tintFor(id), host: id === hid });
+        tint: tintFor(id), host: id === hid, wp: !!(e && e.netWeapon) });
     }
     rows.sort((a, b) => b.score - a.score);
     syncScoreboard(rows);
@@ -2330,9 +3584,18 @@ function update(dt) {
   /* mouse steering fallback only before the pointer has ever locked (menu /
      headless). After an ESC release, mouse input is ignored until re-engaged. */
   if (!locked && !everLocked) steerFallback(dt);
+  /* Mouse input sets a DESIRED heading; the airframe swings toward it with inertia and
+     banks into the turn. Writing the aim straight onto the hull made the ship read as a
+     prop hanging in front of a free camera rather than an aircraft changing heading. */
   const strafe = (keys.has('KeyA') ? 1 : 0) - (keys.has('KeyD') ? 1 : 0);
-  roll = lerp(roll, strafe * 0.45, damp(dt, 6));
-  ship.rotation.set(pitch, yaw, roll, 'YXZ');
+  const prevCraftYaw = craftYaw;
+  craftYaw = lerpAngle(craftYaw, yaw, damp(dt, 5.0));
+  craftPitch = lerp(craftPitch, pitch, damp(dt, 5.0));
+  let dYaw = craftYaw - prevCraftYaw;
+  while (dYaw > Math.PI) dYaw -= Math.PI * 2; while (dYaw < -Math.PI) dYaw += Math.PI * 2;
+  const bank = clamp((dYaw / Math.max(dt, 1e-4)) * 0.34, -0.68, 0.68);
+  roll = lerp(roll, strafe * 0.45 + bank, damp(dt, 4.5));
+  ship.rotation.set(craftPitch, craftYaw, roll, 'YXZ');
 
   const fwd = _fwd;
   ship.getWorldDirection(fwd);
@@ -2347,12 +3610,15 @@ function update(dt) {
   /* afterburner: big speed boost, drains fuel, recharges when not in use */
   boosterMsgCd = Math.max(0, boosterMsgCd - dt);
   const wantBooster = !!(keys.has('ShiftLeft') || keys.has('ShiftRight'));
-  if (boosterOn && (!wantBooster || booster <= 0)) boosterOn = false;
-  if (wantBooster && !boosterOn && booster > 0) { boosterOn = true; Sfx.alienLaser(); }
+  /* Latch the booster once it runs dry: while Shift stays held it must not re-engage, or it
+     regenerates a sliver each frame and re-fires the engage sound several times a second. */
+  if (!wantBooster) boosterLock = false;
+  if (boosterOn && (!wantBooster || booster <= 0)) { if (booster <= 0) boosterLock = true; boosterOn = false; }
+  if (wantBooster && !boosterOn && !boosterLock && booster > 8) { boosterOn = true; Sfx.alienLaser(); }
   const boosting = boosterOn && booster > 0;
   if (boosting) {
     booster = Math.max(0, booster - dt * 30);          // ~3.3s of burn per full bar
-    if (booster <= 0 && boosterMsgCd <= 0) { boosterOn = false; msg('BOOSTER SPENT', '#ffb07a', 2.5); boosterMsgCd = 3; }
+    if (booster <= 0 && boosterMsgCd <= 0) { boosterOn = false; boosterLock = true; msg('BOOSTER SPENT', '#ffb07a', 2.5); boosterMsgCd = 3; }
   } else {
     booster = Math.min(100, booster + dt * 11);        // full recharge in ~9s
   }
@@ -2440,6 +3706,12 @@ function update(dt) {
     }
   }
 
+  /* TWIN LASER pickup: fly into the drop — host verifies range + grants it */
+  if (powerup.alive && inWorld() && ship.position.distanceToSquared(powerup.pos) < POW_R * POW_R) {
+    if (isHostNow()) hostPowerupPickup(myId);
+    else mpSendCmd('pow', {});
+  }
+
   /* engine flame: size ∝ thrust, flickers; afterburner makes it roar */
   const thrust = clamp(Math.max(Math.abs(throttle) * 0.85 + Math.abs(vertical) * 0.55,
                                 boosting ? 0.95 : 0), 0, 1);
@@ -2453,33 +3725,72 @@ function update(dt) {
   shipFlameLight.intensity = thrust * (boosting ? 70 : 26) * (1 + 0.5 * Math.sin(tGame * 27) * (0.85 + 0.15 * fl));
 
   /* rigid chase cam — view = ship heading, no spring (FPS-style look) */
-  const camTarget = _camTarget.copy(ship.position).addScaledVector(fwd, -11);
+  /* Chase camera on a spring rather than bolted to the hull, so in a hard turn the ship
+     banks and slides across the frame while the camera swings in after it. The offset is
+     bounded, otherwise a hard turn slings it far enough that the ship leaves the frame. */
+  const camDist = 11 + Math.min(shipVel.length() * 0.075, 3.5);
+  const camTarget = _camTarget.copy(ship.position).addScaledVector(fwd, -camDist);
   camTarget.y += 3;
   if (camTarget.y < terrainHeight(camTarget.x, camTarget.z) + 1) {
     camTarget.y = terrainHeight(camTarget.x, camTarget.z) + 1;
   }
-  camera.position.copy(camTarget);
-  camera.lookAt(_lookAt.copy(ship.position).addScaledVector(fwd, 8));
+  camPos.lerp(camTarget, damp(dt, 3.6));
+  { const off = _camOff.copy(camPos).sub(camTarget), MAXOFF = 4.5;
+    if (off.lengthSq() > MAXOFF * MAXOFF) camPos.copy(camTarget).add(off.setLength(MAXOFF)); }
+  if (camPos.y < terrainHeight(camPos.x, camPos.z) + 1) camPos.y = terrainHeight(camPos.x, camPos.z) + 1;
+  camera.position.copy(camPos);
+  if (camShake > 0.001) {
+    camera.position.x += rand(-camShake, camShake);
+    camera.position.y += rand(-camShake, camShake) * 0.7;
+    camera.position.z += rand(-camShake, camShake);
+    camShake = Math.max(0, camShake - dt * 2.2);
+  }
+  /* Aim far down the nose axis: converging the view on a near point tilts the camera off
+     the nose, which drifts the crosshair ~9° from where the aircraft actually points. */
+  bossCam = lerp(bossCam, bossCamWant, damp(dt, bossCamWant > 0 ? 2.8 : 1.7));
+  const lookPoint = _lookAt.copy(ship.position).addScaledVector(fwd, 300);
+  if (bossCam > 0.002 && bossGroup) {
+    lookPoint.lerp(_camLookBoss.copy(bossGroup.position).setY(bossGroup.position.y + 11), bossCam);
+  }
+  camera.lookAt(lookPoint);
+  Sfx.listener(camera);
 
   fireCd -= dt;
   if (firing && fireCd <= 0) {
-    fireCd = 0.16;
-    ship.getWorldDirection(_fireDir);
-    _fireDir.negate(); // fire from the nose
-    const origin = _fireOrigin.copy(ship.position).addScaledVector(_fireDir, 5.5);
-    spawnBullet(origin, _fireVel.copy(_fireDir).multiplyScalar(95), myId || 'me', 10);
-    Sfx.laser();
-    stats.shots++;
-    if (mpReady) {
-      mpSendShot('p', origin, _fireDir);           // compact: {o:[..], d:[..]}
-      publishFlamePulse();
+    if (laser) {
+      /* TWIN LASER: hitscan — one beam from EACH wingtip, instantly, to the
+         first thing they touch. Slightly faster cycle than the cannon. */
+      fireCd = 0.12;
+      fireTwinLaser(fwd, right);
+    } else {
+      fireCd = 0.16;
+      ship.getWorldDirection(_fireDir);
+      _fireDir.negate(); // model nose points along local -Z
+      const origin = _fireOrigin.copy(ship.position).addScaledVector(_fireDir, 5.5);
+      /* Converge on whatever the crosshair is over rather than firing straight down the
+         nose — the trailing camera sits off the hull's axis, so those differ. */
+      camera.getWorldDirection(_aimDir);
+      aimRay.set(camera.position, _aimDir);
+      const cross = bossGroup && bossAlive ? aimRay.intersectObject(bossGroup, true) : [];
+      const aimPt = (cross.length && cross[0].distance > 6) ? cross[0].point
+                  : _aimPt.copy(camera.position).addScaledVector(_aimDir, 600);
+      _fireDir.copy(_shotDir.copy(aimPt).sub(origin).normalize());
+      spawnBullet(origin, _fireVel.copy(_fireDir).multiplyScalar(95), myId || 'me', 10);
+      Sfx.laser();
+      stats.shots++;
+      if (mpReady) {
+        mpSendShot('p', origin, _fireDir);           // compact: {o:[..], d:[..]}
+        publishFlamePulse();
+      }
     }
   }
 
   updateBullets(dt);
+  updateBoss(dt, tGame);
   updateAliens(dt, tGame);
   updateSpawning(dt);
   updateFx(dt);
+  updateBeams(dt);
   updateBuildingFlash(dt);
   updateHud();
   if (mpReady) {
@@ -2495,6 +3806,7 @@ window.marsDebug = {
   state() {
     return {
       state, score, hp: Math.ceil(hp), booster: Math.round(booster), boosting: boosterOn,
+      shots: stats.shots,
       alertLevel: Math.round(alertLevel),
       aliens: aliens.length, pending: pendingSpawns.length,
       buildingsAlive: buildings.filter(b => b.alive).length,
@@ -2530,8 +3842,47 @@ window.marsDebug = {
   },
   rocksAlive() { return rockData.filter(r => r.alive).length; },
   buildingsAlive() { return buildings.filter(b => b.alive).length; },
+  /* step the sim and force a paint. requestAnimationFrame is throttled to a crawl when the
+     tab is hidden, so automated screenshots otherwise capture a stale frame. */
+  frame(n = 1, dt = 1 / 60) {
+    for (let i = 0; i < n; i++) { if (state === 'playing') update(dt); else updateFx(dt); renderer.render(scene, camera); }
+    return { stepped: n, boss: bossState, sceneChildren: scene.children.length, calls: renderer.info.render.calls };
+  },
+  /* raze the whole colony — the intended trigger for the scorpion, host-side only */
+  razeColony() {
+    if (!isHostNow()) return 'not host';
+    for (const b of buildings) if (b.alive) { b.hp = 0; mpDestroyBuilding(b, myId); }
+    return { buildingsAlive: buildings.filter(b => b.alive).length, boss: bossState };
+  },
+  bossProbe(x, y, z) { const h = bossHitTest(new THREE.Vector3(x, y, z)); return h ? h.part : null; },
+  bossPartPos(p) { const v = getBossPartWorldPos(p); return v ? v.toArray().map(n => +n.toFixed(1)) : null; },
+  boss() { return { state: bossState, phase: bossPhase, alive: bossAlive, hp: { ...bossHP }, t: +bossT.toFixed(2), yaw: bossRoot ? +bossRoot.rotation.y.toFixed(2) : null, atkCd: +bossAttackCd.toFixed(2), rage: +bossRage.toFixed(2),
+                    pos: bossGroup ? bossGroup.position.toArray().map(v => +v.toFixed(1)) : null }; },
   spawnUfo() { return isHostNow() ? (makeAlien(ship.position.clone().add(new THREE.Vector3(30, 10, 0)), 0, true), publishWorldSnapshot(true)) : null; },
   hostFlag() { return isHostNow(); },
+  /* ---- test cheats ---- */
+  passive(on = !aliensPassive) {   // toggle: aliens stop hunting/firing (host-side; they hover in place)
+    if (isHostNow()) { aliensPassive = on; publishWorldSnapshot(true); }
+    return aliensPassive;
+  },
+  blastAllButOne(keepIdx = 0) {   // destroy every building except one (default: the central dome) — single-target test
+    if (!isHostNow()) return 'not host';
+    const alive = buildings.filter(b => b.alive);
+    const keep = keepIdx >= 0 ? buildings[keepIdx] : (alive[alive.length - 1] || null);
+    for (const b of alive) {
+      if (keep && b === keep) continue;
+      if (b.alive) mpDestroyBuilding(b, myId);   // routes: rubble, fx, alert, drop, snapshot
+    }
+    return { alive: buildings.filter(b => b.alive).length, kept: keep ? keep.type : null, powerup: powerup.alive };
+  },
+  laser() { return laser; },
+  powerup() { return powerup.alive ? { pos: powerup.pos.toArray().map(v => Math.round(v)) } : null; },
+  grantLaser() { grantLaser(myId); },
+  /* ---- model inspector (screenshot the ship + laser frame) ---- */
+  modelInspect(on = true) { return modelInspect(on); },   // white backdrop, ship alone
+  modelPose(name) { return modelPose(name); },            // 'top' | 'front' | 'left'
+  modelDryLaser() { return modelDryLaser(); },            // freeze one dual-beam fire frame (no damage)
+  dropPowerup() { if (isHostNow()) { powerup.alive = true; powerup.pos.set(ship.position.x, Math.max(15, ship.position.y - 25), ship.position.z); spawnPowerupVisual(); publishWorldSnapshot(true); } return powerup.alive; },
 
   /* ---- macro harness: drives the SAME events a user produces (window
      keydown/keyup, canvas mousedown/up), so tests exercise the real input
@@ -2554,7 +3905,7 @@ window.marsDebug = {
       if (s.fire) canvas.dispatchEvent(new MouseEvent('mousedown', { button: 0, bubbles: true }));
       await sleep(s.hold != null ? s.hold : (s.press || s.fire ? 50 : 0)); // default = tap
       if (s.press) for (const k of norm(s.press)) window.dispatchEvent(new KeyboardEvent('keyup', { code: k }));
-      if (s.fire) canvas.dispatchEvent(new MouseEvent('mouseup', { button: 0 }));
+      if (s.fire) canvas.dispatchEvent(new MouseEvent('mouseup', { button: 0, bubbles: true }));
     }
   }
 };
@@ -2581,6 +3932,66 @@ const dbgSprite = new THREE.Sprite(new THREE.SpriteMaterial({
 const dbgScene = new THREE.Scene();
 dbgScene.add(dbgSprite);
 const dbgCam = new THREE.OrthographicCamera(0, 1, 1, 0, 0, 1);
+
+/* ---- model inspector (debug): ship ALONE on a white backdrop, posed for
+   screenshots. modelPose('top'|'front'|'left'), modelDryLaser() freezes one
+   TWIN LASER fire frame (both beams) without damaging anything. ---- */
+const modelScene = new THREE.Scene();
+const modelShip = createShip(0xd8dee6);
+modelScene.add(modelShip, new THREE.AmbientLight(0xffffff, 0.95), (() => { const d = new THREE.DirectionalLight(0xffffff, 1.2); d.position.set(4, 6, 5); return d; })());
+let modelInspecting = false, modelPoseName = 'top', modelLaserOn = false;
+/* ship nose = local -Z, left wing = local -X. A π yaw turns the nose to world
+   +Z (toward the front camera) and the LEFT wing to world +X (toward the side
+   camera), so 'front' and 'left' share the rotation. */
+const MODEL_POSES = {
+  top:   { rot: [0, 0, 0],           off: [0, 12, 0.02] },
+  front: { rot: [0, Math.PI, 0],     off: [0, 0, 12] },
+  left:  { rot: [0, Math.PI, 0],     off: [12, 0, 0] }
+};
+function modelDryLaser() {
+  /* beams are CHILDREN of modelShip so top/front/left poses rotate them too.
+     Mirrors the in-game geometry: each wing aims at a far point on the nose
+     axis, so the two beams converge there (the crosshair direction). */
+  modelClearBeams();
+  modelLaserOn = true;
+  const aim = new THREE.Vector3(0, 0, -60);   // convergence point on the nose axis
+  for (const sgn of [1, -1]) {
+    const o = new THREE.Vector3(1.85 * sgn, 0, 0);
+    const dir = aim.clone().sub(o).normalize();
+    const len = o.distanceTo(aim);
+    const geo = new THREE.CylinderGeometry(0.06, 0.16, 1, 6, 1, true);
+    geo.translate(0, 0.5, 0);
+    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x20c8ff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false }));
+    m.position.copy(o);
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+    m.scale.set(1, len, 1);
+    m.name = 'dbgBeam';
+    modelShip.add(m);
+  }
+  return 2;
+}
+function modelClearBeams() {
+  for (const m of [...modelShip.children]) if (m.name === 'dbgBeam') { modelShip.remove(m); m.geometry.dispose(); m.material.dispose(); }
+  modelLaserOn = false;
+}
+function modelPose(name) {
+  modelPoseName = name;
+  const p = MODEL_POSES[name] || MODEL_POSES.top;
+  modelShip.rotation.set(p.rot[0], p.rot[1], p.rot[2], 'YXZ');
+  if (modelLaserOn) modelClearBeams();
+  return name;
+}
+function modelInspect(on = true) {
+  modelInspecting = !!on;
+  if (modelInspecting) {
+    if (modelPoseName && !modelLaserOn) modelPose(modelPoseName);
+    for (const o of scene.children) if (o !== ship) o.visible = false;
+  } else {
+    for (const o of scene.children) if (o !== ship) o.visible = true;
+    modelClearBeams();
+  }
+  return modelInspecting;
+}
 function layoutDbgOverlay() {
   const w = innerWidth, h = innerHeight;
   dbgCam.left = 0; dbgCam.right = w; dbgCam.top = h; dbgCam.bottom = 0;
@@ -2680,10 +4091,19 @@ function animate() {
   dbgSample(Math.max(1, dtMs));
   dust.rotation.y += dt * 0.012;
 
+  if (powerup.alive && powerup.group) {
+    powerup.t += dt;
+    powerup.group.rotation.y += dt * 2.2;
+    powerup.group.children[0].rotation.x += dt * 3.1;
+    powerup.group.position.y = powerup.pos.y + Math.sin(powerup.t * 2.4) * 0.8;
+    powerup.group.children[2].intensity = 55 + Math.sin(powerup.t * 5) * 25;
+  }
+
   if (state === 'playing') {
     update(dt);
   } else {
     updateFx(dt);
+    updateBeams(dt);
     if (state === 'menu') {
       camera.position.set(Math.sin(t * 0.07) * 110, 55, Math.cos(t * 0.07) * 110);
       camera.lookAt(0, 6, 0);
@@ -2704,13 +4124,22 @@ function animate() {
     }
   }
   updateMessages(dt);
-  renderer.render(scene, camera);
+  if (modelInspecting) {
+    /* model inspector: white backdrop, ship alone, camera per pose */
+    const p = MODEL_POSES[modelPoseName] || MODEL_POSES.top;
+    camera.position.set(p.off[0], p.off[1], p.off[2]);
+    camera.lookAt(0, 0, 0);
+    renderer.render(modelScene, camera);
+  } else {
+    renderer.render(scene, camera);
+  }
   if (dbgOn) {
     renderer.autoClear = false;
     renderer.render(dbgScene, dbgCam);
     renderer.autoClear = true;
   }
 }
+modelScene.background = new THREE.Color(0xffffff);
 animate();
 
 addEventListener('resize', () => {
