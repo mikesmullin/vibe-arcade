@@ -61,7 +61,7 @@
   .sbscore { font-weight:700; font-variant-numeric:tabular-nums; }
   .sbdot.me { box-shadow:0 0 8px 1px rgba(255,255,255,.8); }
   .dead { opacity:.45; text-decoration:line-through; }
-  #roomPanel { top:auto; bottom:14px; right:14px; min-width:210px; }
+  #roomPanel { top:auto; bottom:14px; right:14px; min-width:210px; z-index:30; pointer-events:auto; }
   #roomPanel button { pointer-events:auto; cursor:pointer; font:inherit; font-size:11px;
     background:#3a1c10; color:#ffd9b0; border:1px solid rgba(255,150,90,.4); border-radius:6px;
     padding:3px 9px; margin:2px 0; }
@@ -94,13 +94,14 @@
     <div class="row" style="justify-content:flex-end"><div class="bar" style="flex:0 0 140px"><div class="fill" id="alertFill"></div></div></div>
     <div class="row" style="justify-content:flex-end"><span class="label">Saucers</span><span id="alienCount" class="muted">0</span></div>
   </div>
-  <div class="panel" id="roomPanel">
-    <div class="row"><span class="label">Room</span><span id="roomCode" class="muted" style="color:#7fd4ff">CONNECTING…</span></div>
-    <div class="row"><span class="label">Pilots</span><span id="pilotsCount" class="muted">1</span></div>
-    <div class="row" style="display:flex;flex-wrap:wrap;justify-content:flex-end" id="roomBtns"></div>
-  </div>
   <div id="messages"></div>
-  <div id="hint">WASD fly · Q/E up/down · Shift = afterburner · hold click to fire · Esc releases mouse</div>
+  <div id="hint">WASD fly · Q/E up/down · Shift = afterburner · hold click to fire · Esc releases mouse (click to re-lock)</div>
+</div>
+<!-- room panel lives OUTSIDE .hud so its buttons stay clickable above the death/menu overlays -->
+<div class="panel" id="roomPanel">
+  <div class="row"><span class="label">Room</span><span id="roomCode" class="muted" style="color:#7fd4ff">CONNECTING…</span></div>
+  <div class="row"><span class="label">Pilots</span><span id="pilotsCount" class="muted">1</span></div>
+  <div class="row" style="display:flex;flex-wrap:wrap;justify-content:flex-end" id="roomBtns"></div>
 </div>
 <div id="crosshair" class="hidden"></div>
 
@@ -128,12 +129,7 @@
   </div>
 </div>
 
-<div class="overlay hidden" id="paused">
-  <div class="card">
-    <div class="title" style="font-size:30px">PAUSED</div>
-    <div class="startbtn">CLICK TO RESUME</div>
-  </div>
-</div>
+
 
 <div class="overlay hidden" id="gameover">
   <div class="card">
@@ -173,7 +169,7 @@ const els = {
   boosterFill: $('boosterFill'), boosterText: $('boosterText'), colony: $('colonyEl'),
   kills: $('killsEl'), alertText: $('alertText'), alertFill: $('alertFill'),
   alienCount: $('alienCount'), messages: $('messages'), crosshair: $('crosshair'),
-  dmg: $('dmg'), lowhp: $('lowhp'), menu: $('menu'), paused: $('paused'),
+  dmg: $('dmg'), lowhp: $('lowhp'), menu: $('menu'),
   gameover: $('gameover'), finalStats: $('finalStats'),
   sbRows: $('sbRows'), netStatus: $('netStatus'), roomCode: $('roomCode'),
   pilotsCount: $('pilotsCount'), roomBtns: $('roomBtns')
@@ -350,19 +346,20 @@ let rockMesh;
 const rockRubbleMat = new THREE.MeshStandardMaterial({ color: 0x5c2d1e, roughness: 1, flatShading: true });
 const _rockZero = new THREE.Matrix4().makeScale(0, 0, 0);
 function mpRockHit(i, ownerId, point) {
-  if (ownerId === myId) {
-    mpSend('rock', { i, x: point.x, y: point.y, z: point.z, who: myId, t: Date.now() });
-  }
-  destroyRock(i, point);
+  if (ownerId !== myId) return;
+  if (isHostNow()) { destroyRock(i, point, true); mpSendCmd('rock', { i, p: rArr([point.x, point.y, point.z]) }); }
+  else { destroyRock(i, point, true); mpSendCmd('rock', { i, p: rArr([point.x, point.y, point.z]) }); }
 }
-function destroyRock(i, hitPos) {
+function destroyRock(i, hitPos, localFx) {
   const rk = rockData[i];
   if (!rk.alive) return;
   rk.alive = false;
   rockMesh.setMatrixAt(i, _rockZero);
   rockMesh.instanceMatrix.needsUpdate = true;
-  explosion(hitPos, 0xd9a06a, clamp(rk.r * 0.45, 0.5, 1.2), Math.round(rk.r * 5));
-  Sfx.hit();
+  if (localFx) {
+    explosion(hitPos, 0xd9a06a, clamp(rk.r * 0.45, 0.5, 1.2), Math.round(rk.r * 5));
+    Sfx.hit();
+  }
   const n = 3 + Math.floor(rand(0, 2));
   rk.debris = rk.debris || [];
   for (let k = 0; k < n; k++) {
@@ -488,44 +485,8 @@ addBuilding('tank',  -40, -28);
 addBuilding('hab',    44,  -6);
 addBuilding('antenna', 10,  44);
 
-/** local bullet hit on a building: apply damage, alert, broadcast */
-function mpBuildingHit(bd, ownerId, dmg, point) {
-  if (ownerId === myId) {
-    bd.hp -= dmg;
-    bd.flash = 0.12;
-    Sfx.hit();
-    explosion(point, 0xffd08a, 0.5, 14);
-    alertLevel = Math.min(100, alertLevel + 3);
-    if (!alertTriggered) {
-      alertTriggered = true;
-      alertLevel = Math.max(alertLevel, 25);
-      spawnTimer = 1.4;
-      mpSetAlert(alertLevel);
-      msg('⚠ THE COLONY IS UNDER FIRE — THE ALIEN FLEET IS AWAKENED', '#ffd24d', 5);
-      Sfx.alert();
-    }
-    if (bd.hp <= 0) {
-      mpDestroyBuilding(bd, ownerId);
-    } else {
-      mpSendBuildingHp(bd);
-    }
-  }
-}
-function mpDestroyBuilding(b, ownerId) {
-  b.alive = false;
-  scene.remove(b.group);
-  explosion(b.center, 0xffa04d, 1.6, 60);
-  Sfx.explosion(1.4);
-  if (ownerId === myId) {
-    score += 150;
-    stats.buildings++;
-    alertLevel = Math.min(100, alertLevel + 35);
-    mpSetAlert(alertLevel);
-    msg('🔥 ' + b.type.toUpperCase() + ' DESTROYED — ALIEN FURY RISING', '#ff9c6a', 4);
-    mpSendBuildingHp(b);
-    mpSend('bdestroy', { i: buildings.indexOf(b), x: b.center.x, y: b.center.y, z: b.center.z, who: myId, t: Date.now() });
-  }
-
+/** build + add rubble/crater for a destroyed building (visual only) */
+function addRubble(b) {
   const rubbleMat = new THREE.MeshStandardMaterial({ color: 0x4a2a1e, roughness: 1, flatShading: true });
   for (let i = 0; i < 7; i++) {
     const s = rand(0.8, 2.4);
@@ -546,6 +507,29 @@ function mpDestroyBuilding(b, ownerId) {
   crater.position.set(b.center.x, terrainHeight(b.center.x, b.center.z) + 0.15, b.center.z);
   scene.add(crater);
   b.debris.push(crater);
+}
+/** remove a building + its rubble (host-side, already scored) */
+function destroyBuildingVisual(b) {
+  b.alive = false;
+  scene.remove(b.group);
+  addRubble(b);
+  explosion(b.center, 0xffa04d, 1.6, 60);
+  mpSendFx(b.center.x, b.center.y, b.center.z, 0xffa04d, 1.6);
+  Sfx.explosion(1.4);
+}
+/** a local player bullet struck a building (client detection → route to host authority) */
+function mpBuildingHit(bd, ownerId, dmg, point) {
+  if (ownerId !== myId) return;
+  if (isHostNow()) hostBuildingHit(bd, dmg, point, myId);
+  else mpSendCmd('bhit', { i: buildings.indexOf(bd), dmg, p: rArr([point.x, point.y, point.z]) });
+}
+/** host-side building destruction (visuals, alert, rubble, snapshot). Score via e_score (host gets it too). */
+function mpDestroyBuilding(b, ownerId) {
+  if (b.alive) destroyBuildingVisual(b);
+  alertLevel = Math.min(100, alertLevel + 35);
+  mpSendMsg('🔥 ' + b.type.toUpperCase() + ' DESTROYED — ALIEN FURY RISING', '#ff9c6a');
+  if (ownerId) awardScore(ownerId, 150, 'bld');
+  publishWorldSnapshot(true);
 }
 
 /* ================= ship model (shared by local + remote pilots) ================= */
@@ -668,6 +652,7 @@ const SPAWN_POINTS = [];
 }
 let mpReady = false;
 let myId = null;
+let wasHost = false;
 let callsign = 'RAIDER';
 const peerOrder = [];          // remote peer ids, join order
 const peers = new Map();       // id -> { player }
@@ -679,96 +664,186 @@ const myPlayer = () => { try { return Playroom.myPlayer(); } catch { return null
 const roomGetState = k => { try { return Playroom.getState(k); } catch { return undefined; } };
 const roomSetState = (k, v) => { try { Playroom.setState(k, v, true); } catch {} };
 
-function mpSend(type, payload = {}) {
+/* compact flat-array payloads (much smaller than nested JSON objects) */
+const r1 = v => Math.round((v || 0) * 10) / 10;
+const rArr = a => [r1(a[0]), r1(a[1]), r1(a[2])];
+
+/* per-type reliable event keys (avoid a single slot clobbering in-flight events) */
+function mpSendEvent(key, payload = {}) {
   const me = myPlayer();
-  if (!me) return;
-  try { me.setState('evt', Object.assign({ type }, payload, { who: myId, t: Date.now() }), true); } catch {}
+  if (!me || !mpReady) return;
+  try { me.setState(key, Object.assign(payload, { who: myId, t: Date.now() }), true); } catch {}
 }
-function mpSetAlert(level) {
-  const t = Date.now();
-  roomSetState('world.alert', { level, t });
-  mpSend('alert', { level, t });
+function mpSendShot(kind, o, d, extra = {}) {
+  mpSendEvent('e_shot', { k: kind, o: rArr([o.x, o.y, o.z]), d: rArr([d.x, d.y, d.z]), ...extra });
 }
-function mpSendBuildingHp(bd, point) {
-  const i = buildings.indexOf(bd);
-  const map = Object.assign({}, roomGetState('world.bhp') || {});
-  map[i] = { hp: Math.round(bd.hp), x: point ? point.x : 0, y: point ? point.y : 0, z: point ? point.z : 0, t: Date.now() };
-  roomSetState('world.bhp', map);
-  mpSend('bhp', { i, hp: Math.round(bd.hp), x: point ? point.x : 0, y: point ? point.y : 0, z: point ? point.z : 0, t: Date.now() });
+function mpSendFx(x, y, z, color, size) {
+  mpSendEvent('e_fx', { p: rArr([x, y, z]), c: color, s: size || 1 });
 }
-function applyAlertLevel(level, fromId) {
-  alertLevel = Math.min(100, Math.max(alertLevel, level));
-  if (!alertTriggered) {
-    alertTriggered = true;
-    alertLevel = Math.max(alertLevel, 25);
-    spawnTimer = Math.min(spawnTimer, 1.4) || 1.4;
-    msg('⚠ THE ALIEN FLEET IS AWAKENED', '#ffd24d', 5);
-    Sfx.alert();
+function mpSendCmd(c, payload) { mpSendEvent('e_cmd', Object.assign({ c }, payload)); }
+function mpSendMsg(text, color) { mpSendEvent('e_msg', { text, color: color || '#ffd9b0' }); }
+function mpSendScore(scorerId, amt, why) { mpSendEvent('e_score', { scorer: scorerId, amt, why }); }
+/* host is authoritative: apply locally if the scorer is me, else notify the other client */
+function awardScore(scorerId, amt, why) {
+  if (scorerId === myId) { score += amt; if (why === 'bld') stats.buildings++; else stats.saucers++; }
+  else mpSendScore(scorerId, amt, why);
+}
+
+/* ---- host authority: Playroom's designated host simulates the shared world.
+   (The local participant array is NOT a reliable host signal — each client sees
+   itself first — so we must trust the server's isHost().) ---- */
+function isHostNow() {
+  if (!mpReady) return true; // solo = full local authority
+  try { return !!Playroom.isHost(); } catch { return false; }
+}
+
+/* world snapshot published by the host (compact arrays + version) */
+let snapVer = 0, lastSnapV = 0, lastSnapPub = 0;
+function publishWorldSnapshot(force) {
+  if (!isHostNow()) return;
+  const now = performance.now();
+  if (!force && now - lastSnapPub < 100) return; // ~10Hz
+  lastSnapPub = now;
+  snapVer++;
+  roomSetState('world.snap', {
+    v: snapVer,
+    u: aliens.map(a => [a.uid, r1(a.pos.x), r1(a.pos.y), r1(a.pos.z), r1(a.faceAngle), Math.round(a.hp)]),
+    b: buildings.map(x => (x.alive ? Math.round(x.hp) : 0)),
+    r: rockData.reduce((acc, x, i) => { if (!x.alive) acc.push(i); return acc; }, []),
+    a: Math.round(alertLevel)
+  });
+}
+function syncUfos(list) {
+  const seen = new Set();
+  for (const row of list) {
+    const [uid, x, y, z, fa, hpx] = row;
+    seen.add(uid);
+    let a = aliens.find(t => t.uid === uid);
+    if (!a) a = makeAlien(new THREE.Vector3(x, y, z), uid);
+    a.netPos.set(x, y, z);
+    a.netFace = fa;
+    a.hp = hpx;
+  }
+  for (const a of [...aliens]) {
+    if (a.uid && !seen.has(a.uid)) { scene.remove(a.group); aliens.splice(aliens.indexOf(a), 1); }
   }
 }
+function syncBuildings(hpArr) {
+  for (let i = 0; i < buildings.length; i++) {
+    const b = buildings[i], hpx = hpArr[i];
+    if (hpx === 0 && b.alive) { b.alive = false; scene.remove(b.group); addRubble(b); }
+    else if (hpx > 0 && b.alive && hpx < b.hp) { b.hp = hpx; b.flash = 0.12; }
+  }
+}
+function syncRocks(idxArr) {
+  for (const i of idxArr) { const rk = rockData[i]; if (rk && rk.alive) destroyRock(i, rk.pos); }
+}
+function adoptSnapshot() {
+  const s = roomGetState('world.snap');
+  if (!s) return;
+  syncUfos(s.u || []); syncBuildings(s.b || []); syncRocks(s.r || []);
+  alertLevel = s.a || 0;
+  lastSnapV = s.v;
+}
+function applyWorldSnapshot() {
+  if (!mpReady || isHostNow()) return;
+  const s = roomGetState('world.snap');
+  if (!s || s.v === lastSnapV) return;
+  lastSnapV = s.v;
+  syncUfos(s.u || []); syncBuildings(s.b || []); syncRocks(s.r || []);
+  alertLevel = s.a || 0;
+  if (!alertTriggered && alertLevel > 0) { alertTriggered = true; msg('⚠ THE ALIEN FLEET IS ACTIVE', '#ffd24d', 4); }
+}
+
 function nameOf(id) {
   if (id === myId) return callsign;
   const p = peers.get(id)?.player || tracked.get(id);
   const n = p && p.getState ? p.getState('name') : null;
   return n || 'PILOT';
 }
-function applyRemoteEvent(e, fromId) {
-  const v = (x, y, z) => new THREE.Vector3(x, y, z);
-  switch (e.type) {
-    case 'shot': {
-      if (fromId === myId) break;
-      spawnBullet(v(e.x, e.y, e.z), v(e.dx, e.dy, e.dz).normalize().multiplyScalar(95), fromId, e.dmg || 10);
-      break;
-    }
-    case 'hit': {
-      damagePlayer(e.dmg || 7, e.target);
-      break;
-    }
-    case 'alien': {
-      explosion(v(e.x, e.y, e.z), 0x8fd8ff, 1.3, 50);
-      Sfx.explosion(1);
-      const n = e.n || 1;
-      for (let k = 0; k < n; k++) pendingSpawns.push({ t: 1.1 + k * 0.5 + rand(0, 0.4) });
-      msg('💢 RETRIBUTION! ' + nameOf(fromId) + ' DOWNED A SAUCER — ' + n + ' MORE INBOUND', '#7fd4ff', 3.5);
-      break;
-    }
-    case 'rock': {
-      destroyRock(e.i, v(e.x, e.y, e.z));
-      break;
-    }
-    case 'bdestroy': {
-      const bd = buildings[e.i];
-      if (bd && bd.alive) mpDestroyBuilding(bd, e.who);
-      break;
-    }
-    case 'bhp': {
-      const bd = buildings[e.i];
-      if (bd && bd.alive && e.hp < bd.hp) {
-        bd.hp = e.hp;
-        bd.flash = 0.12;
-        if (e.x || e.y || e.z) explosion(v(e.x, e.y, e.z), 0xffd08a, 0.4, 10);
-      }
-      break;
-    }
-    case 'alert': {
-      applyAlertLevel(e.level || 0, fromId);
-      break;
-    }
-    case 'boom': {
-      explosion(v(e.x, e.y, e.z), e.c || 0xffb060, e.s || 2, 60);
-      Sfx.explosion(e.s || 1.5);
-      break;
-    }
-    case 'death': {
-      msg('☠ ' + nameOf(fromId) + "'S SHIP IS DOWN", '#ff7a5a', 4);
-      break;
-    }
-    case 'reset': {
-      mpResetWorld();
-      msg('🔄 WORLD RESET — ' + nameOf(fromId) + ' REBUILT THE COLONY', '#9dff7f', 4);
-      break;
-    }
+function getShipPos(id) {
+  if (id === myId) return (ship.visible && hp > 0) ? ship.position : null;
+  const p = peers.get(id)?.player || tracked.get(id);
+  if (!p) return null;
+  const alive = p.getState('alive');
+  const hpx = p.getState('hp');
+  if (alive === false || (typeof hpx === 'number' && hpx <= 0)) return null;
+  const pos = p.getState('pos');
+  return pos ? new THREE.Vector3(pos.x, pos.y, pos.z) : null;
+}
+function mpFx(e) {
+  explosion(new THREE.Vector3(e.p[0], e.p[1], e.p[2]), e.c || 0xffffff, e.s || 1, Math.round((e.s || 1) * 40));
+  Sfx.explosion(clamp(e.s || 1, 0.4, 1.6));
+}
+function handleNetEvent(key, e, fromId) {
+  switch (key) {
+    case 'e_shot': spawnNetBullet(e); break;
+    case 'e_hit': if (e.target === myId) { damagePlayer(e.d || 7); } break;
+    case 'e_fx': mpFx(e); break;
+    case 'e_msg': msg(e.text, e.color, 4); break;
+    case 'e_score': if (e.scorer === myId) { score += e.amt || 0; if (e.why === 'bld') stats.buildings++; else stats.saucers++; } break;
+    case 'e_death': msg('☠ ' + nameOf(fromId) + "'S SHIP IS DOWN", '#ff7a5a', 4); break;
+    case 'e_cmd': if (isHostNow()) applyHostCommand(e, fromId); break;
   }
+}
+function spawnNetBullet(e) {
+  const o = new THREE.Vector3(e.o[0], e.o[1], e.o[2]);
+  const d = new THREE.Vector3(e.d[0], e.d[1], e.d[2]).normalize().multiplyScalar(e.k === 'u' ? 48 : 95);
+  spawnBullet(o, d, e.who, e.dmg || 10, { kind: e.k, target: e.target || null, ghost: true, color: e.color });
+}
+function applyHostCommand(e, fromId) {
+  switch (e.c) {
+    case 'bhit': { const b = buildings[e.i]; if (b && b.alive) hostBuildingHit(b, e.dmg || 10, e.p ? new THREE.Vector3(e.p[0], e.p[1], e.p[2]) : null, fromId); break; }
+    case 'rock': { const rk = rockData[e.i]; if (rk && rk.alive) hostRockHit(e.i); break; }
+    case 'ahit': { const a = aliens.find(x => x.uid === e.uid); if (a) hostAlienHit(a, e.dmg || 10, fromId); break; }
+    case 'reset': mpResetWorld(); mpSendMsg('🔄 WORLD RESET — ' + nameOf(fromId) + ' REBUILT THE COLONY', '#9dff7f'); break;
+  }
+}
+/* host-side world mutation (single authority) */
+function hostBuildingHit(b, dmg, point, fromId) {
+  b.hp -= dmg; b.flash = 0.12;
+  if (point) { explosion(point, 0xffd08a, 0.5, 14); mpSendFx(point.x, point.y, point.z, 0xffd08a, 0.5); }
+  alertLevel = Math.min(100, alertLevel + 3);
+  if (!alertTriggered) {
+    alertTriggered = true;
+    alertLevel = Math.max(alertLevel, 25);
+    spawnTimer = 1.4;
+    mpSendMsg('⚠ THE ALIEN FLEET IS AWAKENED', '#ffd24d');
+    Sfx.alert();
+  }
+  if (b.hp <= 0) mpDestroyBuilding(b, fromId);
+  publishWorldSnapshot(true);
+}
+function hostRockHit(i) {
+  const rk = rockData[i];
+  if (rk.alive) {
+    destroyRock(i, rk.pos, false);
+    mpSendFx(rk.pos.x, rk.pos.y, rk.pos.z, 0xd9a06a, clamp(rk.r * 0.45, 0.5, 1.2));
+  }
+  publishWorldSnapshot(true);
+}
+function hostAlienHit(a, dmg, fromId) {
+  a.hp -= dmg;
+  explosion(a.pos, 0x9fe8ff, 0.5, 14);
+  mpSendFx(a.pos.x, a.pos.y, a.pos.z, 0x9fe8ff, 0.5);
+  if (a.hp <= 0) hostAlienKilled(a, fromId);
+  publishWorldSnapshot(true);
+}
+function hostAlienKilled(a, fromId) {
+  const idx = aliens.indexOf(a);
+  if (idx >= 0) aliens.splice(idx, 1);
+  scene.remove(a.group);
+  explosion(a.pos, 0x8fd8ff, 1.3, 50);
+  mpSendFx(a.pos.x, a.pos.y, a.pos.z, 0x8fd8ff, 1.3);
+  Sfx.explosion(1);
+  if (fromId) awardScore(fromId, 100, 'ufo');
+  const n = 1 + (Math.random() < 0.35 ? 1 : 0);
+  if (aliens.length + pendingSpawns.length < MAX_ALIENS) {
+    for (let k = 0; k < n; k++) pendingSpawns.push({ t: 1.1 + k * 0.5 + rand(0, 0.4) });
+    mpSendMsg('💢 RETRIBUTION! ' + nameOf(fromId) + ' DOWNED A SAUCER — ' + n + ' MORE INBOUND', '#7fd4ff');
+    Sfx.alert();
+  }
+  publishWorldSnapshot(true);
 }
 
 /* ---- shared world reset (any pilot can trigger; late joiners get a fresh world) ---- */
@@ -795,10 +870,9 @@ function mpResetWorld() {
   alertLevel = 0;
   alertTriggered = false;
   aliensSpawnedMsg = false;
-  roomSetState('world.bhp', {});
-  roomSetState('world.alert', { level: 0, t: Date.now() });
   /* respawn the local ship too */
   if (state === 'over') redeploy();
+  if (isHostNow()) publishWorldSnapshot(true);
 }
 function rebuildBuilding(b) {
   const { type, x, z } = b.origin;
@@ -861,10 +935,11 @@ function ensurePeerShip(id, idx) {
   group.rotation.set(0, sp.yaw, 0, 'YXZ');
   scene.add(group);
   entry = { group, flame: group.getObjectByName('flame'), flameLight: group.getObjectByName('flameLight'),
-    lastEvt: 0, lastFlame: 0, flameT: 0, score: 0, label: group.children[group.children.length - 1], labelKey: '' };
+    evtSeen: {}, lastFlame: 0, flameT: 0, score: 0, label: group.children[group.children.length - 1], labelKey: '' };
   peerShips.set(id, entry);
   return entry;
 }
+const EVT_KEYS = ['e_shot', 'e_hit', 'e_fx', 'e_msg', 'e_score', 'e_death', 'e_cmd'];
 function retintPeers() {
   peerShips.forEach((entry, id) => {
     entry.group.getObjectByName('body').material.color.set(tintFor(id));
@@ -895,17 +970,15 @@ function reconcile() {
     }
   }
   retintPeers();
-  /* late-joiner world snapshot */
-  const bhp = roomGetState('world.bhp') || {};
-  for (const k of Object.keys(bhp)) {
-    const bd = buildings[Number(k)];
-    if (bd && bd.alive && bhp[k].t && bhp[k].hp < bd.hp) { bd.hp = bhp[k].hp; }
+  /* late-joiner: adopt the host's world snapshot (buildings, UFOs, rocks, alert) */
+  if (!isHostNow()) adoptSnapshot();
+  /* host migration: if the previous host left, this client inherits the world */
+  const h = isHostNow();
+  if (h && !wasHost) {
+    msg('🛰 YOU ARE NOW HOST — SIMULATING THE SHARED WORLD', '#7fd4ff', 4);
+    publishWorldSnapshot(true);
   }
-  const al = roomGetState('world.alert');
-  if (al && al.level > 0 && al.level > alertLevel) {
-    alertLevel = al.level;
-    if (!alertTriggered) { alertTriggered = true; msg('⚠ THE ALIEN FLEET IS ACTIVE', '#ffd24d', 4); }
-  }
+  wasHost = h;
 }
 
 function publishLocal() {
@@ -915,10 +988,10 @@ function publishLocal() {
   lastPublish = now;
   const me = myPlayer();
   if (!me) return;
-  const r1 = v => Math.round(v * 10) / 10;
+  /* compact flat arrays (smaller than nested JSON objects) */
   try {
-    me.setState('pos', { x: r1(ship.position.x), y: r1(ship.position.y), z: r1(ship.position.z) }, false);
-    me.setState('rot', { y: r1(ship.rotation.y), p: r1(ship.rotation.x), r: r1(ship.rotation.z) }, false);
+    me.setState('pos', [r1(ship.position.x), r1(ship.position.y), r1(ship.position.z)], false);
+    me.setState('rot', [r1(ship.rotation.y), r1(ship.rotation.x), r1(ship.rotation.z)], false); // [yaw, pitch, roll]
     me.setState('hp', Math.round(hp), false);
     me.setState('alive', ship.visible, false);
     me.setState('score', score, false);
@@ -940,12 +1013,12 @@ function updateRemoteShips(dt) {
     if (!p) continue;
     const pos = p.getState('pos');
     if (pos) {
-      _peerPos.set(pos.x, pos.y, pos.z);
+      _peerPos.set(pos[0], pos[1], pos[2]);
       entry.group.position.lerp(_peerPos, damp(dt, 14));
     }
     const rot = p.getState('rot');
     if (rot) {
-      entry.group.rotation.set(rot.p, lerpAngle(entry.group.rotation.y, rot.y, damp(dt, 14)), rot.r, 'YXZ');
+      entry.group.rotation.set(rot[1], lerpAngle(entry.group.rotation.y, rot[0], damp(dt, 14)), rot[2], 'YXZ');
     }
     entry.group.visible = p.getState('alive') !== false;
     entry.score = p.getState('score') || 0;
@@ -970,11 +1043,13 @@ function updateRemoteShips(dt) {
       entry.label = buildLabel(nm, tintHex(id));
       entry.group.add(entry.label);
     }
-    /* events (reliable, timestamp-deduped) */
-    const e = p.getState('evt');
-    if (e && e.t && e.t !== entry.lastEvt && e.who !== myId) {
-      entry.lastEvt = e.t;
-      applyRemoteEvent(e, id);
+    /* per-type events (reliable, timestamp-deduped) */
+    for (const key of EVT_KEYS) {
+      const e = p.getState(key);
+      if (e && e.t && e.who !== myId && e.t !== (entry.evtSeen[key] || 0)) {
+        entry.evtSeen[key] = e.t;
+        handleNetEvent(key, e, id);
+      }
     }
   }
 }
@@ -1078,7 +1153,7 @@ function buildRoomPanel(code) {
   mk('RESET WORLD', () => {
     if (confirm('Rebuild the colony and clear all saucers for everyone in the room?')) {
       mpResetWorld();
-      mpSend('reset', {});
+      mpSendCmd('reset', {});
     }
   });
   $('roomCode').textContent = code;
@@ -1107,7 +1182,7 @@ bootMultiplayer();
 /* ================= bullets ================= */
 const bullets = [];
 const bulletPool = [];
-function spawnBullet(pos, vel, owner, dmg) {
+function spawnBullet(pos, vel, owner, dmg, extras = {}) {
   let b = bulletPool.pop();
   if (!b) {
     const mat = new THREE.MeshBasicMaterial();
@@ -1117,12 +1192,14 @@ function spawnBullet(pos, vel, owner, dmg) {
       new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, depthWrite: false })
     );
     mesh.add(glow);
-    b = { mesh, glow, vel: new THREE.Vector3(), owner: '', isPlayer: true, dmg: 0, ttl: 0 };
+    b = { mesh, glow, vel: new THREE.Vector3(), owner: '', isPlayer: true, dmg: 0, ttl: 0, ghost: false, target: null };
     b.mesh.visible = false;
   }
   b.isPlayer = owner !== 'alien';
   const isLocal = (owner === myId) || (!mpReady && owner === 'me');
-  const tint = owner === 'alien' ? 0xff6a3d : (isLocal ? 0x7df9ff : tintFor(owner));
+  b.ghost = !!extras.ghost && owner !== 'alien';       // someone else's player-shot (no local collision)
+  b.target = extras.target || null;                    // for alien bullets: the player being shot
+  const tint = extras.color != null ? extras.color : (owner === 'alien' ? 0xff6a3d : (isLocal ? 0x7df9ff : tintFor(owner)));
   b.mesh.material.color.set(tint);
   b.glow.material.color.copy(b.mesh.material.color);
   b.owner = owner; b.dmg = dmg; b.ttl = 2.5;
@@ -1133,11 +1210,9 @@ function spawnBullet(pos, vel, owner, dmg) {
   bullets.push(b);
 }
 
-function damagePlayer(dmg, targetId) {
-  // Only the owning client applies damage to itself (authoritative per-player)
-  if (targetId != null && targetId !== myId) return;
-  if (targetId == null && state !== 'playing') return;
-  if (invuln > 0) return;
+/* I am authoritative for my own hull — any caller passing to me applies damage */
+function damagePlayer(dmg) {
+  if (state !== 'playing' || invuln > 0) return;
   invuln = 0.35;
   hp = Math.max(0, hp - dmg);
   Sfx.hit();
@@ -1154,13 +1229,13 @@ function updateBullets(dt) {
     const p = b.mesh.position;
     let dead = b.ttl <= 0;
 
-    /* ground impact */
-    if (!dead && p.y <= terrainHeight(p.x, p.z) + 0.2) {
+    /* ground impact (local bullets only) */
+    if (!dead && !b.ghost && p.y <= terrainHeight(p.x, p.z) + 0.2) {
       explosion(p, b.isPlayer ? 0xffc27a : 0xff7a4d, 0.45, 14);
       dead = true;
     }
 
-    if (!dead && b.isPlayer) {
+    if (!dead && b.isPlayer && !b.ghost) {
       for (const bd of buildings) {
         if (!bd.alive) continue;
         if (p.distanceToSquared(bd.center) < (bd.radius + 0.4) * (bd.radius + 0.4)) {
@@ -1184,18 +1259,20 @@ function updateBullets(dt) {
         for (let j = aliens.length - 1; j >= 0; j--) {
           const a = aliens[j];
           if (p.distanceToSquared(a.pos) < 3.2 * 3.2) {
-            a.hp -= b.dmg;
+            /* route to host authority for the shared fleet */
+            if (isHostNow()) hostAlienHit(a, b.dmg, b.owner);
+            else mpSendCmd('ahit', { uid: a.uid, dmg: b.dmg });
             Sfx.hit();
             explosion(p, 0x9fe8ff, 0.5, 14);
-            if (a.hp <= 0) mpAlienKilled(j, b.owner);
             dead = true;
             break;
           }
         }
       }
-    } else if (!dead) {
-      if (p.distanceToSquared(ship.position) < 1.9 * 1.9) {
-        damagePlayer(7, b.owner);
+    } else if (!dead && !b.isPlayer) {
+      /* alien bullet: damage only its designated target; the target applies it locally */
+      if (b.target === myId && p.distanceToSquared(ship.position) < 1.9 * 1.9) {
+        damagePlayer(b.dmg);
         explosion(p, 0xff6a3d, 0.5, 14);
         dead = true;
       }
@@ -1212,7 +1289,11 @@ function updateBullets(dt) {
 
 /* ================= alien saucers ================= */
 const aliens = [];
-function spawnAlien(pos, revenge) {
+let ufoUid = 1;
+const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _zero3 = new THREE.Vector3();
+const UP = new THREE.Vector3(0, 1, 0);
+
+function buildUfoGroup() {
   const g = new THREE.Group();
   const hullMat = new THREE.MeshStandardMaterial({ color: 0xb8c4d0, metalness: 0.85, roughness: 0.3 });
   const disc = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 1.9, 0.8, 24), hullMat);
@@ -1231,90 +1312,112 @@ function spawnAlien(pos, revenge) {
     g.add(lamp);
   }
   g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  return g;
+}
+function makeAlien(pos, uid, revenge) {
+  const g = buildUfoGroup();
+  g.position.copy(pos);
   scene.add(g);
-  aliens.push({
-    group: g, pos: pos.clone(), vel: new THREE.Vector3(),
-    hp: 30, speed: revenge ? 17 : 14,
-    fireTimer: rand(1.2, 2.4), hitCd: 0, phase: rand(0, 6.28)
-  });
+  const a = {
+    group: g, uid: uid || (ufoUid++), pos: pos.clone(), netPos: pos.clone(),
+    vel: new THREE.Vector3(), hp: 30, speed: revenge ? 17 : 14,
+    fireTimer: rand(1.2, 2.4), hitCd: 0, phase: rand(0, 6.28), faceAngle: 0
+  };
+  aliens.push(a);
+  return a;
 }
 
-function mpAlienKilled(idx, ownerId) {
-  const a = aliens[idx];
-  aliens.splice(idx, 1);
-  scene.remove(a.group);
-  explosion(a.pos, 0x8fd8ff, 1.3, 50);
-  Sfx.explosion(1);
-  if (ownerId === myId) {
-    score += 100;
-    stats.saucers++;
-    /* retribution: shooting one down spawns MORE */
-    const n = 1 + (Math.random() < 0.35 ? 1 : 0);
-    if (aliens.length + pendingSpawns.length < MAX_ALIENS) {
-      for (let k = 0; k < n; k++) pendingSpawns.push({ t: 1.1 + k * 0.5 + rand(0, 0.4) });
-      msg('💢 RETRIBUTION! ' + n + ' MORE SAUCER' + (n > 1 ? 'S' : '') + ' INBOUND', '#7fd4ff', 3.5);
-      Sfx.alert();
-    }
-    mpSend('alien', { x: a.pos.x, y: a.pos.y, z: a.pos.z, n, who: myId, t: Date.now() });
+/* nearest LIVE player ship to a point (host uses this to steer the fleet) */
+function nearestLiveShip(from) {
+  let best = null, bd = Infinity;
+  if (ship.visible && hp > 0) {
+    const d = ship.position.distanceToSquared(from);
+    if (d < bd) { bd = d; best = { id: myId, pos: ship.position }; }
   }
+  for (const id of peerOrder) {
+    const pos = getShipPos(id);
+    if (!pos) continue;
+    const d = pos.distanceToSquared(from);
+    if (d < bd) { bd = d; best = { id, pos }; }
+  }
+  return best;
 }
-
-const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3();
-const UP = new THREE.Vector3(0, 1, 0);
 
 function updateAliens(dt, t) {
+  const host = isHostNow();
   for (let i = aliens.length - 1; i >= 0; i--) {
     const a = aliens[i];
-    const toP = _v1.copy(ship.position).sub(a.pos);
-    const dist = toP.length();
-    const want = _v2.copy(toP).normalize()
-      .multiplyScalar(a.speed * clamp((dist - 28) / 35, 0.15, 1.3));
-    a.vel.lerp(want, damp(dt, 1.7));
-    a.pos.addScaledVector(a.vel, dt);
-    const gh = terrainHeight(a.pos.x, a.pos.z) + 6;
-    if (a.pos.y < gh) { a.pos.y = gh; if (a.vel.y < 0) a.vel.y *= -0.4; }
-    a.group.position.copy(a.pos);
-    a.group.lookAt(ship.position);
-    a.group.rotation.z = Math.sin(t * 2.4 + a.phase) * 0.14;
+    if (host) {
+      const tgt = nearestLiveShip(a.pos);
+      if (tgt) {
+        const toP = _v1.copy(tgt.pos).sub(a.pos);
+        const dist = toP.length();
+        const want = _v2.copy(toP).normalize()
+          .multiplyScalar(a.speed * clamp((dist - 28) / 35, 0.15, 1.3));
+        a.vel.lerp(want, damp(dt, 1.7));
+        a.pos.addScaledVector(a.vel, dt);
+        const gh = terrainHeight(a.pos.x, a.pos.z) + 6;
+        if (a.pos.y < gh) { a.pos.y = gh; if (a.vel.y < 0) a.vel.y *= -0.4; }
+        a.group.position.copy(a.pos);
+        a.group.lookAt(tgt.pos);
+        a.group.rotation.z = Math.sin(t * 2.4 + a.phase) * 0.14;
+        a.faceAngle = a.group.rotation.y;
 
-    a.fireTimer -= dt;
-    if (a.fireTimer <= 0 && dist < 170) {
-      const dir = ship.position.clone().addScaledVector(shipVel, 0.35).sub(a.pos).normalize();
-      dir.x += rand(-0.03, 0.03); dir.y += rand(-0.03, 0.03); dir.z += rand(-0.03, 0.03);
-      dir.normalize();
-      spawnBullet(a.pos.clone().addScaledVector(dir, 3), dir.multiplyScalar(48), 'alien', 7);
-      Sfx.alienLaser();
-      a.fireTimer = rand(1.1, 2.3) * (alertLevel > 55 ? 0.75 : 1);
-    }
+        a.fireTimer -= dt;
+        if (a.fireTimer <= 0 && dist < 170) {
+          const lead = (tgt.id === myId) ? shipVel : _zero3;
+          const dir = tgt.pos.clone().addScaledVector(lead, 0.35).sub(a.pos).normalize();
+          dir.x += rand(-0.03, 0.03); dir.y += rand(-0.03, 0.03); dir.z += rand(-0.03, 0.03); dir.normalize();
+          const from = a.pos.clone().addScaledVector(dir, 3);
+          spawnBullet(from, dir.clone().multiplyScalar(48), 'alien', 7, { kind: 'u', target: tgt.id, color: 0xff6a3d });
+          mpSendShot('u', from, dir, { dmg: 7, target: tgt.id, color: 0xff6a3d });
+          Sfx.alienLaser();
+          a.fireTimer = rand(1.1, 2.3) * (alertLevel > 55 ? 0.75 : 1);
+        }
 
-    a.hitCd -= dt;
-    if (dist < 3.8 && a.hitCd <= 0) {
-      a.hitCd = 1.2;
-      damagePlayer(22);
-      a.hp -= 45;
-      shipVel.addScaledVector(_v1.normalize(), 14);
-      if (a.hp <= 0) mpAlienKilled(i, myId);
+        a.hitCd -= dt;
+        if (dist < 3.8 && a.hitCd <= 0) {
+          a.hitCd = 1.2;
+          /* ram: damage that player + the saucer */
+          if (tgt.id === myId) { damagePlayer(22); shipVel.addScaledVector(_v1.copy(tgt.pos).sub(a.pos).normalize(), 14); }
+          else mpSendEvent('e_hit', { target: tgt.id, d: 22 });
+          a.hp -= 45;
+          if (a.hp <= 0) hostAlienKilled(a, tgt.id);
+        }
+      }
+    } else {
+      /* client: interpolate toward host-published netPos */
+      a.pos.lerp(a.netPos, damp(dt, 8));
+      a.group.position.copy(a.pos);
+      if (a.netFace != null) {
+        a.group.rotation.y = lerpAngle(a.group.rotation.y, a.netFace, damp(dt, 8));
+        a.group.rotation.z = Math.sin(t * 2.4 + a.phase) * 0.14;
+      }
     }
   }
 }
 
-/* ================= spawning / alert pressure ================= */
+/* ================= spawning / alert pressure (host only) ================= */
 function updateSpawning(dt) {
+  if (!isHostNow()) return;
   if (alertLevel > 0) {
     spawnTimer -= dt;
     if (spawnTimer <= 0) {
       if (aliens.length < MAX_ALIENS) {
+        const tgt = nearestLiveShip(_zero3.set(0, 0, 0)) || null;
+        const origin = tgt ? tgt.pos : ship.position;
         const a = rand(0, Math.PI * 2), r = rand(240, 400);
         const p = new THREE.Vector3(
-          ship.position.x + Math.cos(a) * r,
+          origin.x + Math.cos(a) * r,
           rand(55, 130),
-          ship.position.z + Math.sin(a) * r
+          origin.z + Math.sin(a) * r
         );
-        spawnAlien(p, false);
+        makeAlien(p, 0, false);
         if (!aliensSpawnedMsg) {
           aliensSpawnedMsg = true;
-          msg('🛸 ALIEN SAUCER INBOUND — THEY HAVE COME FOR YOU', '#8fd8ff', 4);
+          mpSendMsg('🛸 ALIEN SAUCER INBOUND — THEY HAVE COME FOR YOU', '#8fd8ff');
         }
+        publishWorldSnapshot(true);
       }
       spawnTimer = lerp(6.5, 1.5, alertLevel / 100) * rand(0.75, 1.25);
     }
@@ -1332,7 +1435,8 @@ function updateSpawning(dt) {
         rand(45, 110),
         ship.position.z + Math.sin(a) * r
       );
-      spawnAlien(p, true);
+      makeAlien(p, 0, true);
+      publishWorldSnapshot(true);
     }
   }
 }
@@ -1523,12 +1627,14 @@ function lockPointer() {
 }
 document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === canvas;
-  if (locked) everLocked = true;
-  if (!locked && state === 'playing' && everLocked) {
-    state = 'paused';
+  if (locked) {
+    everLocked = true;
+    els.crosshair.classList.remove('hidden');
+  } else if (state === 'playing') {
+    /* ESC: release mouse + ignore mouse input until re-engaged (click canvas).
+       Game keeps running — this is multiplayer, there is no pause. */
     firing = false;
     keys.clear();
-    els.paused.classList.remove('hidden');
     els.crosshair.classList.add('hidden');
   }
 });
@@ -1545,7 +1651,6 @@ function startGame() {
   Sfx.init();
   state = 'playing';
   els.menu.classList.add('hidden');
-  els.paused.classList.add('hidden');
   els.crosshair.classList.remove('hidden');
   yaw = 0; pitch = 0; roll = 0;
   shipVel.set(0, 0, 0);
@@ -1555,15 +1660,8 @@ function startGame() {
   lockPointer();
   msg('Burn the colony. Wake the fleet. Survive.', '#ffd9b0', 4);
 }
-function resumeGame() {
-  state = 'playing';
-  els.paused.classList.add('hidden');
-  els.crosshair.classList.remove('hidden');
-  lockPointer();
-}
 $('startBtn').addEventListener('click', e => { e.stopPropagation(); startGame(); });
 els.menu.addEventListener('click', startGame);
-els.paused.addEventListener('click', resumeGame);
 $('retryBtn').addEventListener('click', e => { e.stopPropagation(); redeployLocal(); });
 els.gameover.addEventListener('click', e => { if (e.target === els.gameover) redeployLocal(); });
 
@@ -1577,7 +1675,10 @@ function gameOver() {
   Sfx.explosion(2);
   ship.visible = false;
   stats.deaths++;
-  if (mpReady) mpSend('death', { x: ship.position.x, y: ship.position.y, z: ship.position.z });
+  if (mpReady) {
+    mpSendFx(ship.position.x, ship.position.y, ship.position.z, 0xffb060, 2.6);
+    mpSendEvent('e_death', {});
+  }
   els.finalStats.innerHTML =
     `Score: <b>${score}</b><br>` +
     `Buildings destroyed: ${stats.buildings} · Saucers downed: ${stats.saucers}<br>` +
@@ -1594,7 +1695,9 @@ function update(dt) {
   tGame += dt;
   invuln = Math.max(0, invuln - dt);
 
-  if (!locked) steerFallback(dt);
+  /* mouse steering fallback only before the pointer has ever locked (menu /
+     headless). After an ESC release, mouse input is ignored until re-engaged. */
+  if (!locked && !everLocked) steerFallback(dt);
   const strafe = (keys.has('KeyA') ? 1 : 0) - (keys.has('KeyD') ? 1 : 0);
   roll = lerp(roll, strafe * 0.45, damp(dt, 6));
   ship.rotation.set(pitch, yaw, roll, 'YXZ');
@@ -1674,7 +1777,7 @@ function update(dt) {
     Sfx.laser();
     stats.shots++;
     if (mpReady) {
-      mpSend('shot', { x: origin.x, y: origin.y, z: origin.z, dx: f.x, dy: f.y, dz: f.z });
+      mpSendShot('p', origin, f);           // compact: {o:[..], d:[..]}
       publishFlamePulse();
     }
   }
@@ -1688,6 +1791,8 @@ function update(dt) {
   if (mpReady) {
     publishLocal();
     updateRemoteShips(dt);
+    if (isHostNow()) publishWorldSnapshot(false);
+    else applyWorldSnapshot();
   }
 }
 
@@ -1711,7 +1816,9 @@ window.marsDebug = {
   },
   shootAt(x, y, z) {
     const dir = new THREE.Vector3(x, y, z).sub(ship.position).normalize();
-    spawnBullet(ship.position.clone().addScaledVector(dir, 5.5), dir.multiplyScalar(95), 'player', 10);
+    const origin = ship.position.clone().addScaledVector(dir, 5.5);
+    spawnBullet(origin, dir.clone().multiplyScalar(95), myId || 'me', 10);
+    if (mpReady) mpSendShot('p', origin, dir);
     stats.shots++;
     Sfx.laser();
   },
@@ -1728,8 +1835,9 @@ window.marsDebug = {
     return best ? { pos: best.pos.toArray().map(v => Math.round(v * 10) / 10), r: best.r } : null;
   },
   rocksAlive() { return rockData.filter(r => r.alive).length; },
-  killAlien(i) { if (aliens[i]) killAlien(i); },
-  spawnAlienNear() { spawnAlien(ship.position.clone().add(new THREE.Vector3(30, 10, 0)), true); }
+  buildingsAlive() { return buildings.filter(b => b.alive).length; },
+  spawnUfo() { return isHostNow() ? (makeAlien(ship.position.clone().add(new THREE.Vector3(30, 10, 0)), 0, true), publishWorldSnapshot(true)) : null; },
+  hostFlag() { return isHostNow(); }
 };
 
 /* ================= loop ================= */
