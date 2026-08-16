@@ -205,11 +205,19 @@ const els = {
 const Sfx = {
   ctx: null,
   init() {
-    if (this.ctx) return;
+    if (this.ctx) {
+      /* auto-launch creates the context on load (no gesture) → suspended;
+         resume on the first interaction so sound works after a refresh */
+      if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+      return;
+    }
     try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
   },
+  /* every sound funnels through blip()/noise() — stay silent unless this tab
+     has focus, so only the window being played actually emits audio */
+  live() { return !!(this.ctx && document.hasFocus()); },
   blip(f0, f1, dur, type = 'square', vol = 0.12) {
-    if (!this.ctx) return;
+    if (!this.live()) return;
     try {
       const t = this.ctx.currentTime;
       const o = this.ctx.createOscillator(), g = this.ctx.createGain();
@@ -223,7 +231,7 @@ const Sfx = {
     } catch (e) {}
   },
   noise(dur, freq, vol = 0.3) {
-    if (!this.ctx) return;
+    if (!this.live()) return;
     try {
       const t = this.ctx.currentTime;
       const n = Math.floor(this.ctx.sampleRate * dur);
@@ -2187,12 +2195,17 @@ canvas.addEventListener('mousedown', e => {
 addEventListener('mouseup', () => firing = false);
 addEventListener('blur', () => { firing = false; });
 
-function startGame() {
+function startGame(auto = false) {
   Sfx.init();
   commitCallsign(callsignEl.value);
   state = 'playing';
   els.menu.classList.add('hidden');
-  els.crosshair.classList.remove('hidden');
+  /* auto (returning pilot after refresh): the mouse has not been engaged by a
+     click yet — do NOT aim with it (skip steerFallback via everLocked), do not
+     show the crosshair, and do not request pointer lock. The first click on the
+     screen captures the mouse (canvas mousedown → lockPointer). */
+  if (auto) everLocked = true;
+  else els.crosshair.classList.remove('hidden');
   const sp = randomSpawn();   // random sky spawn on first launch
   lastSpawnIdx = SPAWN_POINTS.indexOf(sp);
   ship.position.set(sp.x, sp.y, sp.z);
@@ -2202,7 +2215,7 @@ function startGame() {
   camera.position.set(sp.x + Math.sin(sp.yaw) * 11, sp.y + 3, sp.z + Math.cos(sp.yaw) * 11);
   camera.lookAt(ship.position);
   ship.visible = true;
-  lockPointer();
+  if (!auto) lockPointer();   // manual LAUNCH: a click gesture is available, lock now
   msg('Burn the colony. Wake the fleet. Survive.', '#ffd9b0', 4);
   publishLocal(true);
 }
@@ -2210,6 +2223,11 @@ function startGame() {
 $('startBtn').addEventListener('click', e => { e.stopPropagation(); startGame(); });
 $('retryBtn').addEventListener('click', e => { e.stopPropagation(); redeployLocal(); });
 els.gameover.addEventListener('click', e => { if (e.target === els.gameover) redeployLocal(); });
+/* returning pilots: if a callsign is stored, skip the lobby and drop straight
+   into the world on load (pointer lock then engages on the first click to fire) */
+try {
+  if ((localStorage.getItem('mars-callsign') || '').trim()) startGame(true);
+} catch {}
 
 /* ================= game over ================= */
 function gameOver() {
