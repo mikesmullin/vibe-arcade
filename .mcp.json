@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "integrated-browser-mcp": {
+      "command": "node",
+      "args": [
+        "/home/user/.integrated-browser-mcp/mcp-server.mjs"
+      ]
+    }
+  }
+}
