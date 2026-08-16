@@ -668,6 +668,15 @@ let score = 0, hp = 100, alertLevel = 0, tGame = 0;
 let booster = 100, boosterOn = false;
 let alertTriggered = false, aliensSpawnedMsg = false;
 let invuln = 0, fireCd = 0, spawnTimer = 0, boosterMsgCd = 0;
+
+/* ---- Mars flight physics: real gravity + inertial glide ----
+   1 unit ≈ 1 m. Mars surface gravity is 3.71 m/s² (~38% of Earth's).
+   The ship is a glider: lift ∝ airspeed holds it up at speed, drag is low
+   so releasing throttle coasts (inertia), and without speed it sinks. */
+const MARS_G = 3.71;      // Mars surface gravity, m/s² (1 unit ≈ 1 m)
+const LIFT_Q = 0.0041;    // lift = LIFT_Q * airspeed² (≈ gravity at ~30 m/s)
+const DRAG_NORMAL = 0.15; // parasitic drag (exp decay rate) — low, so the ship coasts
+const DRAG_BOOST = 0.06;
 let yaw = 0, pitch = 0, roll = 0;
 let firing = false, locked = false, everLocked = false;
 const stats = { shots: 0, saucers: 0, buildings: 0, deaths: 0 };
@@ -1770,10 +1779,18 @@ function update(dt) {
   accel.addScaledVector(fwd, throttle * fwdAccel);
   accel.addScaledVector(right, -strafe * strafeAccel);
   accel.y += vertical * vertAccel;
+
+  /* Mars gravity + glider lift: lift ∝ airspeed² holds the ship aloft at
+     cruising speed, so releasing the throttle GLIDES (inertia) instead of
+     stopping; slow flight sinks, a full-power dive ends at terminal velocity */
+  const airSpeed = shipVel.length();
+  const lift = Math.min(LIFT_Q * airSpeed * airSpeed, MARS_G * 1.15);
+  accel.y -= MARS_G - lift;
+
   shipVel.addScaledVector(accel, dt);
-  shipVel.multiplyScalar(Math.exp(-(boosting ? 1.25 : 1.9) * dt)); // less drag while boosting
-  const maxSpeed = boosting ? 62 : 34;
-  if (shipVel.length() > maxSpeed) shipVel.setLength(lerp(shipVel.length(), maxSpeed, damp(dt, 6)));
+  shipVel.multiplyScalar(Math.exp(-(boosting ? DRAG_BOOST : DRAG_NORMAL) * dt));
+  const maxSpeed = boosting ? 62 : 46;
+  if (shipVel.length() > maxSpeed) shipVel.setLength(lerp(shipVel.length(), maxSpeed, damp(dt, 3)));
   ship.position.addScaledVector(shipVel, dt);
 
   const gh = terrainHeight(ship.position.x, ship.position.z) + 2.6;
