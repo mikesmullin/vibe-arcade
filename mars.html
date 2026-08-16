@@ -38,7 +38,8 @@
   #lowhp { position:fixed; inset:0; pointer-events:none; z-index:8; opacity:0;
     background:radial-gradient(ellipse at center, transparent 55%, rgba(255,20,10,.45)); transition:opacity .6s ease; }
   .overlay { position:fixed; inset:0; z-index:20; display:flex; align-items:center; justify-content:center;
-    background:rgba(18,7,3,.72); backdrop-filter: blur(6px); cursor:pointer; }
+    background:rgba(18,7,3,.72); backdrop-filter: blur(6px); cursor:default; }
+  #gameover { cursor:pointer; } /* death screen: backdrop click redeploys */
   .card { max-width:540px; text-align:center; padding:38px 46px; background:rgba(38,15,8,.85);
     border:1px solid rgba(255,150,90,.35); border-radius:18px; box-shadow:0 20px 60px rgba(0,0,0,.5); }
   .title { font-size:44px; font-weight:800; letter-spacing:.18em; color:#ffb37c;
@@ -50,7 +51,7 @@
   .controls b { color:#ffd9b0; }
   .startbtn { margin-top:8px; font-size:15px; font-weight:700; letter-spacing:.22em; color:#1a0c06;
     background:linear-gradient(180deg,#ffc38a,#ff8f4d); padding:12px 26px; border-radius:10px;
-    display:inline-block; animation:pulse 1.6s ease-in-out infinite; }
+    display:inline-block; animation:pulse 1.6s ease-in-out infinite; cursor:pointer; }
   @keyframes pulse { 50% { box-shadow:0 0 26px rgba(255,150,70,.65); } }
   .hidden { display:none !important; }
   #finalStats { margin:18px 0; font-size:15px; line-height:1.9; color:#f2d9c4; }
@@ -666,7 +667,7 @@ let state = 'menu';           // menu | playing | paused | over
 let score = 0, hp = 100, alertLevel = 0, tGame = 0;
 let booster = 100, boosterOn = false;
 let alertTriggered = false, aliensSpawnedMsg = false;
-let invuln = 0, fireCd = 0, spawnTimer = 0;
+let invuln = 0, fireCd = 0, spawnTimer = 0, boosterMsgCd = 0;
 let yaw = 0, pitch = 0, roll = 0;
 let firing = false, locked = false, everLocked = false;
 const stats = { shots: 0, saucers: 0, buildings: 0, deaths: 0 };
@@ -1187,10 +1188,8 @@ function buildRoomPanel(code) {
     btns.appendChild(b);
   };
   mk('RESET WORLD', () => {
-    if (confirm('Rebuild the colony and clear all saucers for everyone in the room?')) {
-      mpResetWorld();
-      mpSendCmd('reset', {});
-    }
+    mpResetWorld();
+    mpSendCmd('reset', {});
   });
   $('roomCode').textContent = code;
 }
@@ -1201,11 +1200,11 @@ callsignEl.value = (sessionStorage.getItem('mars-callsign') || localStorage.getI
 /* clicking to focus the input must NOT launch the game */
 callsignEl.addEventListener('click', e => e.stopPropagation());
 callsignEl.addEventListener('keydown', e => {
-  e.stopPropagation();
-  if (e.key === 'Enter') { commitCallsign(callsignEl.value); callsignEl.blur(); }
+  e.stopPropagation(); // typing here never steers the ship or starts the game
   if (e.key === 'Escape') callsignEl.blur();
 });
-callsignEl.addEventListener('change', () => commitCallsign(callsignEl.value));
+/* name commits when the field loses focus (e.g. clicking LAUNCH) —
+   the game starts ONLY via the LAUNCH button */
 callsignEl.addEventListener('blur', () => commitCallsign(callsignEl.value));
 function commitCallsign(val) {
   const next = (val || '').trim().toUpperCase().slice(0, 14) || 'RAIDER';
@@ -1699,8 +1698,8 @@ function startGame() {
   lockPointer();
   msg('Burn the colony. Wake the fleet. Survive.', '#ffd9b0', 4);
 }
+/* the menu starts ONLY via the LAUNCH button (clicking the backdrop does nothing) */
 $('startBtn').addEventListener('click', e => { e.stopPropagation(); startGame(); });
-els.menu.addEventListener('click', startGame);
 $('retryBtn').addEventListener('click', e => { e.stopPropagation(); redeployLocal(); });
 els.gameover.addEventListener('click', e => { if (e.target === els.gameover) redeployLocal(); });
 
@@ -1752,13 +1751,14 @@ function update(dt) {
   const vertical = (keys.has('KeyQ') ? 1 : 0) - (keys.has('KeyE') ? 1 : 0);
 
   /* afterburner: big speed boost, drains fuel, recharges when not in use */
+  boosterMsgCd = Math.max(0, boosterMsgCd - dt);
   const wantBooster = !!(keys.has('ShiftLeft') || keys.has('ShiftRight'));
-  if (boosterOn && (!wantBooster || booster <= 0)) { boosterOn = false; if (wantBooster) msg('BOOSTER SPENT', '#ffb07a', 1.6); }
+  if (boosterOn && (!wantBooster || booster <= 0)) boosterOn = false;
   if (wantBooster && !boosterOn && booster > 0) { boosterOn = true; Sfx.alienLaser(); }
   const boosting = boosterOn && booster > 0;
   if (boosting) {
     booster = Math.max(0, booster - dt * 30);          // ~3.3s of burn per full bar
-    if (booster <= 0) { boosterOn = false; msg('BOOSTER SPENT', '#ffb07a', 1.6); }
+    if (booster <= 0 && boosterMsgCd <= 0) { boosterOn = false; msg('BOOSTER SPENT', '#ffb07a', 2.5); boosterMsgCd = 3; }
   } else {
     booster = Math.min(100, booster + dt * 11);        // full recharge in ~9s
   }
@@ -1777,12 +1777,65 @@ function update(dt) {
   ship.position.addScaledVector(shipVel, dt);
 
   const gh = terrainHeight(ship.position.x, ship.position.z) + 2.6;
-  if (ship.position.y < gh) { ship.position.y = gh; if (shipVel.y < 0) shipVel.y *= -0.3; }
+  if (ship.position.y < gh) {
+    const impact = -shipVel.y;               // downward speed at contact
+    ship.position.y = gh;
+    if (shipVel.y < 0) shipVel.y *= -0.3;
+    if (impact > 8) {
+      /* hard ground strike: proportional damage (≈40 m/s kills a full-hull ship) */
+      damagePlayer(Math.min(120, (impact - 8) * 3.5));
+      const p = ship.position.clone();
+      explosion(p, 0xffb060, 0.7, 24);
+      if (mpReady) mpSendFx(p.x, p.y, p.z, 0xffb060, 0.7);
+      Sfx.hit();
+    }
+  }
   if (ship.position.y > 240) { ship.position.y = 240; shipVel.y = Math.min(shipVel.y, 0); }
   const horiz = Math.hypot(ship.position.x, ship.position.z);
   if (horiz > 680) {
     const k = 680 / horiz;
     ship.position.x *= k; ship.position.z *= k;
+  }
+
+  /* ship-vs-world collisions (ground handled above; buildings + other pilots here) */
+  for (const bd of buildings) {
+    if (!bd.alive) continue;
+    const d = ship.position.distanceTo(bd.center);
+    if (d < bd.radius + 1.4) {
+      const n = ship.position.clone().sub(bd.center).normalize();
+      ship.position.addScaledVector(n, bd.radius + 1.4 - d);   // push out
+      const vn = shipVel.dot(n);
+      if (vn < 0) {
+        shipVel.addScaledVector(n, -vn * 1.6);                 // bounce
+        if (-vn > 8) {
+          damagePlayer(Math.min(120, (-vn - 8) * 3));
+          const p = ship.position.clone().subScaledVector(n, 1);
+          explosion(p, 0xff9a5e, 0.55, 16);
+          if (mpReady) mpSendFx(p.x, p.y, p.z, 0xff9a5e, 0.55);
+          Sfx.hit();
+        }
+      }
+    }
+  }
+  for (const id of peerOrder) {
+    const pos = getShipPos(id);
+    if (!pos) continue;
+    const d = ship.position.distanceTo(pos);
+    if (d < 3.2) {
+      const n = ship.position.clone().sub(pos).normalize(); // away from the other ship
+      ship.position.addScaledVector(n, 3.2 - d);
+      const rel = shipVel.dot(n); // <0 → closing on them
+      if (rel < 0) {
+        shipVel.addScaledVector(n, -rel * 1.4);
+        if (-rel > 10) {
+          damagePlayer(Math.min(120, (-rel - 10) * 2.5));
+          const p = ship.position.clone().subScaledVector(n, 1.5);
+          explosion(p, 0xffd08a, 0.5, 12);
+          if (mpReady) mpSendFx(p.x, p.y, p.z, 0xffd08a, 0.5);
+          Sfx.hit();
+        }
+      }
+    }
   }
 
   /* engine flame: size ∝ thrust, flickers; afterburner makes it roar */
