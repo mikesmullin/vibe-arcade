@@ -61,7 +61,7 @@
   .sbscore { font-weight:700; font-variant-numeric:tabular-nums; }
   .sbdot.me { box-shadow:0 0 8px 1px rgba(255,255,255,.8); }
   .dead { opacity:.45; text-decoration:line-through; }
-  #roomPanel { top:auto; bottom:14px; right:14px; min-width:210px; z-index:30; pointer-events:auto; }
+  #roomPanel { top:auto; bottom:14px; right:14px; min-width:210px; }
   #roomPanel button { pointer-events:auto; cursor:pointer; font:inherit; font-size:11px;
     background:#3a1c10; color:#ffd9b0; border:1px solid rgba(255,150,90,.4); border-radius:6px;
     padding:3px 9px; margin:2px 0; }
@@ -94,14 +94,13 @@
     <div class="row" style="justify-content:flex-end"><div class="bar" style="flex:0 0 140px"><div class="fill" id="alertFill"></div></div></div>
     <div class="row" style="justify-content:flex-end"><span class="label">Saucers</span><span id="alienCount" class="muted">0</span></div>
   </div>
+  <div class="panel" id="roomPanel">
+    <div class="row"><span class="label">Room</span><span id="roomCode" class="muted" style="color:#7fd4ff">CONNECTING…</span></div>
+    <div class="row"><span class="label">Pilots</span><span id="pilotsCount" class="muted">1</span></div>
+    <div class="row" style="display:flex;flex-wrap:wrap;justify-content:flex-end" id="roomBtns"></div>
+  </div>
   <div id="messages"></div>
   <div id="hint">WASD fly · Q/E up/down · Shift = afterburner · hold click to fire · Esc releases mouse (click to re-lock)</div>
-</div>
-<!-- room panel lives OUTSIDE .hud so its buttons stay clickable above the death/menu overlays -->
-<div class="panel" id="roomPanel">
-  <div class="row"><span class="label">Room</span><span id="roomCode" class="muted" style="color:#7fd4ff">CONNECTING…</span></div>
-  <div class="row"><span class="label">Pilots</span><span id="pilotsCount" class="muted">1</span></div>
-  <div class="row" style="display:flex;flex-wrap:wrap;justify-content:flex-end" id="roomBtns"></div>
 </div>
 <div id="crosshair" class="hidden"></div>
 
@@ -1144,12 +1143,6 @@ function buildRoomPanel(code) {
     b.addEventListener('click', ev => { ev.stopPropagation(); fn(); });
     btns.appendChild(b);
   };
-  mk('COPY ROOM LINK', () => {
-    const url = location.origin === 'null' ? location.href : location.href;
-    (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject())
-      .then(() => msg('🔗 ROOM LINK COPIED', '#7fd4ff', 3))
-      .catch(() => prompt('Copy this room link:', url));
-  });
   mk('RESET WORLD', () => {
     if (confirm('Rebuild the colony and clear all saucers for everyone in the room?')) {
       mpResetWorld();
