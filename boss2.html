@@ -1,0 +1,1523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MARS RAID — Scorpion Boss</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;background:#160b06;color:#f7e8dc;font-family:system-ui,"Segoe UI",Roboto,sans-serif}
+  #game{position:fixed;inset:0}
+  canvas{display:block}
+  #game canvas{transform:translateZ(0)}
+  .hud{position:fixed;inset:0;pointer-events:none;z-index:10}
+  .panel{position:absolute;padding:10px 14px;background:rgba(24,10,5,.82);border:1px solid rgba(255,140,80,.28);border-radius:12px;font-size:13px}
+  #stats{top:14px;left:14px;min-width:230px}
+  #bossPanel{top:14px;left:50%;transform:translateX(-50%);min-width:520px;max-width:62vw;text-align:center;padding:10px 18px}
+  #bossName{font-size:11px;letter-spacing:.28em;color:#ff9a5e;text-transform:uppercase}
+  #bossPhase{font-size:11px;letter-spacing:.12em;color:#ffd9b0;margin-top:2px}
+  #bossBar{height:14px;border-radius:7px;background:rgba(255,255,255,.12);overflow:hidden;margin-top:8px;position:relative}
+  #bossFill{height:100%;width:100%;background:linear-gradient(90deg,#ff3b2f,#ff9c2e);transition:width .15s}
+  #bossFill.claws{background:linear-gradient(90deg,#ff3b2f,#ff6a2a)}
+  #bossFill.tail{background:linear-gradient(90deg,#ff9c2e,#ffd24d)}
+  #bossFill.head{background:linear-gradient(90deg,#ffd24d,#7cff6b)}
+  #bossHpText{font-size:11px;color:#ffd9b0;margin-top:4px;letter-spacing:.08em}
+  .row{display:flex;align-items:center;gap:8px;margin:6px 0}
+  .label{width:74px;color:#e8b48f;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+  .bar{flex:1;height:10px;border-radius:5px;background:rgba(255,255,255,.12);overflow:hidden}
+  .fill{height:100%;border-radius:5px}
+  #hpFill{width:100%;background:linear-gradient(90deg,#7cff6b,#c8ff5e)}
+  #boosterFill{width:100%;background:linear-gradient(90deg,#ffd24d,#ff7a2e)}
+  .big{font-size:20px;font-weight:700}
+  .muted{color:#c99a78;font-size:12px}
+  #messages{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);text-align:center;width:100%}
+  .msg{font-size:15px;font-weight:600;letter-spacing:.04em;text-shadow:0 2px 8px rgba(0,0,0,.7);margin:4px 0}
+  #hint{position:absolute;bottom:14px;left:16px;font-size:11px;color:rgba(255,220,190,.45)}
+  #crosshair{position:fixed;left:50%;top:50%;width:18px;height:18px;transform:translate(-50%,-50%);z-index:11;pointer-events:none}
+  #crosshair::before,#crosshair::after{content:"";position:absolute;background:rgba(255,225,190,.95);box-shadow:0 0 6px rgba(255,160,90,.8)}
+  #crosshair::before{left:8px;top:0;width:2px;height:18px}
+  #crosshair::after{left:0;top:8px;width:18px;height:2px}
+  #dmg{position:fixed;inset:0;pointer-events:none;z-index:9;background:radial-gradient(ellipse at center,transparent 50%,rgba(255,25,5,.6))}
+  #lowhp{position:fixed;inset:0;pointer-events:none;z-index:8;background:radial-gradient(ellipse at center,transparent 55%,rgba(255,20,10,.45))}
+  .overlay{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:rgba(18,7,3,.82);cursor:default}
+  #gameover{cursor:pointer}
+  .card{max-width:560px;text-align:center;padding:38px 46px;background:rgba(38,15,8,.85);border:1px solid rgba(255,150,90,.35);border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+  .title{font-size:44px;font-weight:800;letter-spacing:.18em;color:#ffb37c;text-shadow:0 0 30px rgba(255,120,40,.45)}
+  .sub{color:#e0956a;letter-spacing:.3em;font-size:12px;text-transform:uppercase;margin-top:4px}
+  .card p{line-height:1.55;color:#f2d9c4;font-size:14px}
+  .controls{display:grid;grid-template-columns:1fr 1fr;gap:8px 18px;margin:22px 0;font-size:13px;color:#e8c3a6;text-align:left}
+  .controls b{color:#ffd9b0}
+  .startbtn{margin-top:8px;font-size:15px;font-weight:700;letter-spacing:.22em;color:#1a0c06;background:linear-gradient(180deg,#ffc38a,#ff8f4d);padding:12px 26px;border-radius:10px;display:inline-block;animation:pulse 1.6s ease-in-out infinite;cursor:pointer}
+  @keyframes pulse{50%{box-shadow:0 0 26px rgba(255,150,70,.65)}}
+  .hidden{display:none!important}
+  /* off-screen target indicator: brackets when the scorpion is in view, an edge arrow
+     sliding round the border pointing at him when he isn't */
+  #bossMark{position:absolute;transform:translate(-50%,-50%);pointer-events:none;
+    border:2px solid rgba(255,90,50,.9);border-radius:4px;box-shadow:0 0 12px rgba(255,90,50,.35), inset 0 0 12px rgba(255,90,50,.12)}
+  #bossMark::after{content:'';position:absolute;inset:-7px;border:1px solid rgba(255,90,50,.28);border-radius:7px}
+  #bossEdge{position:absolute;pointer-events:none;width:0;height:0}
+  #bossEdge i{display:block;position:absolute;left:0;top:0;transform:translate(-50%,-50%);
+    width:0;height:0;border-left:13px solid transparent;border-right:13px solid transparent;
+    border-bottom:23px solid rgba(255,70,45,.95);filter:drop-shadow(0 0 7px rgba(255,90,50,.8));
+    animation:threatPulse 1.1s ease-in-out infinite}
+  @keyframes threatPulse{50%{opacity:.5}}
+  #finalStats{margin:18px 0;font-size:15px;line-height:1.9;color:#f2d9c4}
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="lowhp" class="hidden"></div>
+<div id="dmg" class="hidden"></div>
+<div class="hud">
+  <div class="panel" id="stats">
+    <div class="big" id="scoreEl">0</div>
+    <div class="row"><span class="label">Hull</span><div class="bar"><div class="fill" id="hpFill"></div></div><span id="hpText" class="muted">100</span></div>
+    <div class="row"><span class="label">Booster</span><div class="bar"><div class="fill" id="boosterFill"></div></div><span id="boosterText" class="muted">100</span></div>
+    <div class="row"><span class="label">Phase</span><span class="muted" id="phaseEl">EMERGING</span></div>
+  </div>
+  <div class="panel" id="bossPanel">
+    <div id="bossName">⚠ MECHA-SCORPION — ARES-7 ANCIENT</div>
+    <div id="bossPhase">EMERGING FROM THE SANDS…</div>
+    <div id="bossBar"><div id="bossFill"></div></div>
+    <div id="bossHpText">—</div>
+  </div>
+  <div id="messages"></div>
+  <div id="bossMark" class="hidden"></div>
+  <div id="bossEdge" class="hidden"><i></i></div>
+  <div id="hint">WASD fly · Q/E up/down · Shift afterburner · hold click to fire · <b>G = wake the scorpion</b> · Esc releases mouse</div>
+</div>
+<div id="crosshair" class="hidden"></div>
+<div class="overlay" id="menu">
+  <div class="card">
+    <div class="title">SCORPION</div>
+    <div class="sub">Boss Arena · Ares-7 Ruins</div>
+    <p>The colony is already ash. Something vast stirs beneath the sand — a mecha-scorpion, tall as the old tower, its tail a laser cannon. <b>Destroy both claws → tail gun → head.</b> Armored plates deflect everything else.</p>
+    <div class="controls">
+      <div><b>Mouse</b> — aim</div><div><b>W / S</b> — thrust / brake</div>
+      <div><b>A / D</b> — strafe</div><div><b>Q / E</b> — up / down</div>
+      <div><b>Shift</b> — afterburner</div><div><b>Click</b> — fire (hold)</div>
+    </div>
+    <div class="startbtn" id="startBtn">ENTER THE RUINS</div>
+    <div style="font-size:11px;color:#c99a78;margin-top:10px">Standalone boss scene — same flight model as MARS RAID</div>
+  </div>
+</div>
+<div class="overlay hidden" id="gameover">
+  <div class="card">
+    <div class="title" id="overTitle" style="font-size:34px">SHIP LOST</div>
+    <div class="sub" id="overSub">The scorpion claims another</div>
+    <div id="finalStats"></div>
+    <div class="startbtn" id="retryBtn">REDEPLOY [R]</div>
+  </div>
+</div>
+<script type="importmap">{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }</script>
+<script type="module">
+import * as THREE from 'three';
+const rand=(a,b)=>a+Math.random()*(b-a), clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), lerp=(a,b,t)=>a+(b-a)*t;
+const lerpAngle=(a,b,t)=>{let d=(b-a)%(Math.PI*2); if(d>Math.PI)d-=Math.PI*2; if(d<-Math.PI)d+=Math.PI*2; return a+d*t;};
+const damp=(dt,l)=>1-Math.exp(-l*dt);
+const $=id=>document.getElementById(id);
+const els={bossMark:$('bossMark'),bossEdge:$('bossEdge'),score:$('scoreEl'),hpFill:$('hpFill'),hpText:$('hpText'),boosterFill:$('boosterFill'),boosterText:$('boosterText'),phaseEl:$('phaseEl'),bossFill:$('bossFill'),bossPhase:$('bossPhase'),bossHpText:$('bossHpText'),messages:$('messages'),crosshair:$('crosshair'),dmg:$('dmg'),lowhp:$('lowhp'),menu:$('menu'),gameover:$('gameover'),finalStats:$('finalStats'),overTitle:$('overTitle'),overSub:$('overSub')};
+
+/* audio */
+const _sfxF=new THREE.Vector3(), _sfxU=new THREE.Vector3();   // listener forward / up
+const Sfx={ctx:null,init(){if(this.ctx){if(this.ctx.state==='suspended')this.ctx.resume().catch(()=>{});return;} try{this.ctx=new (window.AudioContext||window.webkitAudioContext)();}catch{}},
+ live(){return !!(this.ctx&&document.hasFocus());},
+ blip(f0,f1,dur,type='square',vol=0.12,dest=null){if(!this.live())return; try{const t=this.ctx.currentTime,o=this.ctx.createOscillator(),g=this.ctx.createGain();o.type=type;o.frequency.setValueAtTime(f0,t);o.frequency.exponentialRampToValueAtTime(Math.max(1,f1),t+dur);g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.001,t+dur);o.connect(g).connect(dest||this.ctx.destination);o.start(t);o.stop(t+dur+0.02);}catch{}},
+ /* ---- 3D audio ----
+    listener rides the camera; panner() places a source at a world point so it is heard
+    from that bearing and falls off with range. Sounds routed through a panner must NOT
+    also connect to ctx.destination or the dry copy drowns the spatialised one. */
+ listener(cam){if(!this.ctx)return; try{
+   const L=this.ctx.listener,t=this.ctx.currentTime;
+   const p=cam.position;
+   _sfxF.set(0,0,-1).applyQuaternion(cam.quaternion);
+   _sfxU.set(0,1,0).applyQuaternion(cam.quaternion);
+   if(L.positionX){
+     L.positionX.setTargetAtTime(p.x,t,0.02); L.positionY.setTargetAtTime(p.y,t,0.02); L.positionZ.setTargetAtTime(p.z,t,0.02);
+     L.forwardX.setTargetAtTime(_sfxF.x,t,0.02); L.forwardY.setTargetAtTime(_sfxF.y,t,0.02); L.forwardZ.setTargetAtTime(_sfxF.z,t,0.02);
+     L.upX.setTargetAtTime(_sfxU.x,t,0.02); L.upY.setTargetAtTime(_sfxU.y,t,0.02); L.upZ.setTargetAtTime(_sfxU.z,t,0.02);
+   } else { L.setPosition(p.x,p.y,p.z); L.setOrientation(_sfxF.x,_sfxF.y,_sfxF.z,_sfxU.x,_sfxU.y,_sfxU.z); }
+ }catch{}},
+ panner(pos){if(!this.ctx)return null; try{
+   const p=this.ctx.createPanner();
+   p.panningModel='HRTF'; p.distanceModel='inverse';
+   p.refDistance=45; p.maxDistance=1400; p.rolloffFactor=1.1;
+   if(p.positionX){p.positionX.value=pos.x; p.positionY.value=pos.y; p.positionZ.value=pos.z;}
+   else p.setPosition(pos.x,pos.y,pos.z);
+   p.connect(this.ctx.destination); return p;
+ }catch{ return null; }},
+ noise(dur,freq,vol=0.3,dest=null){if(!this.live())return; try{const t=this.ctx.currentTime,n=Math.floor(this.ctx.sampleRate*dur),buf=this.ctx.createBuffer(1,n,this.ctx.sampleRate),d=buf.getChannelData(0);for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*(1-i/n);const src=this.ctx.createBufferSource();src.buffer=buf;const f=this.ctx.createBiquadFilter();f.type='lowpass';f.frequency.setValueAtTime(freq,t);f.frequency.exponentialRampToValueAtTime(Math.max(40,freq*0.15),t+dur);const g=this.ctx.createGain();g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.001,t+dur);src.connect(f).connect(g).connect(dest||this.ctx.destination);src.start(t);}catch{}},
+ laser(){this.blip(950,180,0.13,'square',0.10)}, alienLaser(){this.blip(240,980,0.16,'sawtooth',0.09)}, explosion(b=1){this.noise(0.5*b+0.2,700*b+200,0.35);this.blip(90,35,0.5,'sine',0.25*b)}, hit(){this.noise(0.08,2500,0.12)}, alert(){this.blip(660,660,0.12,'square',0.08); setTimeout(()=>this.blip(880,880,0.12,'square',0.08),140)}, /* roar: two detuned voices sweeping down through a closing lowpass, wobbled by a fast LFO
+    for a growl, with a breath of noise over the top. Layered rather than a single blip so
+    it carries as a monster and not a beep. */
+ roar(pos=null){if(!this.live())return; try{
+   const c=this.ctx,t=c.currentTime;
+   const out=pos?this.panner(pos):null;   // heard from his bearing, quieter with range
+   const g=c.createGain();
+   g.gain.setValueAtTime(0.0001,t);
+   g.gain.exponentialRampToValueAtTime(0.5,t+0.12);
+   g.gain.exponentialRampToValueAtTime(0.3,t+0.7);
+   g.gain.exponentialRampToValueAtTime(0.0001,t+1.5);
+   const lp=c.createBiquadFilter(); lp.type='lowpass'; lp.Q.value=4;
+   lp.frequency.setValueAtTime(1400,t); lp.frequency.exponentialRampToValueAtTime(250,t+1.4);
+   const o1=c.createOscillator(); o1.type='sawtooth';
+   o1.frequency.setValueAtTime(150,t); o1.frequency.exponentialRampToValueAtTime(46,t+1.3);
+   const o2=c.createOscillator(); o2.type='square';
+   o2.frequency.setValueAtTime(74,t); o2.frequency.exponentialRampToValueAtTime(30,t+1.3);
+   const lfo=c.createOscillator(); lfo.type='sine'; lfo.frequency.value=23;   // growl
+   const lfoG=c.createGain(); lfoG.gain.value=14; lfo.connect(lfoG); lfoG.connect(o1.frequency);
+   o1.connect(lp); o2.connect(lp); lp.connect(g); g.connect(out||c.destination);
+   o1.start(t); o2.start(t); lfo.start(t);
+   o1.stop(t+1.6); o2.stop(t+1.6); lfo.stop(t+1.6);
+   this.noise(1.1,900,0.3,out);   // breath layer through the same panner
+ }catch{}}, charge(){this.blip(300,900,0.7,'sine',0.12)}, bossHit(){this.blip(180,90,0.15,'square',0.15); this.noise(0.12,1800,0.15)},
+ /* sustained subsonic rumble for the emergence — a detuned pair under looping filtered
+    noise, with a slow LFO so it churns rather than drones. Level is driven by how close
+    the player is, so it swells as you fly toward the thing clawing its way out. */
+ _rum:null,
+ rumbleStart(){if(!this.live()||this._rum)return; try{
+   const c=this.ctx,t=c.currentTime;
+   const o1=c.createOscillator(); o1.type='sawtooth'; o1.frequency.value=34;
+   const o2=c.createOscillator(); o2.type='square';   o2.frequency.value=25.5;
+   const lfo=c.createOscillator(); lfo.type='sine'; lfo.frequency.value=4.2;
+   const lfoG=c.createGain(); lfoG.gain.value=7; lfo.connect(lfoG); lfoG.connect(o1.frequency);
+   const n=Math.floor(c.sampleRate*2), buf=c.createBuffer(1,n,c.sampleRate), d=buf.getChannelData(0);
+   for(let i=0;i<n;i++)d[i]=Math.random()*2-1;
+   const nz=c.createBufferSource(); nz.buffer=buf; nz.loop=true;
+   const nzG=c.createGain(); nzG.gain.value=0.5;
+   const lp=c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=170; lp.Q.value=6;
+   const g=c.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(0.16,t+0.5);
+   o1.connect(lp); o2.connect(lp); nz.connect(nzG); nzG.connect(lp); lp.connect(g); g.connect(c.destination);
+   o1.start(t); o2.start(t); lfo.start(t); nz.start(t);
+   this._rum={o1,o2,lfo,nz,g};
+ }catch{}},
+ rumbleLevel(v){const r=this._rum; if(!r||!this.ctx)return; try{
+   r.g.gain.setTargetAtTime(clamp(v,0,1)*0.30+0.05, this.ctx.currentTime, 0.15);}catch{}},
+ rumbleStop(){const r=this._rum; if(!r)return; this._rum=null; try{
+   const t=this.ctx.currentTime;
+   r.g.gain.cancelScheduledValues(t); r.g.gain.setValueAtTime(r.g.gain.value,t);
+   r.g.gain.linearRampToValueAtTime(0.0001,t+0.45);
+   setTimeout(()=>{try{r.o1.stop();r.o2.stop();r.lfo.stop();r.nz.stop();}catch{}},650);
+ }catch{}}
+};
+
+/* renderer / scene */
+const renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'});
+renderer.setPixelRatio(0.75); renderer.setSize(innerWidth,innerHeight); renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.BasicShadowMap; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.15;
+$('game').appendChild(renderer.domElement); const canvas=renderer.domElement; canvas.addEventListener('contextmenu',e=>e.preventDefault());
+function freezeStatic(o){o.updateMatrixWorld(true); o.traverse(x=>x.matrixAutoUpdate=false);}
+const scene=new THREE.Scene(); scene.background=new THREE.Color(0x9c4a33); scene.fog=new THREE.Fog(0x9c4a33,80,750);
+const camera=new THREE.PerspectiveCamera(68,innerWidth/innerHeight,0.1,2500); camera.position.set(0,45,140); camera.lookAt(0,6,0);
+scene.add(new THREE.HemisphereLight(0xffb488,0x40180a,0.85));
+const sunLight=new THREE.DirectionalLight(0xffd9b0,1.6); sunLight.position.set(-380,320,-260); sunLight.castShadow=true; sunLight.shadow.mapSize.set(1024,1024); Object.assign(sunLight.shadow.camera,{left:-140,right:140,top:140,bottom:-140,far:1200}); sunLight.shadow.bias=-0.0005; scene.add(sunLight);
+const sunDisc=new THREE.Mesh(new THREE.SphereGeometry(26,20,16),new THREE.MeshBasicMaterial({color:0xffe6c0,fog:false})); sunDisc.position.set(-900,420,-650); scene.add(sunDisc); freezeStatic(sunDisc);
+{const n=700,pos=new Float32Array(n*3); for(let i=0;i<n;i++){const a=rand(0,Math.PI*2),e=rand(0.05,Math.PI/2-0.02),r=1100; pos[i*3]=Math.cos(a)*Math.cos(e)*r; pos[i*3+1]=Math.sin(e)*r; pos[i*3+2]=Math.sin(a)*Math.cos(e)*r;} const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(pos,3)); const stars=new THREE.Points(g,new THREE.PointsMaterial({color:0xfff3e0,size:1.6,sizeAttenuation:false,fog:false,transparent:true,opacity:0.8})); scene.add(stars); freezeStatic(stars);}
+
+/* terrain */
+function terrainHeight(x,z){const d=Math.hypot(x,z); let h=Math.sin(x*0.02)*Math.cos(z*0.023)*4+Math.sin(x*0.005+1.7)*Math.sin(z*0.006)*10+Math.sin(x*0.11)*Math.sin(z*0.09)*0.8; const f=clamp((d-60)/130,0,1); return h*f*f*(3-2*f);}
+/* The colony floor is a raised disc laid ON TOP of the terrain, so terrainHeight() is NOT
+   the surface you can see under the boss — inside the pad it reads 0 while the pad renders
+   at y=1.0. Anything that plants on the ground must use groundHeight(), or it sinks. */
+const PAD_R=78, PAD_TOP=1.0;
+function groundHeight(x,z){const t=terrainHeight(x,z); return Math.hypot(x,z)<=PAD_R ? Math.max(t,PAD_TOP) : t;}
+{const geo=new THREE.PlaneGeometry(1600,1600,140,140); geo.rotateX(-Math.PI/2); const pos=geo.attributes.position; for(let i=0;i<pos.count;i++)pos.setY(i,terrainHeight(pos.getX(i),pos.getZ(i))); geo.computeVertexNormals(); const terrain=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:0xa34a32,roughness:1})); terrain.receiveShadow=true; scene.add(terrain); freezeStatic(terrain);
+ const pad=new THREE.Mesh(new THREE.CylinderGeometry(78,82,1.2,48),new THREE.MeshStandardMaterial({color:0x6e3322,roughness:1})); pad.position.y=0.4; pad.receiveShadow=true; scene.add(pad); freezeStatic(pad);}
+{const mat=new THREE.MeshStandardMaterial({color:0x8a3a26,roughness:1,flatShading:true}); for(let i=0;i<14;i++){const a=(i/14)*Math.PI*2+rand(-0.2,0.2),r=rand(480,700),h=rand(60,160),w=rand(90,190); const m=new THREE.Mesh(new THREE.ConeGeometry(w,h,7),mat); m.position.set(Math.cos(a)*r,h/2-8,Math.sin(a)*r); m.rotation.y=rand(0,6.28); scene.add(m); freezeStatic(m);}}
+let dust; {const N=400,pos=new Float32Array(N*3); for(let i=0;i<N;i++){const a=rand(0,Math.PI*2),r=Math.sqrt(Math.random())*420; pos[i*3]=Math.cos(a)*r; pos[i*3+1]=rand(0.5,45); pos[i*3+2]=Math.sin(a)*r;} const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(pos,3)); dust=new THREE.Points(g,new THREE.PointsMaterial({color:0xd98c64,size:0.7,transparent:true,opacity:0.35,depthWrite:false})); scene.add(dust);}
+
+/* colony rubble — same 11 buildings but pre-destroyed */
+const MATS={metal:new THREE.MeshStandardMaterial({color:0xd9d2c7,metalness:0.4,roughness:0.45}), dark:new THREE.MeshStandardMaterial({color:0x8a8580,metalness:0.5,roughness:0.55}), glass:new THREE.MeshStandardMaterial({color:0x9fd8ff,metalness:0.2,roughness:0.15,transparent:true,opacity:0.6,emissive:0x2a6a8a,emissiveIntensity:0.4})};
+function buildBuildingGroup(type){const g=new THREE.Group(); const [metal,dark,glass]=[MATS.metal.clone(),MATS.dark.clone(),MATS.glass.clone()]; let radius=6,centerY=4;
+ if(type==='dome'){const d=new THREE.Mesh(new THREE.SphereGeometry(9,32,20,0,Math.PI*2,0,Math.PI/2),metal); const ring=new THREE.Mesh(new THREE.TorusGeometry(9,0.5,10,40),dark); ring.rotation.x=Math.PI/2; ring.position.y=0.2; const door=new THREE.Mesh(new THREE.BoxGeometry(3,4,1.5),glass); door.position.set(0,2,8.4); g.add(d,ring,door); radius=9.5; centerY=4;}
+ else if(type==='tower'){const t=new THREE.Mesh(new THREE.CylinderGeometry(2.2,3,15,16),metal); t.position.y=7.5; const top=new THREE.Mesh(new THREE.SphereGeometry(2.6,16,12),glass); top.position.y=15.5; g.add(t,top); radius=6; centerY=8;}
+ else if(type==='hab'){const b=new THREE.Mesh(new THREE.BoxGeometry(9,5,6),metal); b.position.y=2.5; const win=new THREE.Mesh(new THREE.BoxGeometry(9.2,1.2,6.2),glass); win.position.y=3.2; g.add(b,win); radius=5.5; centerY=3;}
+ else if(type==='tank'){const t1=new THREE.Mesh(new THREE.CylinderGeometry(3,3,7,16),dark); t1.rotation.z=Math.PI/2; t1.position.y=3; const t2=new THREE.Mesh(new THREE.CylinderGeometry(2.4,2.4,5,16),dark); t2.position.set(5.5,2.5,0); g.add(t1,t2); radius=6.5; centerY=3;}
+ else if(type==='antenna'){const m=new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.7,13,8),metal); m.position.y=6.5; const dish=new THREE.Mesh(new THREE.SphereGeometry(2.2,16,10,0,Math.PI*2,0,Math.PI/2),glass); dish.rotation.x=Math.PI*0.85; dish.position.y=12; g.add(m,dish); radius=4.5; centerY=7;}
+ else{const base=new THREE.Mesh(new THREE.CylinderGeometry(5,5,3,20),metal); base.position.y=1.5; const dome=new THREE.Mesh(new THREE.SphereGeometry(4.6,24,14,0,Math.PI*2,0,Math.PI/2),glass); dome.position.y=3; g.add(base,dome); radius=6; centerY=4;}
+ g.traverse(o=>{if(o.isMesh){o.castShadow=true; o.receiveShadow=true;}}); g.userData={radius,centerY}; return g;}
+const buildingDefs=[['dome',0,0],['tower',-26,-14],['lab',24,-20],['hab',-30,16],['hab',18,26],['tank',34,8],['antenna',-8,-34],['lab',-14,34],['tank',-40,-28],['hab',44,-6],['antenna',10,44]];
+for(const [type,x,z] of buildingDefs){
+  const g=buildBuildingGroup(type); g.position.set(x,terrainHeight(x,z),z); g.visible=false; scene.add(g);
+  // rubble
+  const rubbleMat=new THREE.MeshStandardMaterial({color:0x4a2a1e,roughness:1,flatShading:true});
+  const cx=x, cz=z, r=g.userData.radius;
+  for(let i=0;i<7;i++){const s=rand(0.8,2.4); const m=new THREE.Mesh(new THREE.BoxGeometry(s,s*0.6,s),rubbleMat); const a=rand(0,Math.PI*2), rr=rand(0,r*0.7); const rx=cx+Math.cos(a)*rr, rz=cz+Math.sin(a)*rr; m.position.set(rx,terrainHeight(rx,rz)+s*0.2,rz); m.rotation.set(rand(-0.5,0.5),rand(0,3),rand(-0.5,0.5)); scene.add(m); freezeStatic(m);}
+  const crater=new THREE.Mesh(new THREE.CircleGeometry(r*0.9,24),new THREE.MeshBasicMaterial({color:0x3a150c,transparent:true,opacity:0.75})); crater.rotation.x=-Math.PI/2; crater.position.set(cx,terrainHeight(cx,cz)+0.15,cz); scene.add(crater); freezeStatic(crater);
+}
+
+/* ship */
+const createShip=(tint=0xd8dee6)=>{const ship=new THREE.Group(); const bodyMat=new THREE.MeshStandardMaterial({color:tint,metalness:0.7,roughness:0.3}); const wingMat=new THREE.MeshStandardMaterial({color:0x8f9aa5,metalness:0.6,roughness:0.4}); const glassMat=new THREE.MeshStandardMaterial({color:0x8fe8ff,metalness:0.3,roughness:0.1,transparent:true,opacity:0.8,emissive:0x36c8e8,emissiveIntensity:0.5}); const body=new THREE.Mesh(new THREE.ConeGeometry(1.0,4.4,14),bodyMat); body.name='body'; body.rotation.x=-Math.PI/2; body.position.z=-1.6; const cockpit=new THREE.Mesh(new THREE.SphereGeometry(0.62,16,12),glassMat); cockpit.position.set(0,0.4,-1.4); const wingL=new THREE.Mesh(new THREE.BoxGeometry(3.6,0.16,1.7),wingMat); wingL.position.set(-2.0,-0.15,1.3); wingL.rotation.y=-0.32; wingL.rotation.z=0.1; const wingR=wingL.clone(); wingR.position.x=2.0; wingR.rotation.y=0.32; wingR.rotation.z=-0.1; const fin=new THREE.Mesh(new THREE.BoxGeometry(0.14,1.3,1.3),wingMat); fin.position.set(0,0.75,2.0); const nozzle=new THREE.Mesh(new THREE.ConeGeometry(0.5,1.6,12),new THREE.MeshStandardMaterial({color:0x4a4f58,metalness:0.8,roughness:0.35})); nozzle.rotation.x=Math.PI/2; nozzle.position.z=2.5; const flameGeo=new THREE.ConeGeometry(0.42,1,10,6,true); {const pa=flameGeo.attributes.position, cols=new Float32Array(pa.count*3), c=new THREE.Color(), cA=new THREE.Color(1,0.93,0.68), cB=new THREE.Color(1,0.5,0.12), cC=new THREE.Color(0.8,0.1,0.02); for(let i=0;i<pa.count;i++){const t=(pa.getY(i)/0.5)*0.5+0.5; if(t<0.5)c.lerpColors(cA,cB,t*2); else c.lerpColors(cB,cC,(t-0.5)*2); cols[i*3]=c.r; cols[i*3+1]=c.g; cols[i*3+2]=c.b;} flameGeo.setAttribute('color',new THREE.BufferAttribute(cols,3));} flameGeo.translate(0,0.5,0); flameGeo.rotateX(Math.PI/2); const flame=new THREE.Mesh(flameGeo,new THREE.MeshBasicMaterial({vertexColors:true,transparent:true,opacity:0.95,blending:THREE.AdditiveBlending,depthWrite:false})); flame.name='flame'; flame.position.z=3.25; flame.scale.set(0.5,0.5,0.05); const flameLight=new THREE.PointLight(0xff7a20,0,32,1.8); flameLight.name='flameLight'; flameLight.position.z=4.4; ship.add(body,cockpit,wingL,wingR,fin,nozzle,flame,flameLight); ship.traverse(o=>{if(o.isMesh)o.castShadow=true;}); return ship;};
+const ship=createShip(0xd8dee6); ship.position.set(0,55,135); ship.visible=false; scene.add(ship);
+const shipFlame=ship.getObjectByName('flame'), shipFlameLight=ship.getObjectByName('flameLight'); const shipVel=new THREE.Vector3();
+
+/* ============ BOSS: Mecha-Scorpion ============ */
+let bossGroup, bossRoot, bossBody, bossHead, bossTail=[], bossLegs=[], bossClaws={L:null,R:null}, bossMats=[];
+/* 'dormant' = buried and waiting for the player to wake it with [G]. Everything downstream
+   (emergence camera, rumble, shake) keys off 'emerging', so it all fires on the keypress
+   wherever the player happens to be, instead of at spawn before he has his bearings. */
+let bossState='dormant', bossT=0, bossWalkPhase=0, bossAttackCd=2.5, bossChargeT=0, bossShake=0;
+let bossDeath=null;   // snapshot taken at death: start height, ground, tail pose, list direction
+let bossPrevYaw=0;    // previous frame heading, for the turn rate the gait needs
+/* rage: losing a claw or the tail gun is a big beat, so he rears up and rocks side to side
+   like a sumo stamping in — and can't shoot while he's doing it. */
+let bossRage=0, bossRageDur=1, bossRageT=0;
+function triggerRage(dur=1.5){
+  bossRage=dur; bossRageDur=dur; bossRageT=0;
+  bossAttackCd=Math.max(bossAttackCd, dur+0.5);   // no shooting mid-tantrum
+  Sfx.roar(_roarAt.copy(bossGroup.position).setY(bossGroup.position.y+10));   // 3D, from his head
+}
+const _roarAt=new THREE.Vector3();
+let bossPos=new THREE.Vector3(0,0,0), bossYaw=0, bossVel=new THREE.Vector3();
+let bossFlash=0, bossHitShake=0;
+let bossAlive=true;
+let inspectFrozen=false;
+// vulnerable HP
+const bossHP={clawL:90, clawR:90, tail:110, head:130};
+const bossMax={clawL:90, clawR:90, tail:110, head:130};
+let bossPhase='claws'; // claws -> tail -> head -> dead
+let bossEmergingY=-36, bossTargetY=0;
+
+function buildScorpion(){
+  bossGroup=new THREE.Group();
+  bossRoot=new THREE.Group();
+  bossGroup.add(bossRoot);
+  const bodyMat=new THREE.MeshStandardMaterial({color:0x5a3a2a,metalness:0.5,roughness:0.6});
+  const bellyMat=new THREE.MeshStandardMaterial({color:0x3a2214,metalness:0.3,roughness:0.8});
+  const armorMat=new THREE.MeshStandardMaterial({color:0x8a6a4a,metalness:0.7,roughness:0.35});
+  const darkMat=new THREE.MeshStandardMaterial({color:0x2a1a0f,metalness:0.4,roughness:0.7});
+  bossMats.push(bodyMat,bellyMat,armorMat,darkMat);
+  // main body — 2x size, all boxes (mecha)
+  bossBody=new THREE.Mesh(new THREE.BoxGeometry(14,6.4,26), bodyMat); bossBody.position.y=6.4; bossBody.castShadow=true; bossBody.receiveShadow=true;
+  const carapace=new THREE.Mesh(new THREE.BoxGeometry(12,1.6,24), armorMat); carapace.position.y=10.2; carapace.castShadow=true;
+  // rivet detail on carapace
+  for(let i=0;i<4;i++){const plate=new THREE.Mesh(new THREE.BoxGeometry(10.4-i*0.6,0.9,4.4), armorMat); plate.position.set(0,10.8, -8 + i*5.6); plate.castShadow=true; bossRoot.add(plate);}
+  // side armor skirts (boxy)
+  const skirtL=new THREE.Mesh(new THREE.BoxGeometry(1.2,3.2,22), darkMat); skirtL.position.set(-7.6,6.8,0); skirtL.castShadow=true;
+  const skirtR=skirtL.clone(); skirtR.position.x=7.6;
+  bossRoot.add(bossBody,carapace,skirtL,skirtR);
+  // head — boxy, 2x
+  bossHead=new THREE.Mesh(new THREE.BoxGeometry(8.4,4.8,6.4), bodyMat); bossHead.position.set(0,7.2,14.4); bossHead.castShadow=true;
+  /* eyes must sit ON the face (head front is z=3.2) — at z=2.4 with 0.5 depth they were
+     entirely inside the skull and never visible. Emissive alone reads flat at distance,
+     so a short-range point light sells the glow against the surrounding armour. */
+  /* unlit: renders flat red whatever the lighting does — no shading, no shadow, no falloff,
+     so the eyes stay the same red on the dark side of the boss as on the sunlit side */
+  const eyeMat=new THREE.MeshBasicMaterial({color:0xff0000});
+  const eyeL=new THREE.Mesh(new THREE.BoxGeometry(1.7,1.2,0.7), eyeMat); eyeL.position.set(-2.4,1.1,3.1);
+  const eyeR=eyeL.clone(); eyeR.position.x=2.4;
+  const browL=new THREE.Mesh(new THREE.BoxGeometry(2.3,0.5,0.5), darkMat); browL.position.set(-2.4,2.0,3.1);
+  const browR=browL.clone(); browR.position.x=2.4;
+  bossHead.add(eyeL,eyeR,browL,browR);
+  const mandL=new THREE.Mesh(new THREE.BoxGeometry(1.2,1.0,2.8), darkMat); mandL.position.set(-2.4,-1.2,3.2); mandL.rotation.y=0.3;
+  const mandR=mandL.clone(); mandR.position.x=2.4; mandR.rotation.y=-0.3;
+  bossHead.add(mandL,mandR);
+  bossHead.userData.eyeMat=eyeMat;
+  bossRoot.add(bossHead);
+  // claws — thick meaty lobster/crab style, all boxes
+  function makeClaw(side){
+    const g=new THREE.Group();
+    const armMat=new THREE.MeshStandardMaterial({color:0x6b4a2e,metalness:0.5,roughness:0.5});
+    const clawMat=new THREE.MeshStandardMaterial({color:0x9a7a4a,metalness:0.6,roughness:0.4});
+    bossMats.push(armMat,clawMat);
+    // upper arm — thick box
+    const upper=new THREE.Mesh(new THREE.BoxGeometry(3.2,3.2,5.4), armMat); upper.position.set(0,0, -0.6); upper.castShadow=true;
+    const joint=new THREE.Group(); joint.add(upper);
+    // forearm — thick box
+    const fore=new THREE.Mesh(new THREE.BoxGeometry(3.0,3.0,4.6), armMat); fore.position.set(0,0, 1.4); fore.castShadow=true;
+    const foreG=new THREE.Group(); foreG.position.set(0,0,2.8); foreG.add(fore);
+    // pincer — meaty crab claw: wide base + two thick fingers
+    const base=new THREE.Mesh(new THREE.BoxGeometry(6.2,3.9,6.4), clawMat); base.position.set(0,0,3.8); base.castShadow=true;
+    // fixed finger (lower)
+    const f1=new THREE.Mesh(new THREE.BoxGeometry(1.8,1.6,6.2), darkMat); f1.position.set(-1.5,0.2,5.2); f1.castShadow=true;
+    // movable finger (upper) — slightly angled
+    const f2=new THREE.Mesh(new THREE.BoxGeometry(1.8,1.6,6.2), darkMat); f2.position.set(1.5,0.2,5.2); f2.castShadow=true;
+    f1.rotation.y=-0.20; f2.rotation.y=0.20;   // pincer gapes open
+    // claw tip highlight
+    const tip1=new THREE.Mesh(new THREE.BoxGeometry(0.9,0.9,1.4), new THREE.MeshStandardMaterial({color:0x1a0f08})); tip1.position.set(0,0,3.2); f1.add(tip1);
+    const tip2=tip1.clone(); f2.add(tip2);
+    base.add(f1,f2);
+    foreG.add(base);
+    joint.add(foreG);
+    g.add(joint);
+    g.userData={armMat,clawMat,upper,fore,base,f1,f2,joint,foreG,side};
+    return g;
+  }
+  const clawL=makeClaw('L'), clawR=makeClaw('R');
+  /* yaw is negative on the left / positive on the right so the pincers open outward —
+     the other way round they cross over each other in front of the head */
+  clawL.position.set(-9.2,7.4,10.5); clawL.rotation.set(-0.42,-0.40,0.16); clawL.scale.setScalar(1.15);
+  clawR.position.set(9.2,7.4,10.5); clawR.rotation.set(-0.42,0.40,-0.16); clawR.scale.setScalar(1.15);
+  bossClaws.L=clawL; bossClaws.R=clawR;
+  bossRoot.add(clawL,clawR);
+  // legs — 8 legs, 3 box segments each, Y-down (vertical), functional
+  const legMat=new THREE.MeshStandardMaterial({color:0x4a3320,metalness:0.4,roughness:0.7});
+  const jointMat=new THREE.MeshStandardMaterial({color:0x6b4a2e,metalness:0.6,roughness:0.5});
+  bossMats.push(legMat,jointMat);
+  const legOffsets=[[-7.2,3.8,7.5],[-8.0,3.8,1.0],[-8.0,3.8,-5.5],[-6.8,3.8,-11.0],[7.2,3.8,7.5],[8.0,3.8,1.0],[8.0,3.8,-5.5],[6.8,3.8,-11.0]];
+  const SEG1=6.5, SEG2=7.0, SEG3=4.2;
+  for(let i=0;i<8;i++){
+    const lg=new THREE.Group(); lg.position.set(legOffsets[i][0],legOffsets[i][1],legOffsets[i][2]);
+    const hipBox=new THREE.Mesh(new THREE.BoxGeometry(1.4,1.4,1.4), jointMat); hipBox.castShadow=true; lg.add(hipBox);
+    const thigh=new THREE.Mesh(new THREE.BoxGeometry(1.6,SEG1,1.6), legMat); thigh.position.set(0,-SEG1/2,0); thigh.castShadow=true;
+    const thighG=new THREE.Group(); thighG.add(thigh);
+    const kneeBox=new THREE.Mesh(new THREE.BoxGeometry(1.3,1.3,1.3), jointMat); kneeBox.position.set(0,-SEG1,0); kneeBox.castShadow=true; thighG.add(kneeBox);
+    const shin=new THREE.Mesh(new THREE.BoxGeometry(1.4,SEG2,1.4), legMat); shin.position.set(0,-SEG2/2,0); shin.castShadow=true;
+    const shinG=new THREE.Group(); shinG.position.set(0,-SEG1,0); shinG.add(shin);
+    const ankleBox=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.1,1.1), jointMat); ankleBox.position.set(0,-SEG2,0); ankleBox.castShadow=true; shinG.add(ankleBox);
+    /* ZYX so the pad can be levelled (z) AND aimed (y) independently — with the default
+       XYZ order the yaw would be applied before the roll and skew the pad off the ground */
+    const foot=new THREE.Mesh(new THREE.BoxGeometry(FOOT_W,FOOT_H,FOOT_L), legMat); foot.position.set(0,-SEG2-FOOT_H/2,0); foot.rotation.order='ZYX'; foot.castShadow=true;
+    const footTip=new THREE.Mesh(new THREE.BoxGeometry(1.4,0.6,1.4), new THREE.MeshStandardMaterial({color:0x1a0f08})); footTip.position.set(0,-0.15,FOOT_L/2+0.3); foot.add(footTip);
+    shinG.add(foot);
+    thighG.add(shinG);
+    lg.add(thighG);
+    const sideStr=i<4?'L':'R';
+    const gaitGroup=([0,5,2,7].includes(i)?0:1);
+    const homeOffset=new THREE.Vector3(lg.position.x + (sideStr==='L'?-1:1)*4.2, 0, lg.position.z + (1.5-(i%4))*2.6);
+    const plantPos=new THREE.Vector3(homeOffset.x, groundHeight(homeOffset.x,homeOffset.z)+REST_FOOT_Y, homeOffset.z);
+    lg.userData={thighG,shinG,foot,hipBox,kneeBox,ankleBox,side:sideStr,idx:i,basePos:new THREE.Vector3().copy(lg.position),seg1:SEG1,seg2:SEG2,seg3:SEG3,phaseOffset:(i%2===0?0:Math.PI)+(i<4?0:0.35),gaitGroup,homeOffset,plantPosition:plantPos,plantNormal:new THREE.Vector3(0,1,0),isStepping:false,stepT:0,stepStart:plantPos.clone(),stepEnd:plantPos.clone()};
+    bossLegs.push(lg); bossRoot.add(lg);
+  }
+  // tail — 6 boxy segments, Y-up, arching forward over body
+  const tailSegMats=[];
+  const tailSizes=[[4.2,4.2,5.8],[3.8,3.8,5.4],[3.4,3.4,5.0],[2.8,2.8,4.6],[2.2,2.2,4.2],[1.8,1.8,3.8]];
+  for(let i=0;i<6;i++){
+    const [w,h,d]=tailSizes[i];
+    const seg=new THREE.Mesh(new THREE.BoxGeometry(w,d,h), armorMat); seg.position.set(0,d/2,0); seg.castShadow=true;
+    const g=new THREE.Group();
+    /* YXZ so the base segment's yaw swings the whole bend PLANE before the segments pitch
+       within it. Under the default XYZ the yaw is applied to the chain's own +Y axis and
+       does nothing, leaving the tail curling on a fixed plane no matter where the target is. */
+    g.rotation.order='YXZ';
+    g.add(seg);
+    if(i<4){const plate=new THREE.Mesh(new THREE.BoxGeometry(w*1.15, d*0.7, 0.6), darkMat); plate.position.set(0,d/2, h/2+0.3); g.add(plate);}
+    if(i<5){const pistL=new THREE.Mesh(new THREE.BoxGeometry(0.5, d*0.8, 0.5), darkMat); pistL.position.set(-w/2-0.3,d/2,0); g.add(pistL);
+             const pistR=pistL.clone(); pistR.position.x=w/2+0.3; g.add(pistR);}
+    g.userData={seg,idx:i,sz:[w,h,d]};
+    tailSegMats.push(g);
+  }
+  let parent=bossRoot;
+  const tailBasePos=new THREE.Vector3(0,7.6,-13.0);
+  for(let i=0;i<6;i++){
+    const g=tailSegMats[i];
+    if(i===0){g.position.copy(tailBasePos);}
+    else {const prevLen=tailSizes[i-1][2]; g.position.set(0,prevLen,0);}
+    parent.add(g);
+    parent=g;
+    bossTail.push(g);
+  }
+  const tip=bossTail[bossTail.length-1];
+  const gunMat=new THREE.MeshStandardMaterial({color:0x2a2a2a,metalness:0.8,roughness:0.3,emissive:0x331100,emissiveIntensity:0});
+  const gun=new THREE.Mesh(new THREE.BoxGeometry(2.2,4.8,2.2), gunMat); gun.position.set(0,2.4,0); gun.castShadow=true;
+  const barb=new THREE.Mesh(new THREE.ConeGeometry(1.1,2.4,4), new THREE.MeshStandardMaterial({color:0x1a1a1a,metalness:0.7,roughness:0.4})); barb.position.set(0,6.0,0);
+  const gunGlow=new THREE.Mesh(new THREE.BoxGeometry(1.6,1.6,1.6), new THREE.MeshBasicMaterial({color:0xff3b2f,transparent:true,opacity:0})); gunGlow.position.set(0,6.0,0);
+  const gunLight=new THREE.PointLight(0xff3b2f,0,28,1.5); gunLight.position.set(0,6.0,0);
+  tip.add(gun,barb,gunGlow,gunLight);
+  tip.userData.gun=gun; tip.userData.barb=barb; tip.userData.gunMat=gunMat; tip.userData.gunGlow=gunGlow; tip.userData.gunLight=gunLight;
+  bossMats.push(gunMat);
+
+  bossGroup.position.set(0,bossEmergingY,0);
+  scene.add(bossGroup);
+  // sand mound covering boss initially — scaled for 2x boss
+  const sandMound=new THREE.Mesh(new THREE.SphereGeometry(26,24,12,0,Math.PI*2,0,Math.PI/2), new THREE.MeshStandardMaterial({color:0xa34a32,roughness:1}));
+  sandMound.scale.set(1,0.45,1); sandMound.position.y=0.1; sandMound.receiveShadow=true; sandMound.name='sandMound';
+  bossGroup.add(sandMound);
+  poseBossRest();
+}
+const TAIL_REST_X=[0.16,0.30,0.46,0.62,0.72,0.60];
+/* ---- leg IK — planar 2-bone solve inside the leg's own vertical plane.
+   The knee bends OUTWARD and UP the way a real scorpion's does, so each leg reads as a
+   tall inverted V: femur rising out to a knee above the belly line, tibia dropping
+   near-vertical onto a flat pad. Bending it the other way is what made the old rig
+   look like it was crawling on its knees. Target is in bossRoot-local space. ---- */
+/* Foot pad. It has to out-read the 1.4×1.4 shin or it just looks like more leg —
+   the old 1.4×0.6×2.2 pad was invisible in-world even when correctly planted. */
+const FOOT_W=2.4, FOOT_H=0.9, FOOT_L=3.4;
+const LEG_PAD=FOOT_H/2;   // knee→pad-centre offset beyond the tibia
+function solveLeg(leg, tx, ty, tz){
+  const d=leg.userData, hip=d.basePos;
+  const dx=tx-hip.x, dy=ty-hip.y, dz=tz-hip.z;
+  const h=Math.max(0.001, Math.hypot(dx,dz));
+  const L1=d.seg1, L2=d.seg2+LEG_PAD;
+  const r=clamp(Math.hypot(h,dy), Math.abs(L1-L2)+0.8, L1+L2-0.6);
+  const beta=Math.atan2(h, Math.max(0.001,-dy));               // hip→foot line, off straight down
+  const a1=Math.acos(clamp((L1*L1+r*r-L2*L2)/(2*L1*r),-1,1));  // femur off that line
+  const femur=beta+a1;                                         // + swings the knee out and up
+  const a2=Math.acos(clamp((L1*L1+L2*L2-r*r)/(2*L1*L2),-1,1)); // interior knee angle
+  const shin=femur-(Math.PI-a2);
+  /* rotation.y aims the leg's bend plane outward; rotation.z is the femur angle off
+     straight down. Euler XYZ applies Z first, then Y — so the whole V stays planar. */
+  leg.rotation.set(0, Math.atan2(-dz/h, dx/h), femur);
+  d.thighG.rotation.set(0,0,0);
+  d.shinG.rotation.set(0,0,shin-femur);
+  /* pad flat on the ground (z) and toe aimed along the leg's own outward direction (y).
+     Without the yaw the toe inherits the leg frame's +Z, which sits 90° off the leg —
+     pointing forward on the right side and backward on the left. */
+  d.foot.rotation.set(0, Math.PI/2, -shin);
+  return {femur, shin, kneeY: hip.y - L1*Math.cos(femur)};
+}
+const REST_OUT=4.2, REST_FAN=2.6, REST_FOOT_Y=FOOT_H/2+0.10;   // pad bottom ~0.1 over the sand
+function legHomeTarget(leg, out=REST_OUT){
+  const d=leg.userData, hip=d.basePos, row=d.idx%4;
+  return { x: hip.x + (d.side==='L'?-1:1)*out, y: REST_FOOT_Y, z: hip.z + (1.5-row)*REST_FAN };
+}
+function poseBossRest(){
+  if(!bossRoot) return;
+  for(const leg of bossLegs){
+    const tgt=legHomeTarget(leg);
+    solveLeg(leg, tgt.x, tgt.y, tgt.z);
+  }
+  for(let i=0;i<bossTail.length;i++){
+    bossTail[i].rotation.set(TAIL_REST_X[i]||0.4, 0, 0);
+  }
+}
+buildScorpion();
+
+/* game state */
+let state='menu', score=0, hp=100, booster=100, boosterOn=false, tGame=0, invuln=0, fireCd=0, boosterMsgCd=0;
+let boosterLock=false;   // ran dry — blocks re-engage (and its sound) until Shift is released
+const MARS_G=3.71, LIFT_Q=0.0041, DRAG_NORMAL=0.15, DRAG_BOOST=0.06;
+let yaw=0,pitch=0,roll=0, firing=false, locked=false, everLocked=false;
+let craftYaw=0, craftPitch=0;        // airframe attitude — lags the yaw/pitch aim input
+const camPos=new THREE.Vector3();    // chase camera's own position, spring-followed
+const _camOff=new THREE.Vector3();
+const _aimDir=new THREE.Vector3(), _aimPt=new THREE.Vector3(), _shotDir=new THREE.Vector3();
+let dbgHold=null, dbgGravity=true;   // debug flight rig — see window.dbg
+let mouseSteered=false;              // has the player moved the mouse since launch?
+let ndcOrigin=null;                  // cursor position at that first move — the neutral point
+const _ndcRel=new THREE.Vector2();
+const stats={shots:0};
+const messages=[];
+let bossDead=false;
+
+/* bullets */
+const bullets=[], bulletPool=[];
+function spawnBullet(pos,vel,owner,dmg,extras={}){
+  let b=bulletPool.pop();
+  if(!b){const mat=new THREE.MeshBasicMaterial(); const mesh=new THREE.Mesh(new THREE.SphereGeometry(0.28,8,8),mat); const glow=new THREE.Mesh(new THREE.SphereGeometry(0.55,8,8),new THREE.MeshBasicMaterial({transparent:true,opacity:0.25,blending:THREE.AdditiveBlending,depthWrite:false})); mesh.add(glow); b={mesh,glow,vel:new THREE.Vector3(),owner:'',isPlayer:true,dmg:0,ttl:0,ghost:false,target:null}; b.mesh.visible=false;}
+  b.isPlayer=owner!=='alien'; b.ghost=!!extras.ghost; b.target=extras.target||null;
+  /* seek: steers toward the player, but only while he is inside a narrow forward cone.
+     Outside it the round is blind and simply holds its trajectory — so a hard break
+     across its nose loses it for good, while a lazy drift gets tracked. */
+  b.seek=!!extras.seek; b.seekCone=extras.cone!=null?extras.cone:0.35; b.seekTurn=extras.turn!=null?extras.turn:1.2;
+  b.mesh.scale.setScalar(extras.scale||1);
+  const tint=extras.color!=null?extras.color:(owner==='alien'?0xff6a3d:0x7df9ff);
+  b.mesh.material.color.set(tint); b.glow.material.color.copy(b.mesh.material.color);
+  b.owner=owner; b.dmg=dmg; b.ttl=extras.ttl||2.5; b.vel.copy(vel); b.mesh.position.copy(pos); b.mesh.visible=true; scene.add(b.mesh); bullets.push(b);
+}
+function damagePlayer(dmg){if(state!=='playing'||invuln>0)return; invuln=0.35; hp=Math.max(0,hp-dmg); Sfx.hit(); setHidden(els.dmg,false); clearTimeout(damagePlayer._hide); damagePlayer._hide=setTimeout(()=>setHidden(els.dmg,true),90); if(hp<=0)gameOver(false);}
+function updateBullets(dt){
+  for(let i=bullets.length-1;i>=0;i--){
+    const b=bullets[i]; b.ttl-=dt;
+    if(b.seek && state==='playing' && hp>0){
+      /* turn the velocity toward the player at a capped rate, never changing speed.
+         The cap is what keeps it dodgeable: it can only bend so far per second. */
+      const sp=b.vel.length();
+      if(sp>1e-4){
+        const cur=_sv1.copy(b.vel).divideScalar(sp);
+        const want=_sv2.copy(ship.position).sub(b.mesh.position);
+        if(want.lengthSq()>1e-4){
+          want.normalize();
+          const ang=Math.acos(clamp(cur.dot(want),-1,1));
+          if(ang<=b.seekCone && ang>1e-4){                 // inside its cone of vision
+            const axis=_sv3.crossVectors(cur,want);
+            if(axis.lengthSq()>1e-8){
+              axis.normalize();
+              cur.applyAxisAngle(axis, Math.min(ang, b.seekTurn*dt));
+              b.vel.copy(cur).multiplyScalar(sp);
+            }
+          }
+        }
+      }
+    }
+    b.mesh.position.addScaledVector(b.vel,dt); const p=b.mesh.position; let dead=b.ttl<=0;
+    if(!dead && !b.ghost && p.y<=terrainHeight(p.x,p.z)+0.2){explosion(p,b.isPlayer?0xffc27a:0xff7a4d,0.45,14); dead=true;}
+    if(!dead && b.isPlayer){
+      // boss hit detection
+      const hit=bossHitTest(p);
+      if(hit){
+        handleBossHit(hit,b.dmg,p);
+        explosion(p,0xffd08a,0.5,14); Sfx.bossHit(); dead=true;
+      }
+    } else if(!dead && !b.isPlayer){
+      if(p.distanceToSquared(ship.position)<1.9*1.9){damagePlayer(b.dmg); explosion(p,0xff6a3d,0.5,14); dead=true;}
+    }
+    if(dead){b.mesh.visible=false; scene.remove(b.mesh); bullets.splice(i,1); bulletPool.push(b);}
+  }
+}
+
+/* boss hit test — returns {part:'clawL'|'clawR'|'tail'|'head'|'armored'} or null */
+const _bossWorldPos=new THREE.Vector3();
+function getBossPartWorldPos(part){
+  if(part==='clawL') bossClaws.L.getWorldPosition(_bossWorldPos);
+  else if(part==='clawR') bossClaws.R.getWorldPosition(_bossWorldPos);
+  else if(part==='tail') bossTail[bossTail.length-1].getWorldPosition(_bossWorldPos);
+  else if(part==='head') bossHead.getWorldPosition(_bossWorldPos);
+  else bossGroup.getWorldPosition(_bossWorldPos);
+  // offset to center of part
+  if(part==='clawL'||part==='clawR') _bossWorldPos.y+=2;
+  if(part==='tail') _bossWorldPos.y+=1;
+  if(part==='head') _bossWorldPos.y+=0.5;
+  return _bossWorldPos.clone();
+}
+function bossHitTest(p){
+  if(!bossAlive||bossState==='emerging'||bossState==='dead') return null;
+  const rClaw=6.5, rTail=4.2, rHead=5.6, rBody=14;
+  // check vulnerable parts first
+  if(bossPhase==='claws'){
+    const cL=getBossPartWorldPos('clawL'), cR=getBossPartWorldPos('clawR');
+    if(p.distanceTo(cL)<rClaw) return {part:'clawL'};
+    if(p.distanceTo(cR)<rClaw) return {part:'clawR'};
+    // hit elsewhere = armored
+    const head=getBossPartWorldPos('head'), tail=getBossPartWorldPos('tail');
+    if(p.distanceTo(head)<rHead || p.distanceTo(tail)<rTail || p.distanceTo(bossPos)<rBody) return {part:'armored'};
+    return null;
+  } else if(bossPhase==='tail'){
+    const t=getBossPartWorldPos('tail');
+    if(p.distanceTo(t)<rTail+0.8) return {part:'tail'};
+    const head=getBossPartWorldPos('head');
+    if(p.distanceTo(head)<rHead || p.distanceTo(bossPos)<rBody) return {part:'armored'};
+    return null;
+  } else if(bossPhase==='head'){
+    const h=getBossPartWorldPos('head');
+    if(p.distanceTo(h)<rHead) return {part:'head'};
+    if(p.distanceTo(bossPos)<rBody) return {part:'armored'};
+    return null;
+  }
+  return null;
+}
+function handleBossHit(hit,dmg,pos){
+  if(hit.part==='armored'){
+    explosion(pos,0x888888,0.35,10);
+    // hint removed — player must discover weak points via boss colors/telegraph (was msg 'ARMORED — FIND THE WEAK POINT!')
+    // no red flash on armored hits — only spark
+    bossHitShake=0.3;
+    return;
+  }
+  bossFlash=0.18; bossHitShake=0.6;
+  if(hit.part==='clawL'){
+    bossHP.clawL=Math.max(0,bossHP.clawL-dmg);
+    // flash claw
+    const m=bossClaws.L.userData.clawMat; m.emissive.set(0xff4422); m.emissiveIntensity=0.9; setTimeout(()=>{m.emissive.set(0x000000); m.emissiveIntensity=0;},120);
+    if(bossHP.clawL<=0 && bossClaws.L.visible){
+      destroyClaw('L');
+    }
+  } else if(hit.part==='clawR'){
+    bossHP.clawR=Math.max(0,bossHP.clawR-dmg);
+    const m=bossClaws.R.userData.clawMat; m.emissive.set(0xff4422); m.emissiveIntensity=0.9; setTimeout(()=>{m.emissive.set(0x000000); m.emissiveIntensity=0;},120);
+    if(bossHP.clawR<=0 && bossClaws.R.visible){
+      destroyClaw('R');
+    }
+  } else if(hit.part==='tail'){
+    bossHP.tail=Math.max(0,bossHP.tail-dmg);
+    const tip=bossTail[bossTail.length-1]; tip.userData.gunMat.emissive.set(0xff4422); tip.userData.gunMat.emissiveIntensity=0.8; setTimeout(()=>{tip.userData.gunMat.emissive.set(0x331100); tip.userData.gunMat.emissiveIntensity=0;},120);
+    if(bossHP.tail<=0) destroyTail();
+  } else if(hit.part==='head'){
+    bossHP.head=Math.max(0,bossHP.head-dmg);
+    bossHead.material.emissive.set(0xff4422); bossHead.material.emissiveIntensity=0.6; setTimeout(()=>{bossHead.material.emissive.set(0x000000); bossHead.material.emissiveIntensity=0;},120);
+    if(bossHP.head<=0) killBoss();
+  }
+  checkPhaseTransition();
+  updateBossHud();
+}
+function destroyClaw(side){
+  const claw=bossClaws[side];
+  const pos=getBossPartWorldPos(side==='L'?'clawL':'clawR');
+  explosion(pos,0xff9a5e,1.4,45); Sfx.explosion(1.2);
+  // claw falls off — hide and spawn debris
+  claw.visible=false;
+  // debris
+  for(let i=0;i<4;i++){const s=rand(0.6,1.4); const m=new THREE.Mesh(new THREE.BoxGeometry(s,s*0.7,s), new THREE.MeshStandardMaterial({color:0x6b4a2e})); m.position.copy(pos).add(new THREE.Vector3(rand(-1,1),rand(0,1),rand(-1,1))); m.rotation.set(rand(0,3),rand(0,3),rand(0,3)); scene.add(m);}
+  msg((side==='L'?'LEFT':'RIGHT')+' CLAW DESTROYED!', '#ff9c6a', 3);
+  score+=250;
+  // shake
+  bossHitShake=1.0;
+  triggerRage(1.5);
+}
+function destroyTail(){
+  const tip=bossTail[bossTail.length-1];
+  const pos=getBossPartWorldPos('tail');
+  explosion(pos,0xff6a2a,1.6,55); Sfx.explosion(1.4);
+  tip.visible=false;
+  // tail segments droop
+  for(let i=2;i<bossTail.length;i++){bossTail[i].rotation.x+=0.6;}
+  msg('TAIL GUN DESTROYED — AIM FOR THE HEAD!', '#ffd24d', 4); Sfx.alert();
+  score+=400;
+  bossHitShake=1.2;
+  triggerRage(1.9);
+}
+function killBoss(){
+  bossAlive=false; bossState='dying'; bossT=0;
+  /* snapshot where it died — the collapse is relative to that, not to y=0. The boss
+     stands on the raised pad, so animating from a hardcoded 0 snaps it down first. */
+  bossDeath={ y0:bossGroup.position.y, gnd:groundHeight(bossGroup.position.x,bossGroup.position.z),
+              tail:bossTail.map(s=>s.rotation.x), roll:(Math.random()<0.5?-1:1), fx:0 };
+  const pos=getBossPartWorldPos('head');
+  explosion(pos,0xffb060,2.2,70); Sfx.explosion(1.6);
+  msg('HEAD DESTROYED — SCORPION SLAIN!', '#7cff6b', 5); Sfx.alert();
+  score+=1000;
+  // death handled in updateBoss dying state
+}
+function checkPhaseTransition(){
+  if(bossPhase==='claws' && bossHP.clawL<=0 && bossHP.clawR<=0){
+    bossPhase='tail';
+    msg('CLAWS DESTROYED — TARGET THE TAIL GUN!', '#ffd24d', 4); Sfx.alert();
+    // make tail glow vulnerable
+    const tip=bossTail[bossTail.length-1]; tip.userData.gunMat.emissive.set(0xff3300); tip.userData.gunMat.emissiveIntensity=0.5;
+  } else if(bossPhase==='tail' && bossHP.tail<=0){
+    bossPhase='head';
+    msg('TAIL GUN DESTROYED — AIM FOR THE HEAD!', '#ff6a2a', 4); Sfx.alert();
+    bossHead.material.emissive.set(0xff3300); bossHead.material.emissiveIntensity=0.3;
+  }
+}
+
+/* boss update */
+const _fwd=new THREE.Vector3(), _right=new THREE.Vector3(), _accel=new THREE.Vector3(), _camTarget=new THREE.Vector3(), _lookAt=new THREE.Vector3();
+const _n=new THREE.Vector3(), _p=new THREE.Vector3(), _bossFace=new THREE.Vector3();
+const _tailTip=new THREE.Vector3(), _tailAim=new THREE.Vector3();
+const _sv1=new THREE.Vector3(), _sv2=new THREE.Vector3(), _sv3=new THREE.Vector3();
+let camShake=0;   // camera-space shake amplitude, decays on its own
+/* emergence cinematic: 0 = normal chase view, 1 = looking straight at the boss. Only the
+   aim point is blended, never the camera's position — the player keeps flying wherever he
+   was pointed, he just gets shown where the thing is coming up. */
+let bossCam=0, bossCamWant=0;
+const _camLookBoss=new THREE.Vector3();
+/* wake the buried scorpion — [G] in game, window.dbg.emerge() from the console */
+function startEmerge(){
+  if(bossState!=='dormant') return false;
+  bossState='emerging'; bossT=0;
+  const mound=bossGroup.getObjectByName('sandMound'); if(mound) mound.visible=true;
+  msg('THE SAND IS MOVING…','#ffd24d',2.5);
+  return true;
+}
+function updateBoss(dt,t){
+  bossT+=dt;
+  if(bossState==='dormant'){
+    bossGroup.position.y=bossEmergingY;   // stay buried, no rumble, no cinematic
+    updateBossHud();
+    return;
+  }
+  if(bossState==='emerging'){
+    const dur=2.8;
+    const k=clamp(bossT/dur,0,1);
+    /* ground rumble: audible everywhere, but both the volume and the camera shake scale
+       with how close the player is, and build as it breaks the surface */
+    bossCamWant=1;                      // swing the player's view onto him while he digs out
+    {if(!Sfx._rum) Sfx.rumbleStart();   // lazily, so it still starts if audio woke up late
+     const d=ship.position.distanceTo(bossGroup.position);
+     const prox=clamp(1-(d-26)/150, 0, 1);
+     Sfx.rumbleLevel(prox);
+     camShake=Math.max(camShake, prox*0.95*(0.4+0.6*k));}
+    const eased=1-Math.pow(1-k,3);
+    bossGroup.position.y=lerp(bossEmergingY,bossTargetY,eased);
+    bossShake=(1-k)*2.5;
+    bossGroup.position.x+=rand(-bossShake, bossShake)*0.3;
+    bossGroup.position.z+=rand(-bossShake, bossShake)*0.3;
+    // sand mound shrinks
+    const mound=bossGroup.getObjectByName('sandMound');
+    if(mound){mound.scale.set(1-k*0.9, 0.45*(1-k), 1-k*0.9); mound.position.y=lerp(0.1,-2,k);}
+    // dust burst - scaled for 2x boss (mound r26, body 14x26) so distribute around perimeter so it remains visible outside larger carapace
+    if(Math.random()<0.62){
+      const a=rand(0,Math.PI*2), r=rand(13,25);
+      const px=Math.cos(a)*r + bossGroup.position.x, pz=Math.sin(a)*r + bossGroup.position.z;
+      explosion(new THREE.Vector3(px, 0.6, pz),0xd9a06a,1.25,22);
+      if(Math.random()<0.45) explosion(new THREE.Vector3(rand(-9,9)+bossGroup.position.x, 0.9, rand(-9,9)+bossGroup.position.z),0xc6865a,0.95,16);
+    }
+    if(k>=1){
+      bossState='active';
+      bossT=0;
+      if(mound) mound.visible=false;
+      bossCamWant=0;                    // hand the view back to the player
+      Sfx.rumbleStop();
+      /* announce himself with the same tantrum he throws when wounded — rear up, rock,
+         stamp. triggerRage plays the roar, so it isn't fired separately here. */
+      triggerRage(2.0);
+      msg('☠ THE SCORPION HAS AWAKENED', '#ff3b2f', 4);
+      // shake camera
+      bossHitShake=1.5;
+    }
+    updateBossHud();
+    return;
+  }
+  if(bossState==='dead' || bossState==='dying'){
+    if(bossState==='dying'){
+      /* Death is a staged collapse that stays ON the ground — rear up, legs buckle
+         outward, belly hits the sand, tail crashes down behind. The body must never
+         sink below the surface: the whole point is that you get to watch it fall. */
+      const DUR=3.6;
+      const k=clamp(bossT/DUR,0,1);
+      const D=bossDeath;
+      // eyes stutter out over the first ~1.2s, well before the head tips away
+      {const em=bossHead.userData.eyeMat;
+       if(em){const f=clamp(bossT/1.2,0,1);
+        const flick=f<0.7 ? (Math.sin(bossT*34)>0.1?1:0.3) : 1;   // failing power, then a clean drain
+        em.color.setRGB(Math.max(0,1-f*f)*flick,0,0);}}
+      const lurch=k<0.18 ? Math.sin((k/0.18)*Math.PI)*0.9 : 0;     // one last rear before the legs go
+      const col=clamp((k-0.14)/0.62,0,1), colE=col*col*(3-2*col);  // collapse progress
+      bossGroup.position.y = D.y0 + lurch - 2.9*colE;              // ends belly-down, not buried
+      bossRoot.position.y = 0;
+      bossRoot.rotation.z = D.roll*0.20*colE;                      // lists to one side
+      bossRoot.rotation.x = -0.12*(1-colE) + 0.14*colE;            // nose up, then down
+      /* legs buckle one after another, feet skating outward as the weight comes down.
+         Driven through the same IK as the walk, so they stay planted while they splay. */
+      const gLocal = D.gnd - bossGroup.position.y + REST_FOOT_Y;
+      for(const leg of bossLegs){
+        const d=leg.userData, row=d.idx%4, side=(d.side==='L'?-1:1);
+        const t2=clamp((col-0.06*d.idx)/0.55,0,1), e2=t2*t2*(3-2*t2);
+        solveLeg(leg, d.basePos.x + side*(REST_OUT+6.0*e2), gLocal, d.basePos.z + (1.5-row)*REST_FAN*(1+e2*0.5));
+      }
+      // tail whips up as it staggers, then falls straight out behind it
+      const tk=clamp((k-0.42)/0.46,0,1), tE=tk*tk*(3-2*tk);
+      const whip=k<0.22 ? Math.sin((k/0.22)*Math.PI)*0.30 : 0;
+      for(let i=0;i<bossTail.length;i++){
+        bossTail[i].rotation.x=lerp((D.tail[i]||0)-whip, i===0?-1.35:0.06, tE);
+        bossTail[i].rotation.z=lerp(bossTail[i].rotation.z, D.roll*0.12, damp(dt,2));
+      }
+      // secondary blasts walking along the hull while it goes down
+      if(bossT>D.fx && k<0.92){
+        D.fx=bossT+rand(0.16,0.36);
+        explosion(new THREE.Vector3(bossGroup.position.x+rand(-8,8), D.gnd+rand(2,8), bossGroup.position.z+rand(-13,13)), 0xff8a3a, rand(0.7,1.3), 26);
+        if(Math.random()<0.45) Sfx.explosion(0.7);
+      }
+      if(k>=1){
+        bossState='dead';
+        bossT=0;
+        Sfx.explosion(1.8);
+        // final detonation — the wreck stays put afterwards
+        for(let i=0;i<4;i++) setTimeout(()=>explosion(bossGroup.position.clone().add(new THREE.Vector3(rand(-7,7),rand(1,7),rand(-11,11))),0xff6a2a,1.5,36), i*260);
+        setTimeout(()=>gameOver(true), 1900);
+      }
+    }
+    return;
+  }
+  // active
+  if(inspectFrozen){
+    bossGroup.position.set(0,0,0);
+    bossRoot.position.set(0,0,0);
+    bossRoot.rotation.set(0,0,0);
+    bossPos.set(0,0,0);
+    return;
+  }
+  bossPos.copy(bossGroup.position);
+  const toPlayer=new THREE.Vector3().copy(ship.position).sub(bossPos);
+  const dist=toPlayer.length();
+  /* Facing comes from the direction TO the player and is updated EVERY frame, never
+     from the movement vector: backing away made that vector point away from the player,
+     so he turned his back, and gating it on movement froze his heading at hold range.
+     The damp is deliberately slack — circle him and he takes about half a second to
+     come round, rather than tracking like a turret. */
+  const face=_bossFace.set(toPlayer.x,0,toPlayer.z);
+  if(face.lengthSq()>1e-4){
+    face.normalize();
+    bossYaw=Math.atan2(face.x,face.z);
+    bossRoot.rotation.y=lerpAngle(bossRoot.rotation.y, bossYaw, damp(dt,1.8));
+  }
+  /* Turning counts as locomotion. Plants are world-space, so a body rotation sweeps every
+     foot backwards in body-local terms just as surely as walking does — but the gait used
+     to see turn-in-place as "idle" and switched to its slow, short-stride settings, so the
+     feet fell behind the body and the legs ended up reaching across the belly. */
+  let yawRate=0;
+  {let dy=bossRoot.rotation.y-bossPrevYaw;
+   while(dy>Math.PI)dy-=Math.PI*2; while(dy<-Math.PI)dy+=Math.PI*2;
+   yawRate=dy/Math.max(dt,1e-4); bossPrevYaw=bossRoot.rotation.y;}
+  const wantDist=62;
+  let moveSpeed=0;
+  if(dist>wantDist+8) moveSpeed=6;
+  else if(dist>wantDist) moveSpeed=2.5;
+  else if(dist<wantDist-12) moveSpeed=-3; // back up if too close — still facing him
+  if(moveSpeed!==0) bossGroup.position.addScaledVector(face, moveSpeed*dt);
+  // walk — procedural tetrapod IK (GrokHeavy): body moves, legs plant/step via raycast
+  const moving=Math.abs(moveSpeed)>0.1 || Math.abs(yawRate)>0.3;
+  bossWalkPhase+=dt*(moving ? 5.2 : 0.9);
+  // group stepping allowances (alternating tetrapod)
+  const _groupStepping=[0,0];
+  for(const leg of bossLegs) if(leg.userData.isStepping) _groupStepping[leg.userData.gaitGroup]++;
+  const canGroupStep=[_groupStepping[0]===0, _groupStepping[1]===0];
+  function neighborStepping(idx){
+    const neighbors=[];
+    if(idx%4!==0) neighbors.push(idx-1);
+    if(idx%4!==3) neighbors.push(idx+1);
+    const mirror= idx<4 ? idx+4 : idx-4;
+    neighbors.push(mirror);
+    for(const n of neighbors){ if(bossLegs[n] && bossLegs[n].userData.isStepping) return true; }
+    return false;
+  }
+  const velocity=new THREE.Vector3().copy(toPlayer).normalize().multiplyScalar(moveSpeed||0);
+  if(!moving) velocity.set(0,0,0);
+  const stepDistance = moving ? 2.8 : 1.4;
+  const stepHeight = moving ? 1.6 : 0.6;
+  const stepDuration = moving ? 0.24 : 0.34;
+  const prediction = 0.15;
+  for(const leg of bossLegs){
+    const d=leg.userData;
+    const yawC2=Math.cos(bossRoot.rotation.y), yawS2=Math.sin(bossRoot.rotation.y);
+    /* body-local → world. three.js makeRotationY is [c,0,s / 0,1,0 / -s,0,c], so this is
+       X = x·c + z·s, Z = -x·s + z·c. It was written with both signs flipped, i.e. rotating
+       by MINUS the yaw, which mirrored every foot target the moment the boss turned. */
+    const rotX =  d.homeOffset.x*yawC2 + d.homeOffset.z*yawS2;
+    const rotZ = -d.homeOffset.x*yawS2 + d.homeOffset.z*yawC2;
+    const ideal=new THREE.Vector3(bossGroup.position.x + rotX + velocity.x*prediction, 0, bossGroup.position.z + rotZ + velocity.z*prediction);
+    const gY=groundHeight(ideal.x, ideal.z);
+    /* IK drives the pad's CENTRE, so plant a half-pad above the surface — planting at
+       surface+0.02 buries the bottom half of every foot. */
+    ideal.y = gY + REST_FOOT_Y;
+    const dist=ideal.distanceTo(d.plantPosition);
+    const groupOk = canGroupStep[d.gaitGroup];
+    const neighborOk = !neighborStepping(d.idx);
+    /* The gait rules keep four feet down, but a leg that is badly out of place has to be
+       allowed to recover even if its group or a neighbour is mid-step — otherwise it waits
+       its turn while the body keeps rotating away from it, and that is what produced the
+       crossed-under legs. Normal steps still obey the tetrapod ordering. */
+    const urgent = dist > stepDistance*2.2;
+    if(!d.isStepping){
+      if(dist > stepDistance && ((groupOk && neighborOk) || urgent)){
+        d.isStepping=true; d.stepT=0; d.stepStart.copy(d.plantPosition); d.stepEnd.copy(ideal);
+        canGroupStep[d.gaitGroup]=false;
+        _groupStepping[d.gaitGroup]++;
+      }
+    }
+    let targetPos;
+    if(d.isStepping){
+      d.stepT += dt / stepDuration;
+      const t=clamp(d.stepT,0,1);
+      const smooth = t<0.5 ? 2*t*t : -1+(4-2*t)*t;
+      targetPos=new THREE.Vector3().lerpVectors(d.stepStart, d.stepEnd, smooth);
+      targetPos.y += Math.sin(t*Math.PI) * stepHeight;
+      if(t>0.2 && t<0.8){
+        const fwdY=groundHeight(targetPos.x, targetPos.z)+REST_FOOT_Y;
+        if(fwdY > targetPos.y - 0.2) targetPos.y = fwdY + Math.sin(t*Math.PI)*stepHeight;
+      }
+      if(d.stepT >= 1){
+        d.isStepping=false; d.plantPosition.copy(d.stepEnd); d.plantNormal.set(0,1,0);
+        targetPos.copy(d.plantPosition);
+      }
+    } else {
+      targetPos=d.plantPosition;
+    }
+    /* world plant target → bossRoot-local, then the same solver the rest pose uses,
+       so the walk and the inspection rig can never drift apart again */
+    const wx2=targetPos.x - bossGroup.position.x, wz2=targetPos.z - bossGroup.position.z;
+    const lx2= wx2*yawC2 - wz2*yawS2;   // world → body-local: the transpose of the above
+    const lz2= wx2*yawS2 + wz2*yawC2;
+    const ly2= targetPos.y - bossGroup.position.y - bossRoot.position.y;
+    /* Safety net: hold the foot inside its own wedge of the body. Even with the recovery
+       step above, a plant can be stale for a frame or two mid-turn, and solveLeg will
+       happily aim the leg wherever the target is — including under the belly or past the
+       centreline. Clamping the angle off the leg's home direction (and the reach) means
+       a lagging foot slides within its wedge instead of folding under the body. */
+    const hx=d.basePos.x, hz=d.basePos.z;
+    const homeA=Math.atan2(d.homeOffset.x-hx, d.homeOffset.z-hz);
+    let ang=Math.atan2(lx2-hx, lz2-hz);
+    let da=ang-homeA;
+    while(da>Math.PI)da-=Math.PI*2; while(da<-Math.PI)da+=Math.PI*2;
+    const LEG_WEDGE=0.85;
+    if(Math.abs(da)>LEG_WEDGE) ang=homeA+(da>0?LEG_WEDGE:-LEG_WEDGE);
+    d.dbgDa=da; d.dbgAng=ang; d.dbgHomeA=homeA;   // gait() reads these
+    const reach=clamp(Math.hypot(lx2-hx, lz2-hz), 3.0, 11.0);
+    if(!d.dbgTgt) d.dbgTgt=[0,0,0];   // reused, not reallocated per frame
+    d.dbgTgt[0]=hx+Math.sin(ang)*reach; d.dbgTgt[1]=ly2; d.dbgTgt[2]=hz+Math.cos(ang)*reach;
+    solveLeg(leg, d.dbgTgt[0], d.dbgTgt[1], d.dbgTgt[2]);
+  }
+  // body adaptation: average planted Y + subtle bob
+  let avgY=0, cnt=0;
+  for(const leg of bossLegs) if(!leg.userData.isStepping){ avgY+=leg.userData.plantPosition.y; cnt++; }
+  if(cnt>0){
+    avgY/=cnt;
+    // keep hips ~3.6 above avg foot without floating - lerp slowly
+    const targetBodyY = avgY - REST_FOOT_Y;   // hips ride ~3.45 above the planted feet
+    bossGroup.position.y = lerp(bossGroup.position.y, targetBodyY, damp(dt,4));
+  }
+  bossRoot.position.y = Math.sin(bossWalkPhase)*0.22 + (moving?0.15:0);
+  /* rage: rear up, then rock weight from one side to the other and stamp back down.
+     Envelope peaks fast and tails off so it lands as one deliberate outburst. */
+  if(bossRage>0){
+    bossRage=Math.max(0,bossRage-dt); bossRageT+=dt;
+    const k=1-bossRage/bossRageDur;                       // 0..1 through the tantrum
+    const env=Math.sin(Math.min(1,k*1.15)*Math.PI);       // rise and fall
+    const rock=Math.sin(bossRageT*9.5);
+    bossRoot.rotation.z = rock*0.16*env;                  // sway side to side
+    bossRoot.rotation.x = -0.26*env;                      // reared back on the hind legs
+    bossRoot.position.y += (0.9 + Math.abs(rock)*0.7)*env; // heaved up, stamping
+    // claws thrown up and out, tail hauled back over the head
+    if(bossClaws.L.visible) bossClaws.L.rotation.x=-0.42-0.5*env;
+    if(bossClaws.R.visible) bossClaws.R.rotation.x=-0.42-0.5*env;
+    if(bossRage<=0){ bossRoot.rotation.z=0; bossRoot.rotation.x=0;
+      if(bossClaws.L.visible) bossClaws.L.rotation.x=-0.42;
+      if(bossClaws.R.visible) bossClaws.R.rotation.x=-0.42; }
+  }
+  /* tail — idle sway at rest; while charging or firing the barb is aimed at the player.
+     The aim is measured FROM THE BARB in body-local space and re-solved every frame, so
+     the chain converges on genuinely pointing at him rather than being nudged by a fudge
+     factor. The old version scaled the raw world-space offset into rotation.z/.y, which is
+     why the tail ended up pointing behind him or into the ground. */
+  const aiming=(bossState==='charging'||bossState==='firing');
+  if(aiming){
+    const tip=bossTail[bossTail.length-1];
+    tip.userData.barb.getWorldPosition(_tailTip);
+    _tailAim.copy(ship.position).sub(_tailTip);
+    const yc=Math.cos(bossRoot.rotation.y), ys=Math.sin(bossRoot.rotation.y);
+    const ax=_tailAim.x*yc - _tailAim.z*ys, az=_tailAim.x*ys + _tailAim.z*yc, ay=_tailAim.y;
+    const azimuth=Math.atan2(ax,az);
+    const pitch=Math.atan2(Math.hypot(ax,az), ay);   // 0 = straight up, π/2 = level
+    /* Spread that total down the chain — most of the bend near the base, the last
+       segments nearly straight, so the barb reads as a barrel lined up on the target. */
+    const W=[0.34,0.26,0.18,0.12,0.07,0.03];
+    for(let i=0;i<bossTail.length;i++){
+      const seg=bossTail[i], sway=Math.sin(t*2.4+i*0.5)*0.02;
+      seg.rotation.x=lerp(seg.rotation.x, pitch*(W[i]||0)+sway, damp(dt,6));
+      seg.rotation.y=lerp(seg.rotation.y, i===0?azimuth:0, damp(dt,6));
+      seg.rotation.z=lerp(seg.rotation.z, 0, damp(dt,6));
+    }
+  } else {
+    for(let i=0;i<bossTail.length;i++){
+      const seg=bossTail[i], sway=Math.sin(t*1.2+i*0.6)*0.12;
+      seg.rotation.x=lerp(seg.rotation.x, (TAIL_REST_X[i]||0.4)+sway*0.35, damp(dt,4));
+      seg.rotation.y=lerp(seg.rotation.y, 0, damp(dt,3));
+      seg.rotation.z=lerp(seg.rotation.z, sway, damp(dt,4));
+    }
+  }
+  // claw idle animation
+  const clawSway=Math.sin(t*1.6)*0.08;
+  if(bossClaws.L.visible) bossClaws.L.rotation.y=-0.40+clawSway;
+  if(bossClaws.R.visible) bossClaws.R.rotation.y=0.40-clawSway;
+  // hit flash — only the struck part flashes (handled in handleBossHit), global flash only for valid hits
+  if(bossFlash>0){bossFlash=Math.max(0,bossFlash-dt); if(bossFlash<=0){for(const m of bossMats){if(m.emissive){m.emissive.set(0x000000); m.emissiveIntensity=0;}}}}
+  if(bossHitShake>0){bossHitShake=Math.max(0,bossHitShake-dt*3); bossRoot.position.x+=rand(-bossHitShake,bossHitShake)*0.15; bossRoot.position.z+=rand(-bossHitShake,bossHitShake)*0.15;}
+  // attack logic - tail gun disabled after destroyed (no shooting without gun)
+  const tailTipAlive = bossHP.tail>0 && bossTail.length && bossTail[bossTail.length-1].visible;
+  if(!tailTipAlive && bossState==='charging'){
+    // abort charge if tail destroyed mid-charge
+    bossState='active';
+    try{
+      const tip=bossTail[bossTail.length-1];
+      if(tip && tip.userData.gunGlow) tip.userData.gunGlow.material.opacity=0;
+      if(tip && tip.userData.gunLight) tip.userData.gunLight.intensity=0;
+      if(tip && tip.userData.gunMat){ tip.userData.gunMat.emissive.set(0x331100); tip.userData.gunMat.emissiveIntensity=0; }
+    }catch{}
+  }
+  if(bossPhase!=='dead' && bossAlive && tailTipAlive){
+    bossAttackCd-=dt;
+    if(bossState==='active' && bossAttackCd<=0){
+      bossState='charging'; bossChargeT=0.9; bossAttackCd=3.5+rand(-0.8,0.8);
+      Sfx.charge();
+      msg('⚡ SCORPION CHARGING LASER!', '#ff3b2f', 1.5);
+      // telegraph: tail tip glows
+      const tip=bossTail[bossTail.length-1];
+      tip.userData.gunGlow.material.opacity=0.9; tip.userData.gunGlow.material.color.set(0xff3b2f);
+      tip.userData.gunLight.intensity=60;
+      tip.userData.gunMat.emissive.set(0xff1a0a); tip.userData.gunMat.emissiveIntensity=1.2;
+    } else if(bossState==='charging'){
+      bossChargeT-=dt;
+      const tip=bossTail[bossTail.length-1];
+      const pulse=0.7+Math.sin(t*18)*0.3;
+      tip.userData.gunGlow.scale.set(pulse,pulse,pulse);
+      tip.userData.gunLight.intensity=40+Math.sin(t*22)*20;
+      if(bossChargeT<=0){
+        bossState='firing';
+        // fire laser burst — proper intercept (was under-leading with fixed 0.18)
+        const bulletSpeed=68;
+        const origin=new THREE.Vector3(); tip.getWorldPosition(origin);
+        // tip gun is Box 2.2×4.8 at top of tip — fire from barb center
+        origin.y+=0.2;
+        const toShip=new THREE.Vector3().copy(ship.position).sub(origin);
+        const dist=toShip.length();
+        const time=Math.max(0, dist / bulletSpeed);
+        /* Only a partial lead now that the round steers. A full intercept lead can put the
+           player 30° off the muzzle line — outside the seeker's cone — so the shot would
+           launch blind and never acquire him. Half-lead starts him inside the cone and lets
+           the seeking do the rest. */
+        const lead=new THREE.Vector3().copy(shipVel).multiplyScalar(time * 0.45);
+        const aimPos=new THREE.Vector3().copy(ship.position).add(lead);
+        aimPos.y+=0.35; // cockpit
+        const dir=new THREE.Vector3().copy(aimPos).sub(origin).normalize();
+        // tighter spread that scales with distance — was fixed 0.02 and felt random
+        const spread=clamp(dist/380, 0.006, 0.014);
+        dir.x+=rand(-spread,spread); dir.y+=rand(-spread,spread); dir.z+=rand(-spread,spread); dir.normalize();
+        for(let k=0;k<2;k++){
+          const o=origin.clone().addScaledVector(dir, k*1.2);
+          spawnBullet(o, dir.clone().multiplyScalar(bulletSpeed), 'alien', 14,
+            /* ttl 9s at 68 u/s ≈ 610 units of reach, ~3.5× the old 2.5s default — outrunning
+               him by simply flying away shouldn't put you out of his range. cone 0.35rad ≈ 40° wide. */
+            {color:0xff3b2f, scale:1.9, seek:true, cone:0.35, turn:1.2, ttl:9});
+        }
+        Sfx.alienLaser();
+        tip.userData.gunGlow.material.opacity=0.2; tip.userData.gunLight.intensity=0;
+        setTimeout(()=>{if(bossState==='firing') bossState='active';}, 400);
+      }
+    }
+  }
+  updateBossHud();
+}
+function updateBossHud(){
+  let total=0, cur=0, fillClass='claws';
+  if(bossPhase==='claws'){total=bossMax.clawL+bossMax.clawR; cur=Math.max(0,bossHP.clawL)+Math.max(0,bossHP.clawR); fillClass='claws';}
+  else if(bossPhase==='tail'){total=bossMax.tail; cur=Math.max(0,bossHP.tail); fillClass='tail';}
+  else if(bossPhase==='head'){total=bossMax.head; cur=Math.max(0,bossHP.head); fillClass='head';}
+  else if(!bossAlive){total=1; cur=0; fillClass='head';}
+  const pct=total? (cur/total*100) : 0;
+  els.bossFill.style.width=pct+'%'; els.bossFill.className=''; els.bossFill.classList.add(fillClass);
+  // tips removed — player must discover weak points (was 'DESTROY BOTH CLAWS' / 'DESTROY THE TAIL GUN' / 'AIM FOR THE HEAD')
+  els.bossPhase.textContent='';
+  // health meter: generic boss health only, no per-part labels (was 'CLAWS 90/90 · 90/90' / 'TAIL HP' etc.)
+  els.bossHpText.textContent = bossState==='dormant' ? 'DORMANT — PRESS [G] TO WAKE IT'
+                             : bossState==='emerging' ? 'EMERGING…'
+                             : `${Math.ceil(cur)}/${total}`;
+  els.phaseEl.textContent=bossPhase.toUpperCase() + (bossState==='dormant'?' (BURIED)':bossState==='emerging'?' (EMERGING)':'');
+  if(bossState==='emerging') els.bossFill.style.width='100%';
+}
+
+/* explosions / fx */
+const fx=[]; const FX_PARTS_MAX=90, fxPartsPool=[], fxRingPool=[];
+const fxPartsMatProto=new THREE.PointsMaterial({color:0xffffff,size:0.9,transparent:true,opacity:1,blending:THREE.AdditiveBlending,depthWrite:false});
+const fxRingGeo=new THREE.RingGeometry(0.6,1.0,40); const fxRingMatProto=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.85,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false});
+const fxFlash=new THREE.PointLight(0xffffff,0,90,1.8); scene.add(fxFlash); let fxFlashLife=0, fxFlashMax=0.28, fxFlashPower=0;
+function allocFxParts(){let rec=fxPartsPool.pop(); if(rec) return rec; const posArr=new Float32Array(FX_PARTS_MAX*3); const geo=new THREE.BufferGeometry(); geo.setAttribute('position',new THREE.BufferAttribute(posArr,3)); geo.setDrawRange(0,0); const pts=new THREE.Points(geo,fxPartsMatProto.clone()); pts.frustumCulled=false; return {obj:pts,vels:new Float32Array(FX_PARTS_MAX*3)};}
+function allocFxRing(){return fxRingPool.pop()||new THREE.Mesh(fxRingGeo,fxRingMatProto.clone());}
+function explosion(pos,color,size,count){const n=Math.min(count,FX_PARTS_MAX); const rec=allocFxParts(); const posArr=rec.obj.geometry.attributes.position.array, vels=rec.vels; for(let i=0;i<n;i++){posArr[i*3]=pos.x; posArr[i*3+1]=pos.y; posArr[i*3+2]=pos.z; const th=rand(0,Math.PI*2), ph=Math.acos(rand(-1,1)), sp=rand(6,22)*size; vels[i*3]=Math.sin(ph)*Math.cos(th)*sp; vels[i*3+1]=Math.cos(ph)*sp*0.8; vels[i*3+2]=Math.sin(ph)*Math.sin(th)*sp;} rec.obj.geometry.setDrawRange(0,n); rec.obj.geometry.attributes.position.needsUpdate=true; rec.obj.material.color.set(color); rec.obj.material.opacity=1; rec.obj.material.size=0.9*size; rec.obj.visible=true; scene.add(rec.obj); fx.push({kind:'parts',obj:rec.obj,vels,n,life:rand(0.7,1.0),max:1,size:0.9*size}); fxFlash.color.set(color); fxFlash.position.copy(pos); fxFlash.distance=90*size; fxFlashPower=80*size; fxFlash.intensity=fxFlashPower; fxFlashLife=fxFlashMax; const ring=allocFxRing(); ring.material.color.set(color); ring.material.opacity=0.85; ring.scale.set(1,1,1); ring.position.copy(pos); ring.lookAt(camera.position); ring.visible=true; scene.add(ring); fx.push({kind:'ring',obj:ring,life:0.55,max:0.55,grow:9*size});}
+function updateFx(dt){if(fxFlashLife>0){fxFlashLife=Math.max(0,fxFlashLife-dt); fxFlash.intensity=fxFlashPower*(fxFlashLife/fxFlashMax);} else fxFlash.intensity=0; for(let i=fx.length-1;i>=0;i--){const f=fx[i]; f.life-=dt; const k=Math.max(0,f.life/f.max); if(f.kind==='parts'){const p=f.obj.geometry.attributes.position; for(let j=0;j<f.n;j++){p.array[j*3]+=f.vels[j*3]*dt; p.array[j*3+1]+=f.vels[j*3+1]*dt-14*dt*(1-k); p.array[j*3+2]+=f.vels[j*3+2]*dt;} p.needsUpdate=true; f.obj.material.opacity=k; f.obj.material.size=f.size*(0.5+0.5*k);} else {const s=1+(1-k)*f.grow; f.obj.scale.set(s,s,s); f.obj.material.opacity=0.85*k; f.obj.lookAt(camera.position);} if(f.life<=0){f.obj.visible=false; scene.remove(f.obj); if(f.kind==='parts')fxPartsPool.push({obj:f.obj,vels:f.vels}); else fxRingPool.push(f.obj); fx.splice(i,1);}}}
+
+/* messages / hud */
+function msg(text,color,ttl){messages.push({text,color,ttl,max:ttl}); if(messages.length>4)messages.shift();}
+function setText(el,v){if(el._v!==v){el._v=v; el.textContent=v;}}
+function setWidth(el,v){if(el._w!==v){el._w=v; el.style.width=v;}}
+function setBg(el,v){if(el._bg!==v){el._bg=v; el.style.background=v;}}
+function setColor(el,v){if(el._c!==v){el._c=v; el.style.color=v;}}
+function setHidden(el,hide){if(el._hid!==hide){el._hid=hide; el.classList.toggle('hidden',hide);}}
+const msgEls=[];
+function updateMessages(dt){for(let i=messages.length-1;i>=0;i--){messages[i].ttl-=dt; if(messages[i].ttl<=0)messages.splice(i,1);} while(msgEls.length<messages.length){const d=document.createElement('div'); d.className='msg'; els.messages.appendChild(d); msgEls.push(d);} for(let i=0;i<msgEls.length;i++){const el=msgEls[i]; if(i>=messages.length){el.style.display='none'; continue;} const m=messages[i]; el.style.display=''; setText(el,m.text); setColor(el,m.color); el.style.opacity=clamp(m.ttl/(m.max*0.4),0,1);}}
+function updateHud(){setText(els.score,String(score)); setWidth(els.hpFill,hp+'%'); setBg(els.hpFill,hp>55?'linear-gradient(90deg,#7cff6b,#c8ff5e)':hp>25?'linear-gradient(90deg,#ffc94d,#ff9c2e)':'linear-gradient(90deg,#ff5a3d,#ff2e2e)'); setText(els.hpText,String(Math.ceil(hp))); const isBoosting=boosterOn&&booster>0; setWidth(els.boosterFill,booster+'%'); setBg(els.boosterFill,isBoosting?'linear-gradient(90deg,#fff3c0,#ff9a3d)':booster>25?'linear-gradient(90deg,#ffd24d,#ff7a2e)':'linear-gradient(90deg,#8a5a3a,#5c3a26)'); setText(els.boosterText,Math.ceil(booster)+(isBoosting?' ⚡':'')); setHidden(els.lowhp,!(hp<=30&&state==='playing')); updateBossMarker();}
+/* Off-screen target indicator. In view: brackets sized by range, locked on him. Out of
+   view: an arrow riding the screen edge, pointing the shortest way to turn. Points behind
+   the camera project mirrored, so their NDC is negated before use — without that the arrow
+   points the wrong way exactly when he's behind you and you need it most. */
+const _mv=new THREE.Vector3();
+function updateBossMarker(){
+  if(!(state==='playing'&&bossAlive&&bossState!=='dormant'&&bossState!=='dead')){
+    setHidden(els.bossMark,true); setHidden(els.bossEdge,true); return; }
+  _mv.copy(bossGroup.position); _mv.y+=10;
+  _mv.applyMatrix4(camera.matrixWorldInverse);
+  const behind=_mv.z>0;
+  _mv.applyMatrix4(camera.projectionMatrix);
+  let nx=_mv.x, ny=_mv.y;
+  if(behind){nx=-nx; ny=-ny;}
+  const W=innerWidth, H=innerHeight;
+  if(!behind && Math.abs(nx)<=1 && Math.abs(ny)<=1){
+    setHidden(els.bossEdge,true); setHidden(els.bossMark,false);
+    const dist=camera.position.distanceTo(bossGroup.position);
+    const size=clamp(2600/Math.max(dist,1),44,300);
+    els.bossMark.style.left=((nx*0.5+0.5)*W)+'px';
+    els.bossMark.style.top=((-ny*0.5+0.5)*H)+'px';
+    els.bossMark.style.width=size+'px'; els.bossMark.style.height=(size*0.72)+'px';
+  } else {
+    setHidden(els.bossMark,true); setHidden(els.bossEdge,false);
+    let dx=nx, dy=-ny; const len=Math.hypot(dx,dy)||1; dx/=len; dy/=len;
+    const pad=38, hw=W/2-pad, hh=H/2-pad;
+    const t=Math.min(hw/Math.max(Math.abs(dx),1e-6), hh/Math.max(Math.abs(dy),1e-6));
+    els.bossEdge.style.left=(W/2+dx*t)+'px';
+    els.bossEdge.style.top=(H/2+dy*t)+'px';
+    els.bossEdge.querySelector('i').style.transform=
+      `translate(-50%,-50%) rotate(${Math.atan2(dx,-dy)}rad)`;
+  }
+}
+
+/* input */
+const keys=new Set(); const mouseNDC=new THREE.Vector2(0,0); const aimRay=new THREE.Raycaster();
+addEventListener('keydown',e=>{keys.add(e.code); if(e.code==='KeyR'&&state==='over')redeploy();
+ if(e.code==='KeyG'&&state==='playing')startEmerge(); if(e.code==='Backspace'){e.preventDefault(); return;} if(['ArrowUp','ArrowDown'].includes(e.code))e.preventDefault();});
+addEventListener('keyup',e=>keys.delete(e.code));
+addEventListener('mousemove',e=>{mouseNDC.set((e.clientX/innerWidth)*2-1, -(e.clientY/innerHeight)*2+1);
+ /* the first move after launch becomes the neutral point, so wherever the cursor was left
+    sitting (on the launch button, below centre) doesn't yank the nose down */
+ if(!mouseSteered){ndcOrigin=mouseNDC.clone(); mouseSteered=true;} if(!locked||performance.now()<lockIgnoreUntil) return; const parts=e.getCoalescedEvents?e.getCoalescedEvents():[e]; let mx=0,my=0; for(const p of parts){mx+=p.movementX; my+=p.movementY;} if(Math.abs(mx)>250)mx=0; if(Math.abs(my)>250)my=0; yaw-=mx*0.0024; pitch=clamp(pitch-my*0.0024,-1.15,1.15);});
+function steerFallback(dt){aimRay.setFromCamera(ndcOrigin?_ndcRel.set(mouseNDC.x-ndcOrigin.x,mouseNDC.y-ndcOrigin.y):mouseNDC,camera); const d=aimRay.ray.direction; const dy=Math.atan2(-d.x,-d.z), dp=Math.asin(clamp(d.y,-1,1)); yaw=lerpAngle(yaw,dy,damp(dt,7)); pitch=lerp(pitch,dp,damp(dt,7));}
+let lockIgnoreUntil=0, unlockTimer=0;
+function lockPointer(){if(document.pointerLockElement===canvas) return; try{const p=canvas.requestPointerLock({unadjustedMovement:true}); if(p&&p.catch)p.catch(()=>{try{canvas.requestPointerLock();}catch{}});}catch{try{canvas.requestPointerLock();}catch{}}}
+document.addEventListener('pointerlockchange',()=>{const on=document.pointerLockElement===canvas; if(on){locked=true; everLocked=true; lockIgnoreUntil=performance.now()+16; clearTimeout(unlockTimer); els.crosshair.classList.remove('hidden'); return;} locked=false; clearTimeout(unlockTimer); unlockTimer=setTimeout(()=>{if(document.pointerLockElement===canvas||state!=='playing')return; firing=false; keys.clear(); els.crosshair.classList.add('hidden');},50);});
+canvas.addEventListener('mousedown',e=>{if(e.button!==0)return; e.preventDefault(); Sfx.init(); if(state==='playing'){firing=true; if(document.pointerLockElement!==canvas)lockPointer();}});
+addEventListener('mouseup',()=>firing=false); addEventListener('blur',()=>firing=false);
+function startGame(){Sfx.init(); state='playing'; els.menu.classList.add('hidden'); els.crosshair.classList.remove('hidden');
+  // spawn looking at boss from distance
+  /* yaw 0 puts fwd on -Z, i.e. looking at the boss at the origin. It was Math.PI, which
+     spawned the player facing away from the arena. */
+  /* Spawn flying, not falling. Lift is LIFT_Q·v², which only matches gravity around 30 m/s,
+     so launching at rest meant dropping out of the sky until the player found the throttle —
+     which read as a nosedive. Enter at cruise speed on a near-level attitude instead. */
+  /* Spawn out to one side and pointed ~49° off the boss. Facing him head-on (as it did)
+     left the emergence camera nothing to do — it was already looking at him, so the swing
+     was invisible. Off-axis by more than the 34° half-FOV puts him just outside the frame,
+     so the view visibly travels onto him and back. */
+  const sp={x:120,y:60,z:165};
+  const yawToBoss=Math.atan2(sp.x, sp.z);
+  /* 1.35rad ≈ 77° off him. 49° wasn't enough: the arena pad is 78 units across, so at this
+     range it still filled the frame and the swing barely read. At 77° the whole arena starts
+     off-screen, so the camera visibly travels onto him and back. */
+  ship.position.set(sp.x,sp.y,sp.z); yaw=yawToBoss+1.35; pitch=-0.06; roll=0;
+  const sf=_sv1.set(-Math.sin(yaw)*Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw)*Math.cos(pitch));
+  shipVel.copy(sf).multiplyScalar(34);
+  mouseSteered=false; ndcOrigin=null; camShake=0; bossCam=0; bossCamWant=0; Sfx.rumbleStop(); ship.rotation.set(pitch,yaw,0,'YXZ');
+  /* seat the camera on the ship's heading, not on the boss — otherwise frame one flashes
+     the boss before the ease has started */
+  craftYaw=yaw; craftPitch=pitch;   // airframe starts settled, not swinging into place
+  camPos.copy(ship.position).addScaledVector(sf,-11); camPos.y+=3;
+  camera.position.copy(camPos);
+  camera.lookAt(_lookAt.copy(ship.position).addScaledVector(sf,8)); ship.visible=true;
+  // reset boss
+  if(bossHead.userData.eyeMat) bossHead.userData.eyeMat.color.setHex(0xff0000);   // undo the death fade
+  bossDeath=null;
+  bossGroup.position.set(0,bossEmergingY,0); bossRoot.position.set(0,0,0); bossRoot.rotation.set(0,0,0); bossState='dormant'; bossT=0; bossAlive=true; bossDead=false; bossPhase='claws';
+  bossHP.clawL=bossMax.clawL; bossHP.clawR=bossMax.clawR; bossHP.tail=bossMax.tail; bossHP.head=bossMax.head;
+  bossClaws.L.visible=true; bossClaws.R.visible=true; bossTail[bossTail.length-1].visible=true;
+  const mound=bossGroup.getObjectByName('sandMound'); if(mound){mound.visible=true; mound.scale.set(1,0.45,1);}
+  bossAttackCd=3.5; bossWalkPhase=0; bossFlash=0; bossHitShake=0;
+  hp=100; booster=100; score=0; invuln=0;
+  msg('THE RUINS ARE SILENT — SOMETHING MOVES BENEATH THE SAND…', '#ffd9b0', 4);
+  updateBossHud();
+  lockPointer();
+}
+$('startBtn').addEventListener('click',e=>{e.stopPropagation(); startGame();});
+$('retryBtn').addEventListener('click',e=>{e.stopPropagation(); redeploy();});
+els.gameover.addEventListener('click',e=>{if(e.target===els.gameover)redeploy();});
+function redeploy(){if(state!=='over')return; els.gameover.classList.add('hidden'); startGame();}
+function gameOver(victory){
+  Sfx.rumbleStop(); camShake=0; bossCamWant=0;   // never leave the rumble or the cinematic hanging
+  state='over'; firing=false; if(document.pointerLockElement)document.exitPointerLock(); els.crosshair.classList.add('hidden'); setHidden(els.lowhp,true); setHidden(els.dmg,true);
+  if(!victory){explosion(ship.position,0xffb060,2.6,90); Sfx.explosion(2); ship.visible=false;}
+  els.overTitle.textContent=victory?'VICTORY':'SHIP LOST';
+  els.overTitle.style.color=victory?'#7cff6b':'#ffb37c';
+  els.overSub.textContent=victory?'The scorpion lies broken in the dust':'The red dust claims another';
+  els.finalStats.innerHTML=`Score: <b>${score}</b><br>${victory?'Scorpion slain!':'Scorpion still hunts…'}<br>Shots fired: ${stats.shots}`;
+  els.gameover.classList.remove('hidden');
+}
+
+/* main update */
+function update(dt){
+  tGame+=dt; invuln=Math.max(0,invuln-dt);
+  /* Don't steer toward the cursor until the player has actually moved the mouse. The
+     launch button sits below screen centre, so the cursor is left pointing down at the
+     moment of spawn and the fallback flew the ship straight into the ground. */
+  if(!locked&&!everLocked&&!dbgHold&&mouseSteered) steerFallback(dt);
+  /* Mouse input sets a DESIRED heading (yaw/pitch); the airframe swings toward it with
+     inertia instead of snapping. Without this the hull is welded to the input and the
+     whole rig pivots as one, which reads as a gun model hung in front of a free camera
+     rather than an aircraft changing heading. */
+  const strafe=(keys.has('KeyA')?1:0)-(keys.has('KeyD')?1:0);
+  const prevCraftYaw=craftYaw;
+  craftYaw=lerpAngle(craftYaw, yaw, damp(dt,5.0));
+  craftPitch=lerp(craftPitch, pitch, damp(dt,5.0));
+  let dYaw=craftYaw-prevCraftYaw; while(dYaw>Math.PI)dYaw-=Math.PI*2; while(dYaw<-Math.PI)dYaw+=Math.PI*2;
+  // bank into the turn — roll follows the rate of turn, the way a real aircraft does
+  const bank=clamp((dYaw/Math.max(dt,1e-4))*0.34, -0.68, 0.68);
+  roll=lerp(roll, strafe*0.45+bank, damp(dt,4.5));
+  ship.rotation.set(craftPitch,craftYaw,roll,'YXZ');
+  const fwd=_fwd; ship.getWorldDirection(fwd); fwd.negate(); const right=_right.crossVectors(fwd,new THREE.Vector3(0,1,0)); if(right.lengthSq()<1e-6)right.set(1,0,0); else right.normalize();
+  const throttle=(keys.has('KeyW')||keys.has('ArrowUp')?1:0)-(keys.has('KeyS')||keys.has('ArrowDown')?1:0); const vertical=(keys.has('KeyQ')?1:0)-(keys.has('KeyE')?1:0);
+  boosterMsgCd=Math.max(0,boosterMsgCd-dt); const wantBooster=!!(keys.has('ShiftLeft')||keys.has('ShiftRight'));
+  /* Latch the booster once it runs dry: while Shift stays held it must not re-engage.
+     Without this it drained to 0, regenerated a sliver on the very next frame, re-engaged,
+     and re-fired the engage sound — several times a second for as long as you held Shift. */
+  if(!wantBooster) boosterLock=false;
+  if(boosterOn&&(!wantBooster||booster<=0)){ if(booster<=0) boosterLock=true; boosterOn=false; }
+  if(wantBooster&&!boosterOn&&!boosterLock&&booster>8){boosterOn=true; Sfx.alienLaser();} const boosting=boosterOn&&booster>0; if(boosting){booster=Math.max(0,booster-dt*30); if(booster<=0&&boosterMsgCd<=0){boosterOn=false; boosterLock=true; msg('BOOSTER SPENT','#ffb07a',2.5); boosterMsgCd=3;}} else booster=Math.min(100,booster+dt*11);
+  const accel=_accel.set(0,0,0); const fwdAccel=42*(boosting?2.1:1), strafeAccel=30*(boosting?1.5:1), vertAccel=30*(boosting?1.5:1); accel.addScaledVector(fwd,throttle*fwdAccel); accel.addScaledVector(right,-strafe*strafeAccel); accel.y+=vertical*vertAccel;
+  const airSpeed=shipVel.length(), lift=Math.min(LIFT_Q*airSpeed*airSpeed, MARS_G*1.15); if(dbgGravity) accel.y-=MARS_G-lift; shipVel.addScaledVector(accel,dt); shipVel.multiplyScalar(Math.exp(-(boosting?DRAG_BOOST:DRAG_NORMAL)*dt)); const maxSpeed=boosting?62:46; if(shipVel.length()>maxSpeed)shipVel.setLength(lerp(shipVel.length(),maxSpeed,damp(dt,3))); ship.position.addScaledVector(shipVel,dt); if(dbgHold){ship.position.copy(dbgHold); shipVel.set(0,0,0);}
+  const gh=terrainHeight(ship.position.x,ship.position.z)+2.6; if(ship.position.y<gh){const impact=-shipVel.y; ship.position.y=gh; if(shipVel.y<0)shipVel.y*=-0.3; if(impact>8){damagePlayer(Math.min(120,(impact-8)*3.5)); const p=ship.position.clone(); explosion(p,0xffb060,0.7,24); Sfx.hit();}}
+  if(ship.position.y>240){ship.position.y=240; shipVel.y=Math.min(shipVel.y,0);} const horiz=Math.hypot(ship.position.x,ship.position.z); if(horiz>680){const k=680/horiz; ship.position.x*=k; ship.position.z*=k;}
+  // boss collision — push away (2x size)
+  if(bossAlive||bossState==='dying'){
+    const d=ship.position.distanceTo(bossPos);
+    if(d<16){
+      const n=_n.copy(ship.position).sub(bossPos).normalize(); ship.position.addScaledVector(n,16-d); const vn=shipVel.dot(n); if(vn<0){shipVel.addScaledVector(n,-vn*1.6); if(-vn>8){damagePlayer(Math.min(120,(-vn-8)*3)); const p=_p.copy(ship.position).addScaledVector(n,-1); explosion(p,0xff9a5e,0.55,16); Sfx.hit();}}
+    }
+  }
+  const thrust=clamp(Math.max(Math.abs(throttle)*0.85+Math.abs(vertical)*0.55, boosting?0.95:0),0,1); const boostMul=boosting?1.65:1; const fl=0.82+Math.sin(tGame*24)*0.1+Math.sin(tGame*47)*0.06+Math.sin(tGame*9.3)*0.04; const flameScale=0.05+thrust*1.55*fl*boostMul; shipFlame.scale.set(lerp(shipFlame.scale.x,(0.6+thrust*0.5)*(boosting?1.25:1),0.5),lerp(shipFlame.scale.y,(0.6+thrust*0.5)*(boosting?1.25:1),0.5),flameScale); shipFlame.material.opacity=thrust>0.02?0.85+0.1*Math.sin(tGame*31):0; shipFlameLight.intensity=thrust*(boosting?70:26)*(1+0.5*Math.sin(tGame*27)*(0.85+0.15*fl));
+  /* Chase camera on a spring, not bolted to the hull. It has its own position that eases
+     toward the slot behind the ship, so in a hard turn the ship banks and slides across
+     the frame while the camera swings in after it — a second aircraft on a tether. It
+     also trails further back the faster you go. */
+  const camDist=11+Math.min(shipVel.length()*0.075,3.5);
+  const camTarget=_camTarget.copy(ship.position).addScaledVector(fwd,-camDist); camTarget.y+=3;
+  if(camTarget.y<terrainHeight(camTarget.x,camTarget.z)+1)camTarget.y=terrainHeight(camTarget.x,camTarget.z)+1;
+  camPos.lerp(camTarget, damp(dt,3.6));
+  /* Bound the trail. A pure spring lets a hard turn sling the camera far enough off the
+     slot that your own aircraft leaves the frame — you get the lag but lose sight of the
+     ship. Capping the offset keeps it under ~21° off the view axis, so the ship always
+     stays on screen while still visibly sliding across it. */
+  {const off=_camOff.copy(camPos).sub(camTarget), MAXOFF=4.5;
+   if(off.lengthSq()>MAXOFF*MAXOFF) camPos.copy(camTarget).add(off.setLength(MAXOFF));}
+  if(camPos.y<terrainHeight(camPos.x,camPos.z)+1)camPos.y=terrainHeight(camPos.x,camPos.z)+1;
+  camera.position.copy(camPos);
+  /* ease the aim point toward the boss while he emerges, then ease it back. Slower on the
+     way out than in, so the hand-back feels like a settle rather than a snap. */
+  bossCam=lerp(bossCam, bossCamWant, damp(dt, bossCamWant>0?2.8:1.7));
+  /* Aim far down the nose axis, not 8 units ahead. Converging the view on a near point tilts
+     the camera's axis off the nose, so the crosshair drifted ~9° below where the aircraft
+     actually points — the nose could be dead on the boss while the crosshair sat off it.
+     A distant look point keeps the view axis parallel to the nose at combat range. */
+  const lookPoint=_lookAt.copy(ship.position).addScaledVector(fwd,300);
+  if(bossCam>0.002) lookPoint.lerp(_camLookBoss.copy(bossGroup.position).setY(bossGroup.position.y+11), bossCam);
+  camera.lookAt(lookPoint);
+  Sfx.listener(camera);   // keep the audio listener on the camera for 3D sources
+  /* positional shake, applied after lookAt so the view judders without the aim swinging */
+  if(camShake>0.001){camera.position.x+=rand(-camShake,camShake); camera.position.y+=rand(-camShake,camShake)*0.7; camera.position.z+=rand(-camShake,camShake); camShake=Math.max(0,camShake-dt*2.2);}
+  /* Fire from the nose TOWARD whatever the crosshair is over, not straight down the nose.
+     The camera trails and can sit off the hull's axis, so those two directions differ —
+     shooting along the nose made the crosshair a lie. Raycast the boss from the camera
+     through screen centre; if it hits, converge on that exact point, otherwise aim at a
+     far point down the same ray. */
+  fireCd-=dt;
+  if(firing&&fireCd<=0){
+    fireCd=0.16;
+    ship.getWorldDirection(_fwd); _fwd.negate();
+    const origin=new THREE.Vector3().copy(ship.position).addScaledVector(_fwd,5.5);
+    camera.getWorldDirection(_aimDir);
+    aimRay.set(camera.position,_aimDir);
+    const hits=aimRay.intersectObject(bossGroup,true);
+    const aimPt=(hits.length&&hits[0].distance>6) ? hits[0].point
+               : _aimPt.copy(camera.position).addScaledVector(_aimDir,600);
+    const dir=_shotDir.copy(aimPt).sub(origin).normalize();
+    spawnBullet(origin,dir.clone().multiplyScalar(95),'me',18); Sfx.laser(); stats.shots++;
+  }
+  updateBullets(dt); updateBoss(dt,tGame); updateFx(dt); updateHud();
+}
+
+/* loop */
+const clock=new THREE.Clock();
+function animate(){requestAnimationFrame(animate); const dt=Math.min(clock.getDelta(),0.05), t=clock.elapsedTime; if(inspectFrozen){updateMessages(dt); renderer.render(scene,camera); return;} dust.rotation.y+=dt*0.012; if(state==='playing')update(dt); else {updateFx(dt); if(state==='menu'){camera.position.set(Math.sin(t*0.07)*110,55,Math.cos(t*0.07)*110); camera.lookAt(0,6,0);} updateBoss(dt,t);} updateMessages(dt); renderer.render(scene,camera);}
+animate();
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight);});
+
+// debug
+/* feetClear(): per-foot pad-bottom clearance over the terrain directly beneath it.
+   pose() alone can't catch a sunk foot — it reports world Y with nothing to compare against. */
+/* ---- debug flight rig ----
+   The ship normally falls under Mars gravity and, while the pointer is unlocked, is
+   steered continuously toward the mouse position — so a screenshot taken a few seconds
+   after launch is usually of the ground. These park it instead.
+     dbg.watchBoss(dist, height, azimuth) — park facing the boss (azimuth in radians, 0 = +Z)
+     dbg.park(x,y,z) / dbg.face(x,y,z)    — place and aim by hand
+     dbg.gravity(false)                   — float without parking
+     dbg.release()                        — hand the ship back to the player  */
+window.dbg={
+  park:(x,y,z)=>{dbgHold=new THREE.Vector3(x,y,z); ship.position.copy(dbgHold); shipVel.set(0,0,0); return dbgHold.toArray();},
+  face:(x,y,z)=>{const d=new THREE.Vector3(x,y,z).sub(ship.position).normalize();
+                 yaw=Math.atan2(-d.x,-d.z); pitch=clamp(Math.asin(clamp(d.y,-1,1)),-1.15,1.15);
+                 craftYaw=yaw; craftPitch=pitch; roll=0;   // snap the airframe + camera, don't ease (test framing)
+                 ship.rotation.set(craftPitch,craftYaw,0,'YXZ');
+                 const f=new THREE.Vector3(); ship.getWorldDirection(f); f.negate();
+                 camPos.copy(ship.position).addScaledVector(f,-11); camPos.y+=3;
+                 return {yaw:+yaw.toFixed(3), pitch:+pitch.toFixed(3)};},
+  pos:()=>ship.position.toArray().map(v=>+v.toFixed(1)),
+  /* aim(): how far the shot direction is corrected off the nose to meet the crosshair */
+  aim:()=>{const f=new THREE.Vector3(); ship.getWorldDirection(f); f.negate();
+    const c=new THREE.Vector3(); camera.getWorldDirection(c);
+    aimRay.set(camera.position,c); const hits=aimRay.intersectObject(bossGroup,true);
+    const origin=ship.position.clone().addScaledVector(f,5.5);
+    const pt=(hits.length&&hits[0].distance>6)?hits[0].point:camera.position.clone().addScaledVector(c,600);
+    const d=pt.clone().sub(origin).normalize();
+    return {noseVsShot:+(Math.acos(clamp(f.dot(d),-1,1))*180/Math.PI).toFixed(2),
+            crosshairOnBoss:!!(hits.length&&hits[0].distance>6),
+            range:hits.length?+hits[0].distance.toFixed(1):null};},
+  boost:()=>({booster:+booster.toFixed(1), on:boosterOn, lock:boosterLock}),
+  /* audio(): confirms the 3D path — listener glued to the camera, and what a panner placed
+     at the boss would report for bearing/range. */
+  audio:()=>{const c=Sfx.ctx; if(!c) return {ctx:false};
+    const L=c.listener, has=!!L.positionX;
+    const p=Sfx.panner(bossGroup.position); const pp=p&&p.positionX?[+p.positionX.value.toFixed(1),+p.positionY.value.toFixed(1),+p.positionZ.value.toFixed(1)]:null;
+    const model=p?{panning:p.panningModel,dist:p.distanceModel,ref:p.refDistance,rolloff:p.rolloffFactor}:null;
+    if(p)p.disconnect();
+    return {ctx:c.state, focus:document.hasFocus(), live:Sfx.live(), modernListener:has,
+      listenerPos:has?[+L.positionX.value.toFixed(1),+L.positionY.value.toFixed(1),+L.positionZ.value.toFixed(1)]:null,
+      listenerFwd:has?[+L.forwardX.value.toFixed(2),+L.forwardY.value.toFixed(2),+L.forwardZ.value.toFixed(2)]:null,
+      cameraPos:camera.position.toArray().map(v=>+v.toFixed(1)),
+      sourceAt:pp, range:+camera.position.distanceTo(bossGroup.position).toFixed(1), model};},
+  /* nudge the aim without a mouse, to exercise the airframe lag / camera spring */
+  turn:(dYaw=0,dPitch=0)=>{yaw+=dYaw; pitch=clamp(pitch+dPitch,-1.15,1.15); return {yaw:+yaw.toFixed(2)};},
+  fly:()=>{const n=ship.position.clone().project(camera);   // ship in NDC: |x|,|y| must stay <1
+    const f=new THREE.Vector3(); ship.getWorldDirection(f); f.negate();
+    const slot=ship.position.clone().addScaledVector(f,-(11+Math.min(shipVel.length()*0.075,3.5))); slot.y+=3;
+    const camOff=+camPos.distanceTo(slot).toFixed(1);
+    return {aim:+yaw.toFixed(2), craft:+craftYaw.toFixed(2), lag:+(yaw-craftYaw).toFixed(2),
+            roll:+roll.toFixed(2), camGap:+camPos.distanceTo(ship.position).toFixed(1),
+            camOff, screen:[+n.x.toFixed(2),+n.y.toFixed(2)], onScreen:Math.abs(n.x)<1&&Math.abs(n.y)<1};},
+  status:()=>({pos:ship.position.toArray().map(v=>+v.toFixed(1)), vy:+shipVel.y.toFixed(1),
+               pitch:+pitch.toFixed(3), yaw:+yaw.toFixed(3), steered:mouseSteered,
+               shake:+camShake.toFixed(2), rumble:!!Sfx._rum, bossCam:+bossCam.toFixed(2), boss:bossState}),
+  nudge:(dx=0,dy=0,dz=0)=>window.dbg.park(ship.position.x+dx, ship.position.y+dy, ship.position.z+dz),
+  /* slide perpendicular to the boss — how a player actually breaks away from a shot */
+  dodge:(amount)=>{const p=ship.position,b=bossGroup.position;
+    const dx=p.x-b.x, dz=p.z-b.z, len=Math.hypot(dx,dz)||1;
+    return window.dbg.park(p.x+(-dz/len)*amount, p.y, p.z+(dx/len)*amount);},
+  emerge:()=>startEmerge()?'emerging':'not dormant ('+bossState+')',   // same trigger as [G]
+  gravity:(on=true)=>{dbgGravity=!!on; return dbgGravity;},
+  release:()=>{dbgHold=null; dbgGravity=true; return 'released';},
+  watchBoss:(dist=90,height=26,azimuth=0)=>{
+    const b=bossGroup.position;
+    window.dbg.gravity(false);
+    window.dbg.park(b.x+Math.sin(azimuth)*dist, b.y+height, b.z+Math.cos(azimuth)*dist);
+    window.dbg.face(b.x, b.y+7, b.z);
+    return {ship:ship.position.toArray().map(v=>+v.toFixed(1)), boss:b.toArray().map(v=>+v.toFixed(1))};},
+};
+/* gait(): per-leg body-local placement. dev = degrees off the leg's home direction,
+   crossed = foot has strayed to the wrong side of the centreline (should never be true). */
+window.bossDebug={gait:()=>{const v=new THREE.Vector3(), c=Math.cos(bossRoot.rotation.y), s=Math.sin(bossRoot.rotation.y);
+   return bossLegs.map(l=>{const d=l.userData; d.foot.getWorldPosition(v);
+     const wx=v.x-bossGroup.position.x, wz=v.z-bossGroup.position.z;
+     const lx=wx*c-wz*s, lz=wx*s+wz*c;
+     const homeA=Math.atan2(d.homeOffset.x-d.basePos.x, d.homeOffset.z-d.basePos.z);
+     let da=Math.atan2(lx-d.basePos.x, lz-d.basePos.z)-homeA;
+     while(da>Math.PI)da-=Math.PI*2; while(da<-Math.PI)da+=Math.PI*2;
+     return {i:d.idx, side:d.side, dev:+(da*180/Math.PI).toFixed(0), lx:+lx.toFixed(1),
+             crossed:(d.side==='L'? lx>0 : lx<0), step:d.isStepping,
+             rawDa:d.dbgDa===undefined?null:+(d.dbgDa*180/Math.PI).toFixed(0),
+             usedDev:d.dbgAng===undefined?null:+((d.dbgAng-d.dbgHomeA)*180/Math.PI).toFixed(0),
+             tgt:d.dbgTgt?d.dbgTgt.map(n=>+n.toFixed(1)):null,
+             foot:[+lx.toFixed(1),+v.y.toFixed(1),+lz.toFixed(1)]};});},
+ /* tail(): degrees between the barb's own axis and the line from the barb to the player.
+    ~0 while charging/firing means the stinger is genuinely aimed at him. */
+ tail:()=>{const tip=bossTail[bossTail.length-1], v=new THREE.Vector3(), q=new THREE.Quaternion();
+   tip.userData.barb.getWorldPosition(v); tip.getWorldQuaternion(q);
+   const axis=new THREE.Vector3(0,1,0).applyQuaternion(q);
+   const toShip=new THREE.Vector3().copy(ship.position).sub(v).normalize();
+   return {err:+(Math.acos(clamp(axis.dot(toShip),-1,1))*180/Math.PI).toFixed(1),
+           barb:v.toArray().map(n=>+n.toFixed(1)), state:bossState};},
+ /* shots(): live boss projectiles. offAxis = degrees between the round's heading and the
+    player; inside the seeker cone it should shrink, outside it the round is blind. */
+ shots:()=>bullets.filter(b=>!b.isPlayer).map(b=>{
+   const d=new THREE.Vector3().copy(ship.position).sub(b.mesh.position), dist=d.length();
+   const ang=Math.acos(clamp(new THREE.Vector3().copy(b.vel).normalize().dot(d.clone().normalize()),-1,1))*180/Math.PI;
+   return {dist:+dist.toFixed(1), offAxis:+ang.toFixed(1), seek:!!b.seek, size:+b.mesh.scale.x.toFixed(2)};}),
+ hitShake:()=>+bossHitShake.toFixed(2),   // >0 means a round just struck him (armour included)
+ rage:()=>({t:+bossRage.toFixed(2), rock:+bossRoot.rotation.z.toFixed(3), rear:+bossRoot.rotation.x.toFixed(3), lift:+bossRoot.position.y.toFixed(2)}),
+ eyes:()=>bossHead.userData.eyeMat.color.getHexString(),
+ groundAt:(x,z)=>terrainHeight(x,z),
+ feetClear:()=>{const v=new THREE.Vector3(); return bossLegs.map(l=>{l.userData.foot.getWorldPosition(v); const g=groundHeight(v.x,v.z); return {i:l.userData.idx, padY:+v.y.toFixed(2), gnd:+g.toFixed(2), clear:+(v.y-FOOT_H/2-g).toFixed(2), step:l.userData.isStepping};});},
+ state:()=>({bossState,bossPhase,hp:Math.ceil(hp),bossHP:{...bossHP},pos:bossGroup.position.toArray().map(v=>Math.round(v*10)/10)}), hurtBoss:(part,dmg=20)=>handleBossHit({part},dmg,getBossPartWorldPos(part)), killClaws:()=>{handleBossHit({part:'clawL'},999,getBossPartWorldPos('clawL')); handleBossHit({part:'clawR'},999,getBossPartWorldPos('clawR'));}, killTail:()=>handleBossHit({part:'tail'},999,getBossPartWorldPos('tail')), killHead:()=>handleBossHit({part:'head'},999,getBossPartWorldPos('head')), pose:()=>{const v=new THREE.Vector3(); const feet=bossLegs.map((leg,i)=>{leg.userData.foot.getWorldPosition(v); return {i,side:leg.userData.side,foot:v.toArray().map(n=>+n.toFixed(2)),rot:leg.rotation.toArray().slice(0,3).map(n=>+n.toFixed(2)),thigh:leg.userData.thighG.rotation.toArray().slice(0,3).map(n=>+n.toFixed(2)),shin:leg.userData.shinG.rotation.toArray().slice(0,3).map(n=>+n.toFixed(2))};}); const tail=bossTail.map((seg,i)=>{seg.getWorldPosition(v); return {i,pos:v.toArray().map(n=>+n.toFixed(2)),rot:seg.rotation.toArray().slice(0,3).map(n=>+n.toFixed(2))};}); bossTail[5].userData.barb.getWorldPosition(v); const barb=v.toArray().map(n=>+n.toFixed(2)); bossHead.getWorldPosition(v); const head=v.toArray().map(n=>+n.toFixed(2)); return {feet,tail,barb,head};}};
+
+// --- Boss inspection rig: white background, boss alone, multi-angle ---
+(() => {
+  let _prev = null;
+  let _whiteGround = null;
+  const _angles = {
+    front: { pos:[0, 14, 52], look:[0,7,0], label:'FRONT' },
+    back:  { pos:[0, 14,-52], look:[0,7,0], label:'BACK' },
+    left:  { pos:[-52,14, 0], look:[0,7,0], label:'LEFT' },
+    right: { pos:[52, 14, 0], look:[0,7,0], label:'RIGHT' },
+    top:   { pos:[0, 62, 0], look:[0,0,0], label:'TOP' },
+    iso:   { pos:[38, 26, 38], look:[0,7,0], label:'ISO 3/4' },
+    tail:  { pos:[0, 20,-48], look:[0,10,-6], label:'TAIL / BARB' },
+    claw:  { pos:[0, 12, 42], look:[0,6,10], label:'CLAWS' },
+  };
+  function _hideNonBoss() {
+    const hidden=[];
+    scene.traverse(o=>{
+      if((o.isMesh||o.isPoints||o.isSprite) && o.visible){
+        // keep anything under bossGroup, and keep lights
+        let underBoss=false;
+        let p=o;
+        while(p){ if(p===bossGroup){underBoss=true;break;} p=p.parent; }
+        if(!underBoss && o!==scene && !o.isLight){
+          // also keep fxFlash light
+          if(o===fxFlash) return;
+          hidden.push(o);
+          o.visible=false;
+        }
+      }
+    });
+    // also hide dust points explicitly if missed
+    if(dust) dust.visible=false;
+    return hidden;
+  }
+  window.bossInspect = {
+    angles: Object.keys(_angles),
+    _angles,
+    _state: ()=> ({ active: !!_prev, angle: _prev?.angle||null }),
+    enter(angle='front'){
+      if(_prev) this.exit();
+      const a=_angles[angle]||_angles.front;
+      _prev={
+        bg: scene.background.clone(),
+        fog: scene.fog,
+        angle,
+        hudHidden: [],
+        hiddenObjs: _hideNonBoss(),
+        prevBossPos: bossGroup.position.clone(),
+        prevBossRootPos: bossRoot.position.clone(),
+        prevBossRootRot: bossRoot.rotation.clone(),
+        prevState: bossState,
+        prevPhase: bossPhase,
+      };
+      scene.background=new THREE.Color(0xffffff);
+      scene.fog=null;
+      // hide HUD overlays
+      document.querySelectorAll('.hud,.overlay').forEach(el=>{ _prev.hudHidden.push([el,el.style.display]); el.style.display='none'; });
+      // white ground for reference
+      _whiteGround=new THREE.Mesh(new THREE.PlaneGeometry(120,120), new THREE.MeshStandardMaterial({color:0xeeeeee, roughness:1}));
+      _whiteGround.rotation.x=-Math.PI/2; _whiteGround.position.y=0.02; _whiteGround.receiveShadow=true;
+      scene.add(_whiteGround);
+      // freeze boss at origin, fully assembled, no emerging / walking
+      inspectFrozen=true;
+      bossGroup.position.set(0,0,0);
+      bossRoot.position.set(0,0,0);
+      bossRoot.rotation.set(0,0,0);
+      bossPos.set(0,0,0);
+      poseBossRest();
+      bossState='active'; bossPhase='claws';
+      bossHP.clawL=bossMax.clawL; bossHP.clawR=bossMax.clawR; bossHP.tail=bossMax.tail; bossHP.head=bossMax.head;
+      bossClaws.L.visible=true; bossClaws.R.visible=true;
+      if(bossTail.length) bossTail[bossTail.length-1].visible=true;
+      const mound=bossGroup.getObjectByName('sandMound'); if(mound) mound.visible=false;
+      // camera
+      camera.position.set(...a.pos);
+      camera.lookAt(...a.look);
+      camera.updateMatrixWorld();
+      renderer.render(scene,camera);
+      return `inspect: ${a.label} — white bg, boss alone. Use bossInspect.view('left'|'top'|...) or bossInspect.exit()`;
+    },
+    view(angle='front'){
+      if(!_prev) return this.enter(angle);
+      const a=_angles[angle]||_angles.front;
+      _prev.angle=angle;
+      camera.position.set(...a.pos);
+      camera.lookAt(...a.look);
+      camera.updateMatrixWorld();
+      renderer.render(scene,camera);
+      return `view: ${a.label} ${a.pos} -> ${a.look}`;
+    },
+    exit(){
+      if(!_prev) return 'not in inspect mode';
+      scene.background=_prev.bg;
+      scene.fog=_prev.fog;
+      _prev.hiddenObjs.forEach(o=>o.visible=true);
+      if(dust) dust.visible=true;
+      _prev.hudHidden.forEach(([el,d])=>el.style.display=d);
+      if(_whiteGround){ scene.remove(_whiteGround); _whiteGround=null; }
+      bossGroup.position.copy(_prev.prevBossPos);
+      bossRoot.position.copy(_prev.prevBossRootPos);
+      bossRoot.rotation.copy(_prev.prevBossRootRot);
+      bossState=_prev.prevState;
+      inspectFrozen=false;
+      _prev=null;
+      renderer.render(scene,camera);
+      return 'exited inspect mode';
+    },
+    // render all angles sequentially and return data URLs (for automated screenshots)
+    async shootAll(){
+      const out={};
+      for(const k of Object.keys(_angles)){
+        this.view(k);
+        await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+        renderer.render(scene,camera);
+        out[k]=renderer.domElement.toDataURL('image/jpeg',0.85).slice(0,80)+'…';
+      }
+      return out;
+    }
+  };
+  // convenience aliases
+  window.inspectBoss=(a)=>window.bossInspect.enter(a||'front');
+  window.viewBoss=(a)=>window.bossInspect.view(a);
+  window.exitInspect=()=>window.bossInspect.exit();
+  window.__bossTest={get:()=>({bossState,bossPhase,bossAttackCd,bossChargeT,hp, bullets:bullets.length, bossHP:{...bossHP}, shipPos:ship.position.clone(), shipVel:shipVel.clone()}), setState:(s)=>{bossState=s}, setCd:(v)=>{bossAttackCd=v}, setCharge:(v)=>{bossChargeT=v}, setShipPos:(x,y,z)=>{ship.position.set(x,y,z)}, setShipVel:(x,y,z)=>{shipVel.set(x,y,z)}};
+})();
+</script>
+</body>
+</html>
