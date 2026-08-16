@@ -893,7 +893,9 @@ function evFlush() {
   const w = new BinW(64 + evLog.length * 40);
   w.u8(evLog.length);
   for (let i = 0; i < evLog.length; i++) writeEvent(w, evLog[i]);
-  try { me.setState('e', u8ToB64(w.bytes()), true); } catch {}
+  const blob = u8ToB64(w.bytes());
+  try { me.setState('e', blob, true); } catch {}
+  roomSetState('ev-' + myId, blob);   // room-state mirror (host-migration fallback)
 }
 function evSeqGt(a, b) { return ((a - b) & 65535) < 32768 && a !== b; }
 function evApplyBlob(raw, entry, fromId) {
@@ -982,7 +984,7 @@ function encodeWorld(withPresence) {
   for (let i = 0; i < dead.length && i < 255; i++) w.u8(dead[i]);
   w.u16(worldEpoch & 65535);
   if (withPresence) {
-    const live = hostLiveIds();
+    const live = hostLiveIds(heartbeatLiveIds());
     w.u8(Math.min(255, live.length));
     for (let i = 0; i < live.length && i < 255; i++) w.str(live[i]);
   }
@@ -1032,6 +1034,9 @@ function publishWorldSnapshot(force, withPresence) {
   const now = performance.now();
   if (!force && now - lastSnapPub < 100) return; // ~10Hz
   lastSnapPub = now;
+  /* version must bump on EVERY publish (forced or periodic): clients gate on
+     s.v === lastSnapV, so an unchanged version means "nothing to apply" and a
+     stale snapshot adopted at load would never be corrected */
   snapVer++;
   roomSetState('w', encodeWorld(!!withPresence));
 }
@@ -1260,11 +1265,54 @@ function participantList() {
     return Array.isArray(parts) ? parts : (parts ? Object.values(parts) : []);
   } catch { return []; }
 }
-function hostLiveIds() {
+/* ---- heartbeat presence via room state ----
+   After a host migration the new host's getParticipants() can be stale
+   (observed: it lists only itself), which makes reconcile() forget every
+   peer — their ships vanish and their e-blob commands (bhit/ahit) are never
+   read, so their shots silently stop registering. Every pilot therefore also
+   writes a small 'hb-<id>' = "callsign|timestamp" key to room state each
+   presence cycle; the host unions those into the live set. Room state is
+   fully bidirectional (verified), so this works even when the participant
+   list does not. */
+const HB_TTL = 15000, HB_PRUNE = 60000;
+function publishHeartbeat() {
+  if (!mpReady || !myId) return;
+  try { Playroom.setState('hb-' + myId, callsign + '|' + Date.now(), true); } catch {}
+}
+function heartbeatLiveIds() {
+  const out = new Map(); // id -> callsign
+  let full = null;
+  try { full = Playroom.getState(); } catch { return out; }
+  if (!full || typeof full !== 'object') return out;
+  const now = Date.now();
+  for (const k of Object.keys(full)) {
+    if (!k.startsWith('hb-')) continue;
+    const v = full[k];
+    if (typeof v !== 'string') continue;
+    const i = v.lastIndexOf('|');
+    const ts = +v.slice(i + 1);
+    if (!ts) continue;
+    const age = now - ts;
+    if (age < HB_TTL) out.set(k.slice(3), v.slice(0, i));
+    else if (age > HB_PRUNE && isHostNow()) {
+      const pid = k.slice(3);
+      try { Playroom.setState(k, '', true); Playroom.setState('pp-' + pid, '', true); Playroom.setState('ev-' + pid, '', true); } catch {}
+    }
+  }
+  return out;
+}
+function hostLiveIds(hb) {
   const ids = [];
   if (myId) ids.push(myId);
   for (const p of participantList()) {
     if (p && p.id && p.id !== myId && !p.isDestroyed) ids.push(p.id);
+  }
+  for (const id of (hb || new Map()).keys()) {
+    if (id !== myId && !ids.includes(id)) {
+      ids.push(id);
+      const p = tracked.get(id) || peers.get(id)?.player;
+      if (p && !tracked.has(id)) trackPlayer(p);
+    }
   }
   return ids;
 }
@@ -1364,6 +1412,7 @@ function publishPresence() {
   const me = myPlayer();
   if (me) try { me.setState('name', callsign, true); } catch {}
   refreshRosterNames();
+  publishHeartbeat();
 }
 function reconcile() {
   if (!mpReady || !Playroom) return;
@@ -1372,14 +1421,19 @@ function reconcile() {
   /* Playroom only calls PlayerState.disconnect / onQuit on the host when a
      heartbeat or leave arrives. Non-hosts still see the leaver in
      getParticipants(), so only the host may treat that list as live. */
+  const hb = heartbeatLiveIds();
+  for (const [id, n] of hb) rememberName(id, n);   // callsign rides the heartbeat too
   publishPresence();
   if (isHostNow()) {
-    applyLiveSet(hostLiveIds());
+    applyLiveSet(hostLiveIds(hb));
     publishWorldSnapshot(true, true);
   } else {
     const s = readWorldSnap();
-    if (s && s.ids) applyLiveSet(s.ids);
-    else adoptSnapshot();
+    if (s && s.ids) {
+      const live = new Set(s.ids);
+      for (const id of hb.keys()) if (id !== myId) live.add(id);
+      applyLiveSet([...live]);
+    } else adoptSnapshot();
   }
   retintPeers();
   const h = isHostNow();
@@ -1399,7 +1453,9 @@ function publishLocal(force) {
   poseSeq = (poseSeq + 1) & 65535;
   const me = myPlayer();
   if (!me) return;
-  try { me.setState('p', encodePose(), !!force); } catch {}
+  const pose = encodePose();
+  try { me.setState('p', pose, !!force); } catch {}
+  roomSetState('pp-' + myId, pose);   // room-state mirror (host-migration fallback)
 }
 function publishFlamePulse() {
   flameSeq = (flameSeq + 1) & 255;
@@ -1410,8 +1466,11 @@ function updateRemoteShips(dt) {
   if (!mpReady) return;
   for (const [id, entry] of peerShips) {
     const p = peers.get(id)?.player || tracked.get(id);
-    if (!p) continue;
-    const poseRaw = p.getState('p');
+    /* after a host migration the new host's Playroom participant list can be
+       permanently stale → no Player object → per-player p/e state unreadable.
+       Fall back to the room-state mirror, which is always bidirectional. */
+    const poseRaw = p ? p.getState('p') : roomGetState('pp-' + id);
+    if (!poseRaw) continue;
     if (poseRaw !== entry.poseRaw) {
       entry.poseRaw = poseRaw;
       const pose = decodePose(poseRaw);
@@ -1456,7 +1515,7 @@ function updateRemoteShips(dt) {
       entry.label = buildLabel(nm, tintHex(id));
       entry.group.add(entry.label);
     }
-    evApplyBlob(p.getState('e'), entry, id);
+    evApplyBlob(p ? p.getState('e') : roomGetState('ev-' + id), entry, id);
   }
 }
 
