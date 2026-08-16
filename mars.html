@@ -1929,7 +1929,32 @@ window.marsDebug = {
   rocksAlive() { return rockData.filter(r => r.alive).length; },
   buildingsAlive() { return buildings.filter(b => b.alive).length; },
   spawnUfo() { return isHostNow() ? (makeAlien(ship.position.clone().add(new THREE.Vector3(30, 10, 0)), 0, true), publishWorldSnapshot(true)) : null; },
-  hostFlag() { return isHostNow(); }
+  hostFlag() { return isHostNow(); },
+
+  /* ---- macro harness: drives the SAME events a user produces (window
+     keydown/keyup, canvas mousedown/up), so tests exercise the real input
+     path with deterministic, time-orchestrated control ----
+     step grammar: { press:'KeyE' | press:['KeyW','ShiftLeft'], hold:ms, fire:ms }
+                   { wait: ms }
+     e.g. script([{press:'KeyE', hold:2000}, {wait:200}, {press:'KeyW', fire:1000, hold:1500}]) */
+  esc() {
+    /* equivalent of the user pressing ESC: release pointer lock and stop
+       mouse steering — the ship keeps flying but the cursor can't yaw it */
+    try { everLocked = true; if (document.pointerLockElement) document.exitPointerLock(); } catch {}
+  },
+  hold(keys, ms) { return this.script([{ press: keys, hold: ms }]); },
+  async script(steps) {
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    const norm = k => (Array.isArray(k) ? k : [k]);
+    for (const s of steps) {
+      if (s.wait) { await sleep(s.wait); continue; }
+      if (s.press) for (const k of norm(s.press)) window.dispatchEvent(new KeyboardEvent('keydown', { code: k }));
+      if (s.fire) canvas.dispatchEvent(new MouseEvent('mousedown', { button: 0, bubbles: true }));
+      await sleep(s.hold != null ? s.hold : (s.press || s.fire ? 50 : 0)); // default = tap
+      if (s.press) for (const k of norm(s.press)) window.dispatchEvent(new KeyboardEvent('keyup', { code: k }));
+      if (s.fire) canvas.dispatchEvent(new MouseEvent('mouseup', { button: 0 }));
+    }
+  }
 };
 
 /* ================= debug overlay (Backspace toggle): fps + net charts ================= */
