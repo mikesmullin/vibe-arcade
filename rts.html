@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>The Swarm Awakens — Zerg RTS Slice</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0d1207}
+  *{user-select:none;-webkit-user-select:none}
+  #game{position:fixed;inset:0}
+  #game canvas{display:block;cursor:crosshair}
+  #hud{position:fixed;inset:0;pointer-events:none;color:#d8e8c8;font:13px/1.4 "Segoe UI",system-ui,sans-serif}
+  .panel{position:absolute;background:rgba(10,15,8,.78);border:1px solid rgba(125,255,106,.28);border-radius:6px;padding:7px 12px;box-shadow:0 2px 12px rgba(0,0,0,.4)}
+  .panel b{color:#fff}
+  #resPanel{top:10px;left:10px;display:flex;gap:14px;align-items:center}
+  #resPanel .mat{color:#ffc24d;font-size:15px}
+  #wavePanel{top:10px;left:50%;transform:translateX(-50%);text-align:center;min-width:170px}
+  #waveVal{font-size:16px;font-weight:700;letter-spacing:1px}
+  #waveTimer{display:block;font-size:12px;color:#9fc890;margin-top:2px}
+  #waveTimer.alert{color:#ff6a4d;animation:blink .8s infinite}
+  #statPanel{top:10px;right:10px;display:flex;gap:12px}
+  @keyframes blink{50%{opacity:.35}}
+  #msgs{position:absolute;top:64px;left:12px;width:340px}
+  .msg{background:rgba(10,15,8,.85);border-left:3px solid #7dff6a;padding:6px 10px;margin-bottom:6px;border-radius:4px;font-size:12.5px;color:#cfe8b8;animation:msgin .25s ease-out;transition:opacity .5s,transform .5s}
+  .msg.out{opacity:0;transform:translateX(-12px)}
+  @keyframes msgin{from{opacity:0;transform:translateX(-10px)}}
+  #selInfo{position:absolute;bottom:64px;left:50%;transform:translateX(-50%);color:#9fe88a;font-size:13px;letter-spacing:.5px;text-shadow:0 1px 2px #000;white-space:nowrap}
+  #bottombar{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:8px;pointer-events:auto}
+  .btn{pointer-events:auto;cursor:pointer;background:rgba(14,20,10,.88);border:1px solid #4c7a3a;color:#cfe8b8;padding:8px 14px;border-radius:6px;font:600 13px/1.2 "Segoe UI",system-ui,sans-serif;transition:border-color .15s,opacity .15s}
+  .btn:hover:not(.dis){border-color:#7dff6a;color:#fff}
+  .btn.dis{opacity:.4;cursor:default}
+  .btn .key{display:inline-block;background:#243a18;border:1px solid #5a8a44;border-radius:4px;padding:1px 6px;margin-right:6px;font-size:11px;color:#9fe88a}
+  .btn .cost{color:#ffc24d;margin-left:6px}
+  #hint{position:absolute;bottom:12px;right:12px;color:#6f8a62;font-size:11px;text-align:right;line-height:1.5}
+  #debug{position:absolute;bottom:12px;left:12px;color:#5a7050;font-size:11px;font-family:ui-monospace,monospace}
+  #paused{position:absolute;top:45%;left:50%;transform:translate(-50%,-50%);font-size:22px;font-weight:700;letter-spacing:4px;color:#d8e8c8;text-shadow:0 0 18px rgba(125,255,106,.5);display:none}
+  #selbox{position:fixed;border:1px solid #7dff6a;background:rgba(125,255,106,.12);pointer-events:none;display:none;z-index:5}
+  .overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 40%,rgba(20,30,12,.92),rgba(5,8,4,.96));z-index:10;color:#d8e8c8;text-align:center;padding:20px}
+  .overlay h1{font-size:42px;margin:0 0 6px;letter-spacing:6px;color:#9fe88a;text-shadow:0 0 24px rgba(125,255,106,.45)}
+  .overlay .tag{color:#8aa578;margin:0 0 22px;font-size:15px}
+  .ctrls{background:rgba(10,15,8,.7);border:1px solid rgba(125,255,106,.25);border-radius:8px;padding:14px 22px;font-size:13px;line-height:1.9;color:#bcd8a8;margin-bottom:18px}
+  .ctrls b{color:#9fe88a}
+  .goal{max-width:540px;color:#a8bf95;font-size:14px;line-height:1.6}
+  .goal b{color:#ffc24d}
+  .startbtn{margin-top:26px;font-size:17px;font-weight:700;letter-spacing:3px;color:#0d1207;background:#7dff6a;padding:12px 34px;border-radius:8px;cursor:pointer;box-shadow:0 0 26px rgba(125,255,106,.5)}
+  .startbtn:hover{background:#9fff8a}
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="selbox"></div>
+<div id="hud">
+  <div class="panel" id="resPanel">
+    <span class="mat">◆ <b id="matVal">0</b></span>
+    <span>SUP <b id="supVal">0/0</b></span>
+    <span>Q <b id="queueVal">0/0</b></span>
+  </div>
+  <div class="panel" id="wavePanel">
+    <span id="waveVal">WAVE 1/8</span>
+    <span id="waveTimer">FIRST WAVE IN 0:25</span>
+  </div>
+  <div class="panel" id="statPanel">
+    <span>KILLS <b id="killsEl">0</b></span>
+    <span>UNITS <b id="unitsEl">0</b></span>
+    <span>ENEMIES <b id="enemyEl">0</b></span>
+  </div>
+  <div id="msgs"></div>
+  <div id="selInfo"></div>
+  <div id="bottombar">
+    <button class="btn" id="btnZerg"><span class="key">1</span>Zergling<span class="cost">◆50</span></button>
+    <button class="btn" id="btnHydra"><span class="key">2</span>Hydralisk<span class="cost">◆100</span></button>
+    <button class="btn" id="btnHatch"><span class="key">B</span>Hatchery<span class="cost">◆300</span></button>
+    <button class="btn" id="btnSpore"><span class="key">C</span>Spore Colony<span class="cost">◆60</span></button>
+  </div>
+  <div id="hint">LMB drag — select · RMB — move / attack<br>WASD or MMB-drag — camera · wheel — zoom · P — pause</div>
+  <div id="debug"></div>
+  <div id="paused">PAUSED — P TO RESUME</div>
+</div>
+<div class="overlay" id="startScreen">
+  <h1>THE SWARM AWAKENS</h1>
+  <div class="tag">A Zerg RTS vertical slice — the core game loop, demonstrated</div>
+  <div class="ctrls">
+    <b>LMB</b> click / drag box — select &nbsp;·&nbsp; <b>RMB</b> — move / attack<br/>
+    <b>WASD</b> / middle-drag — camera &nbsp;·&nbsp; <b>wheel</b> — zoom &nbsp;·&nbsp; <b>P</b> — pause<br/>
+    <b>1</b> Zergling &nbsp;·&nbsp; <b>2</b> Hydralisk &nbsp;·&nbsp; <b>B</b> Hatchery &nbsp;·&nbsp; <b>C</b> Spore Colony
+  </div>
+  <div class="goal">Spore colonies generate minerals. Hatcheries turn minerals into the brood.<br/>
+  Survive <b>8 Terran waves</b>. If your main hatchery falls, the brood falls.</div>
+  <div class="startbtn">CLICK TO BEGIN</div>
+</div>
+<div class="overlay" id="endScreen" style="display:none">
+  <h1 id="endTitle">THE SWARM PREVAILS</h1>
+  <div class="tag" id="endSub"></div>
+  <div class="goal" id="endStats"></div>
+  <div class="startbtn" id="restartBtn">PLAY AGAIN [R]</div>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+/* ============================================================
+   THE SWARM AWAKENS — a Zerg-flavoured RTS vertical slice.
+
+   The slice demonstrates the full RTS game loop:
+     resources (spore income) -> construction -> production
+     -> unit command (select / move / attack) -> combat
+     -> escalating waves -> win / lose.
+
+   Simulation stages, run once per frame in update(dt):
+     1 resources   2 buildings (build + train)   3 wave director
+     4 unit AI     5 separation                  6 projectiles
+     7 death cleanup + fx                        8 HUD
+   ============================================================ */
+
+/* ---------------- helpers ---------------- */
+const rand = (a,b) => a + Math.random()*(b-a);
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const lerp = (a,b,t) => a + (b-a)*t;
+const lerpAngle = (a,b,t) => { let d = (b-a) % (Math.PI*2); if (d > Math.PI) d -= Math.PI*2; if (d < -Math.PI) d += Math.PI*2; return a + d*t; };
+const cap = s => s[0].toUpperCase() + s.slice(1);
+const $ = id => document.getElementById(id);
+
+/* ---------------- renderer / scene / camera ---------------- */
+const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.BasicShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+$('game').appendChild(renderer.domElement);
+const canvas = renderer.domElement;
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0d1207);
+scene.fog = new THREE.Fog(0x0d1207, 90, 330);
+
+const camera = new THREE.PerspectiveCamera(58, innerWidth/innerHeight, 0.5, 900);
+let camTarget = new THREE.Vector3(0,0,0), camDist = 62, camSm = new THREE.Vector3(0,0,0);
+let mdrag = null;
+
+function updateCamera(dt){
+  const pan = 52 * (camDist/62) * dt;
+  if (keys.KeyW || keys.ArrowUp)    camTarget.z -= pan;
+  if (keys.KeyS || keys.ArrowDown)  camTarget.z += pan;
+  if (keys.KeyA || keys.ArrowLeft)  camTarget.x -= pan;
+  if (keys.KeyD || keys.ArrowRight) camTarget.x += pan;
+  if (mdrag){
+    camTarget.x += (mdrag.dx) * camDist/240;
+    camTarget.z += (mdrag.dy) * camDist/240;
+    mdrag.dx = 0; mdrag.dy = 0;
+  }
+  camTarget.x = clamp(camTarget.x, -110, 110);
+  camTarget.z = clamp(camTarget.z, -110, 110);
+  camSm.lerp(camTarget, 1 - Math.exp(-8*dt));
+  camera.position.set(camSm.x, camDist*0.95, camSm.z + camDist*0.62);
+  camera.lookAt(camSm.x, 0, camSm.z);
+}
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+scene.add(new THREE.HemisphereLight(0x9fb56a, 0x1c1408, 0.9));
+const sun = new THREE.DirectionalLight(0xf5ecc8, 1.5);
+sun.position.set(90, 160, -60);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+Object.assign(sun.shadow.camera, { left:-130, right:130, top:130, bottom:-130, far:600 });
+sun.shadow.bias = -0.0008;
+scene.add(sun);
+
+/* ---------------- terrain ---------------- */
+function terrainHeight(x, z){
+  let h = Math.sin(x*0.02)*Math.cos(z*0.023)*1.6
+        + Math.sin(x*0.005+1.7)*Math.sin(z*0.006)*3
+        + Math.sin(x*0.11)*Math.sin(z*0.09)*0.35;
+  const d = Math.hypot(x, z), f = clamp((d-42)/60, 0, 1);
+  return h * f*f * (3-2*f);
+}
+{
+  const geo = new THREE.PlaneGeometry(260, 260, 88, 88);
+  geo.rotateX(-Math.PI/2);
+  const pos = geo.attributes.position;
+  const cols = new Float32Array(pos.count*3);
+  const cA = new THREE.Color(0x2c3a1e), cB = new THREE.Color(0x4a4a26), cC = new THREE.Color(0x35502a);
+  const tmp = new THREE.Color();
+  for (let i=0;i<pos.count;i++){
+    const x = pos.getX(i), z = pos.getZ(i);
+    pos.setY(i, terrainHeight(x, z));
+    const n = (Math.sin(x*0.05+3)*Math.cos(z*0.047)+1)*0.5;
+    tmp.copy(cA).lerp(n > 0.5 ? cB : cC, Math.abs(n-0.5)*2);
+    cols[i*3] = tmp.r; cols[i*3+1] = tmp.g; cols[i*3+2] = tmp.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+  geo.computeVertexNormals();
+  const terrain = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors:true, roughness:1 }));
+  terrain.receiveShadow = true;
+  scene.add(terrain);
+}
+
+/* ---------------- decorations ---------------- */
+{
+  const moundGeo = new THREE.SphereGeometry(1, 8, 6);
+  const moundMat = new THREE.MeshStandardMaterial({ color:0x22301a, roughness:1 });
+  for (let i=0;i<70;i++){
+    const a = rand(0, Math.PI*2), r = rand(30, 125);
+    const x = Math.cos(a)*r, z = Math.sin(a)*r;
+    if (Math.abs(x)<20 && Math.abs(z)<20) continue;
+    const m = new THREE.Mesh(moundGeo, moundMat);
+    const s = rand(0.8, 2.6);
+    m.scale.set(s*rand(0.8,1.6), s*0.5, s*rand(0.8,1.6));
+    m.position.set(x, terrainHeight(x,z)-0.15, z);
+    scene.add(m);
+  }
+  const sporeGeo = new THREE.SphereGeometry(0.22, 6, 6);
+  const sporeMat = new THREE.MeshBasicMaterial({ color:0xffb04d });
+  for (let i=0;i<40;i++){
+    const a = rand(0, Math.PI*2), r = rand(24, 120);
+    const x = Math.cos(a)*r, z = Math.sin(a)*r;
+    const s = new THREE.Mesh(sporeGeo, sporeMat);
+    s.position.set(x, terrainHeight(x,z)+rand(0.3,1.1), z);
+    scene.add(s);
+  }
+  const crysGeo = new THREE.IcosahedronGeometry(0.7, 0);
+  const crysMat = new THREE.MeshStandardMaterial({ color:0x9dff8a, emissive:0x2f7a22, emissiveIntensity:0.7, roughness:0.3 });
+  for (let i=0;i<14;i++){
+    const a = rand(0, Math.PI*2), r = rand(14, 26);
+    const x = Math.cos(a)*r, z = Math.sin(a)*r;
+    const c = new THREE.Mesh(crysGeo, crysMat);
+    c.scale.set(rand(0.5,1.1), rand(1.2,2.4), rand(0.5,1.1));
+    c.rotation.y = rand(0, 3);
+    c.position.set(x, terrainHeight(x,z)+0.4, z);
+    c.castShadow = true;
+    scene.add(c);
+  }
+}
+/* terran drop portals */
+const PORTALS = [ new THREE.Vector3(-98,-48), new THREE.Vector3(98,-48), new THREE.Vector3(0,105) ];
+{
+  const discGeo = new THREE.CylinderGeometry(4.5, 5, 0.4, 24);
+  const discMat = new THREE.MeshStandardMaterial({ color:0x241414, roughness:0.9 });
+  const ringGeo = new THREE.TorusGeometry(3.4, 0.16, 8, 32);
+  const ringMat = new THREE.MeshBasicMaterial({ color:0xff4030 });
+  for (const p of PORTALS){
+    const y = terrainHeight(p.x, p.z);
+    const d = new THREE.Mesh(discGeo, discMat);
+    d.position.set(p.x, y+0.1, p.z);
+    scene.add(d);
+    const r = new THREE.Mesh(ringGeo, ringMat);
+    r.position.set(p.x, y+1.9, p.z);
+    scene.add(r);
+  }
+}
+
+/* analytic ground picking (fixed-point solve of ray vs heightfield) */
+const _ray = new THREE.Raycaster();
+const _v2 = new THREE.Vector2();
+function groundPick(cx, cy){
+  _v2.set((cx/innerWidth)*2-1, -(cy/innerHeight)*2+1);
+  _ray.setFromCamera(_v2, camera);
+  const ro = _ray.ray.origin, rd = _ray.ray.direction;
+  if (rd.y > -1e-4) return null;
+  let t = (0 - ro.y) / rd.y;
+  for (let i=0;i<5;i++){
+    const x = ro.x + rd.x*t, z = ro.z + rd.z*t;
+    t = (terrainHeight(x, z) - ro.y) / rd.y;
+  }
+  if (t < 0) return null;
+  const x = ro.x + rd.x*t, z = ro.z + rd.z*t;
+  if (Math.abs(x) > 125 || Math.abs(z) > 125) return null;
+  return new THREE.Vector3(x, terrainHeight(x, z), z);
+}
+
+/* ---------------- audio (tiny synth) ---------------- */
+let AC = null;
+function audio(){
+  try {
+    if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === 'suspended') AC.resume();
+  } catch(e){}
+  return AC;
+}
+function tone(f0, f1, dur, type, vol, delay=0){
+  const ac = audio(); if (!ac) return;
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type;
+  const t = ac.currentTime + delay;
+  o.frequency.setValueAtTime(Math.max(1, f0), t);
+  o.frequency.exponentialRampToValueAtTime(Math.max(1, f1), t + dur);
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(ac.destination);
+  o.start(t); o.stop(t + dur + 0.03);
+}
+function noiseBurst(dur, vol, f0, f1){
+  const ac = audio(); if (!ac) return;
+  const n = Math.floor(ac.sampleRate * dur);
+  const buf = ac.createBuffer(1, n, ac.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i=0;i<n;i++) d[i] = (Math.random()*2-1) * (1 - i/n);
+  const src = ac.createBufferSource(); src.buffer = buf;
+  const f = ac.createBiquadFilter(); f.type = 'lowpass';
+  const t = ac.currentTime;
+  f.frequency.setValueAtTime(f0, t);
+  f.frequency.exponentialRampToTimeValue = f.frequency.exponentialRampToValueAtTime;
+  f.frequency.exponentialRampToValueAtTime(Math.max(40, f1), t + dur);
+  const g = ac.createGain(); g.gain.value = vol;
+  src.connect(f); f.connect(g); g.connect(ac.destination);
+  src.start(t);
+}
+const sfxLast = {};
+function sfx(name){
+  const iv = { boom:180, squish:110, zap:70, blip:60, alarm:400, born:150, build:150 }[name] || 100;
+  const now = performance.now();
+  if (now - (sfxLast[name] || 0) < iv) return;
+  sfxLast[name] = now;
+  switch(name){
+    case 'zap':    tone(950, 180, 0.09, 'square', 0.035); break;
+    case 'squish': noiseBurst(0.09, 0.06, 900, 200); break;
+    case 'boom':   noiseBurst(0.5, 0.16, 1400, 80); tone(130, 40, 0.4, 'sine', 0.12); break;
+    case 'blip':   tone(500, 900, 0.12, 'sine', 0.05); break;
+    case 'born':   tone(280, 720, 0.2, 'triangle', 0.06); break;
+    case 'build':  tone(400, 620, 0.1, 'sine', 0.05); tone(620, 940, 0.12, 'sine', 0.05, 0.1); break;
+    case 'alarm':  tone(720, 720, 0.14, 'square', 0.04); tone(540, 540, 0.14, 'square', 0.04, 0.18); break;
+  }
+}
+
+/* ---------------- entity definitions ---------------- */
+const TYPES = {
+  zergling:  { side:'zerg',   hp:35,  dmg:7,  cd:0.8,  range:2.2, speed:6.5, r:0.9,  cost:50,  supply:1, trainTime:6,  aggro:16, melee:true,  barY:1.7 },
+  hydralisk: { side:'zerg',   hp:70,  dmg:11, cd:1.05, range:9,   speed:5,   r:1.1,  cost:100, supply:1, trainTime:10, aggro:14, barY:2.4 },
+  marine:    { side:'terran', hp:55,  dmg:8,  cd:1.0,  range:8,   speed:4.5, r:0.9,  aggro:18, barY:2.1 },
+  cyclone:   { side:'terran', hp:260, dmg:18, cd:1.6,  range:11,  speed:3,   r:1.5,  aggro:22, barY:2.9 },
+};
+const BUILD = {
+  hatchery: { cost:300, buildTime:12, hp:500, r:5 },
+  spore:    { cost:60,  buildTime:4,  hp:150, r:2, income:4 },
+};
+const MAX_WAVES = 8;
+
+/* ---------------- materials / model builders ---------------- */
+function stdMat(color, extra={}){ return new THREE.MeshStandardMaterial(Object.assign({ color, roughness:0.8, metalness:0.05 }, extra)); }
+function M(geo, mat){ const m = new THREE.Mesh(geo, mat); m.castShadow = true; return m; }
+const BOXGEO = new THREE.BoxGeometry(1,1,1);
+function box(w, h, d, mat, x=0, y=0, z=0){
+  const m = new THREE.Mesh(BOXGEO, mat);
+  m.scale.set(w, h, d); m.position.set(x, y, z); m.castShadow = true;
+  return m;
+}
+
+function modelZergling(){
+  const g = new THREE.Group();
+  const car = stdMat(0x41702a, { roughness:0.55 });
+  const dark = stdMat(0x27431a);
+  const body = M(new THREE.SphereGeometry(0.55, 10, 8), car);
+  body.scale.set(1.15, 0.72, 1.5); body.position.y = 0.5; g.add(body);
+  const head = M(new THREE.SphereGeometry(0.32, 8, 7), car);
+  head.scale.set(1, 0.85, 1.25); head.position.set(0, 0.6, 0.8); g.add(head);
+  const eyeMat = new THREE.MeshBasicMaterial({ color:0xff5040 });
+  for (const s of [-1,1]){
+    const e = M(new THREE.SphereGeometry(0.07, 5, 5), eyeMat);
+    e.position.set(0.16*s, 0.68, 1.05); g.add(e);
+  }
+  const legs = [];
+  for (let i=0;i<6;i++){
+    const s = i<3 ? -1 : 1, k = i%3;
+    const leg = box(0.09, 0.5, 0.09, dark, s*0.42, 0.28, 0.45 - k*0.45);
+    leg.rotation.z = s*0.5; leg.rotation.x = (k-1)*0.25;
+    leg.userData.base = leg.rotation.x;
+    legs.push(leg); g.add(leg);
+  }
+  g.userData.legs = legs;
+  for (const s of [-1,1]){
+    const sp = M(new THREE.ConeGeometry(0.09, 0.5, 5), dark);
+    sp.position.set(0.2*s, 0.95, -0.15); sp.rotation.z = s*0.35; g.add(sp);
+  }
+  return g;
+}
+
+function modelHydra(){
+  const g = new THREE.Group();
+  const car = stdMat(0x4c7a30, { roughness:0.5 });
+  const dark = stdMat(0x2a451d);
+  const body = M(new THREE.SphereGeometry(0.8, 10, 8), car);
+  body.scale.set(1.1, 0.7, 1.5); body.position.y = 0.65; g.add(body);
+  const neck = box(0.3, 0.9, 0.3, car, 0, 1.15, 0.75);
+  neck.rotation.x = -0.5; g.add(neck);
+  const head = M(new THREE.SphereGeometry(0.3, 8, 7), car);
+  head.position.set(0, 1.5, 1.0); head.scale.set(1, 0.9, 1.3); g.add(head);
+  g.add(box(0.34, 0.12, 0.4, dark, 0, 1.35, 1.25));
+  const eyeMat = new THREE.MeshBasicMaterial({ color:0xffc24d });
+  for (const s of [-1,1]){
+    const e = M(new THREE.SphereGeometry(0.06, 5, 5), eyeMat);
+    e.position.set(0.14*s, 1.55, 1.2); g.add(e);
+  }
+  const legs = [];
+  for (let i=0;i<6;i++){
+    const s = i<3 ? -1 : 1, k = i%3;
+    const leg = box(0.11, 0.7, 0.11, dark, s*0.55, 0.35, 0.55 - k*0.55);
+    leg.rotation.z = s*0.5; leg.rotation.x = (k-1)*0.3;
+    leg.userData.base = leg.rotation.x;
+    legs.push(leg); g.add(leg);
+  }
+  g.userData.legs = legs;
+  const spines = [[0,1.15,-0.2,-0.4],[0,1.3,-0.6,-0.7],[0,1.2,-0.95,-1.0]];
+  for (const [x,y,z,rx] of spines){
+    const sp = M(new THREE.ConeGeometry(0.12, 0.55, 5), dark);
+    sp.position.set(x, y, z); sp.rotation.x = rx; g.add(sp);
+  }
+  const t1 = box(0.2, 0.45, 0.2, dark, 0, 0.75, -1.05); t1.rotation.x = 0.7; g.add(t1);
+  const t2 = box(0.14, 0.4, 0.14, dark, 0, 0.55, -1.4); t2.rotation.x = 1.0; g.add(t2);
+  return g;
+}
+
+function modelMarine(){
+  const g = new THREE.Group();
+  const armor = stdMat(0x9fb2c4, { roughness:0.5, metalness:0.25 });
+  const dark = stdMat(0x3a4550);
+  const visor = new THREE.MeshBasicMaterial({ color:0x66e0ff });
+  for (const s of [-1,1]) g.add(box(0.18, 0.6, 0.2, dark, s*0.14, 0.3, 0));
+  g.add(box(0.6, 0.62, 0.4, armor, 0, 0.95, 0));
+  g.add(box(0.44, 0.36, 0.22, dark, 0, 1.0, -0.3));
+  g.add(box(0.3, 0.28, 0.3, armor, 0, 1.42, 0));
+  g.add(box(0.26, 0.08, 0.1, visor, 0, 1.44, 0.14));
+  g.add(box(0.12, 0.12, 0.5, dark, 0.2, 1.0, 0.35));
+  g.add(box(0.08, 0.08, 0.75, dark, 0.2, 1.0, 0.7));
+  return g;
+}
+
+function modelCyclone(){
+  const g = new THREE.Group();
+  const hull = stdMat(0x6a7686, { roughness:0.5, metalness:0.3 });
+  const dark = stdMat(0x2c333c);
+  for (const s of [-1,1]) g.add(box(0.5, 0.55, 2.4, dark, s*0.95, 0.3, 0));
+  g.add(box(2.0, 0.8, 2.5, hull, 0, 0.85, 0));
+  g.add(box(1.3, 0.55, 1.5, hull, 0, 1.55, 0.1));
+  g.add(box(0.2, 0.2, 2.0, dark, 0, 1.6, 1.4));
+  const light = new THREE.Mesh(new THREE.SphereGeometry(0.14, 6, 6), new THREE.MeshBasicMaterial({ color:0xff3020 }));
+  light.position.set(0, 1.95, -0.3); g.add(light);
+  return g;
+}
+
+function modelHatchery(){
+  const g = new THREE.Group();
+  const car = stdMat(0x5d7a3a, { roughness:0.6 });
+  const dark = stdMat(0x33481f);
+  const glow = new THREE.MeshBasicMaterial({ color:0x8dff5a });
+  const base = M(new THREE.CylinderGeometry(4.6, 5.2, 0.8, 20), dark);
+  base.position.y = 0.4; g.add(base);
+  const pod = M(new THREE.SphereGeometry(3.6, 16, 12), car);
+  pod.scale.set(1.15, 0.95, 1.3); pod.position.y = 2.0; g.add(pod);
+  const mouth = M(new THREE.TorusGeometry(1.5, 0.45, 8, 16), dark);
+  mouth.position.set(0, 1.2, 3.4); mouth.rotation.x = 0.5; g.add(mouth);
+  for (let i=0;i<3;i++){
+    const ring = M(new THREE.TorusGeometry(3.9 - i*0.5, 0.09, 6, 24), glow);
+    ring.rotation.x = Math.PI/2; ring.position.y = 1.2 + i*0.7; g.add(ring);
+  }
+  for (let i=0;i<8;i++){
+    const a = i/8 * Math.PI*2;
+    const t = M(new THREE.ConeGeometry(0.35, 1.4, 6), dark);
+    t.position.set(Math.cos(a)*4.4, 0.9, Math.sin(a)*4.4);
+    t.rotation.set(Math.sin(a)*0.5, 0, -Math.cos(a)*0.5);
+    g.add(t);
+  }
+  return g;
+}
+
+function modelSpore(){
+  const g = new THREE.Group();
+  const stem = stdMat(0x3d5a26);
+  const bulbMat = new THREE.MeshBasicMaterial({ color:0xffc25a });
+  const bulbGeo = new THREE.SphereGeometry(0.45, 8, 7);
+  const root = M(new THREE.CylinderGeometry(1.1, 1.4, 0.4, 10), stdMat(0x2c401c));
+  root.position.y = 0.2; g.add(root);
+  for (let i=0;i<3;i++){
+    const a = i/3 * Math.PI*2 + 0.5;
+    const st = M(new THREE.CylinderGeometry(0.12, 0.2, 1.1, 6), stem);
+    st.position.set(Math.cos(a)*0.5, 0.55, Math.sin(a)*0.5);
+    st.rotation.set(Math.sin(a)*0.35, 0, -Math.cos(a)*0.35);
+    g.add(st);
+    const b = new THREE.Mesh(bulbGeo, bulbMat);
+    b.position.set(Math.cos(a)*0.72, 1.15, Math.sin(a)*0.72);
+    g.add(b);
+  }
+  return g;
+}
+
+function makeGhost(type){
+  const g = type === 'hatchery' ? modelHatchery() : modelSpore();
+  g.traverse(o => {
+    if (o.isMesh){
+      o.material = new THREE.MeshBasicMaterial({ color:0x7dff6a, transparent:true, opacity:0.45, depthWrite:false });
+      o.castShadow = false;
+    }
+  });
+  return g;
+}
+
+/* ---------------- hp bars & selection rings ---------------- */
+function makeHpBar(w, color){
+  const g = new THREE.Group();
+  const bg = new THREE.Mesh(new THREE.PlaneGeometry(w, 0.26),
+    new THREE.MeshBasicMaterial({ color:0x0a0f08, transparent:true, opacity:0.75, depthWrite:false }));
+  const fgGeo = new THREE.PlaneGeometry(w, 0.16);
+  fgGeo.translate(w/2, 0, 0);
+  const fg = new THREE.Mesh(fgGeo, new THREE.MeshBasicMaterial({ color, transparent:true, depthWrite:false }));
+  fg.position.x = -w/2; fg.position.z = 0.01;
+  g.add(bg, fg);
+  return {
+    g, fg,
+    set(r, c){ fg.scale.x = clamp(r, 0.001, 1); if (c != null) fg.material.color.set(c); }
+  };
+}
+function makeRing(color){
+  const m = new THREE.Mesh(new THREE.RingGeometry(0.85, 1.2, 28),
+    new THREE.MeshBasicMaterial({ color, transparent:true, opacity:0.85, side:THREE.DoubleSide, depthWrite:false }));
+  m.rotation.x = -Math.PI/2; m.visible = false;
+  scene.add(m);
+  return m;
+}
+
+/* ---------------- particles / fx ---------------- */
+const particles = [];
+function addParticle(mesh, vel, life, grav=0, grow=0){
+  if (particles.length > 260) return;
+  scene.add(mesh);
+  particles.push({ mesh, vel, life, max:life, grav, grow });
+}
+function explode(p, scale=1){
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.7, 1, 24),
+    new THREE.MeshBasicMaterial({ color:0xffa04d, transparent:true, side:THREE.DoubleSide, depthWrite:false }));
+  ring.rotation.x = -Math.PI/2;
+  ring.position.set(p.x, p.y + 0.3, p.z);
+  ring.scale.setScalar(0.5*scale);
+  addParticle(ring, new THREE.Vector3(0, 0.5, 0), 0.5, 0, scale*5);
+  const flash = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 8),
+    new THREE.MeshBasicMaterial({ color:0xffd080, transparent:true }));
+  flash.position.set(p.x, p.y + 0.8, p.z);
+  flash.scale.setScalar(scale);
+  addParticle(flash, new THREE.Vector3(0, 1.5, 0), 0.3, 0, scale*4);
+  const spGeo = new THREE.TetrahedronGeometry(0.16);
+  const spMat = new THREE.MeshBasicMaterial({ color:0xff8040, transparent:true });
+  for (let i=0;i<7;i++){
+    const s = new THREE.Mesh(spGeo, spMat);
+    s.position.set(p.x, p.y + 0.6, p.z);
+    addParticle(s, new THREE.Vector3(rand(-4,4), rand(2,7), rand(-4,4)).multiplyScalar(scale), rand(0.4, 0.7), 14);
+  }
+}
+function spawnFx(p, color=0x8dff5a){
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.6, 0.9, 20),
+    new THREE.MeshBasicMaterial({ color, transparent:true, side:THREE.DoubleSide, depthWrite:false }));
+  ring.rotation.x = -Math.PI/2;
+  ring.position.set(p.x, p.y + 0.2, p.z);
+  addParticle(ring, new THREE.Vector3(0, 0.4, 0), 0.5, 0, 6);
+  for (let i=0;i<5;i++){
+    const s = new THREE.Mesh(new THREE.SphereGeometry(0.12, 5, 5),
+      new THREE.MeshBasicMaterial({ color, transparent:true }));
+    s.position.set(p.x + rand(-1,1), p.y + rand(0,1), p.z + rand(-1,1));
+    addParticle(s, new THREE.Vector3(rand(-1,1), rand(2,4), rand(-1,1)), 0.6, 3);
+  }
+}
+function impactFx(p, color){
+  for (let i=0;i<3;i++){
+    const s = new THREE.Mesh(new THREE.SphereGeometry(0.1, 5, 5),
+      new THREE.MeshBasicMaterial({ color, transparent:true }));
+    s.position.copy(p);
+    addParticle(s, new THREE.Vector3(rand(-2,2), rand(1,3), rand(-2,2)), 0.25, 6);
+  }
+}
+function updateParticles(dt){
+  for (let i=particles.length-1;i>=0;i--){
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0){ scene.remove(p.mesh); particles.splice(i,1); continue; }
+    p.vel.y -= p.grav*dt;
+    p.mesh.position.addScaledVector(p.vel, dt);
+    if (p.grow) p.mesh.scale.addScalar(p.grow*dt);
+    p.mesh.material.opacity = clamp(p.life / p.max, 0, 1);
+  }
+}
+
+/* ---------------- game state ---------------- */
+let minerals = 150, kills = 0, gameTime = 0;
+let started = false, paused = false, gameOver = false;
+const units = [], buildings = [], projectiles = [];
+let selected = [];
+let ghost = null;
+let mainHatch = null;
+
+function supplyUsed(){ let s = 0; for (const u of units) if (u.side === 'zerg') s += u.supply; return s; }
+function supplyCap(){ let c = 0; for (const b of buildings) if (b.side === 'zerg' && b.state === 'built' && b.type === 'hatchery') c += 10; return c; }
+function addBuilding(type, pos, state='built'){
+  const b = new Building(type, pos, state);
+  buildings.push(b);
+  return b;
+}
+function spawnUnit(type, pos){
+  const u = new Unit(type, TYPES[type].side, pos);
+  units.push(u);
+  spawnFx(pos, u.side === 'zerg' ? 0x8dff5a : 0xff5040);
+  return u;
+}
+
+/* ---------------- Building ---------------- */
+class Building {
+  constructor(type, pos, state='built'){
+    const spec = BUILD[type];
+    this.type = type;
+    this.side = 'zerg';
+    this.pos = new THREE.Vector3(pos.x, terrainHeight(pos.x, pos.z), pos.z);
+    this.r = spec.r;
+    this.hp = spec.hp; this.maxHp = spec.hp;
+    this.state = state;
+    this.buildTime = spec.buildTime;
+    this.progress = state === 'built' ? spec.buildTime : 0;
+    this.queue = []; this.prod = 0;
+    this.dead = false; this.pulse = rand(0, 6);
+    this.marker = null;
+    this.mesh = type === 'hatchery' ? modelHatchery() : modelSpore();
+    this.mesh.position.copy(this.pos);
+    if (state === 'building') this.mesh.scale.setScalar(0.6);
+    scene.add(this.mesh);
+    this.hpbar = makeHpBar(type === 'hatchery' ? 4 : 2, 0x62e05a);
+    scene.add(this.hpbar.g);
+    this.hpY = type === 'hatchery' ? 6.2 : 2.6;
+  }
+  update(dt){
+    this.pulse += dt;
+    if (this.marker){
+      this.marker.position.set(this.pos.x, this.pos.y + 6.8 + Math.sin(gameTime*2)*0.3, this.pos.z);
+      this.marker.rotation.y += dt;
+    }
+    if (this.state === 'building'){
+      this.progress += dt;
+      const t = clamp(this.progress / this.buildTime, 0, 1);
+      this.mesh.scale.setScalar(lerp(0.6, 1, t));
+      this.hpbar.set(t, 0x59c8ff);
+      if (this.progress >= this.buildTime){
+        this.state = 'built';
+        this.mesh.scale.setScalar(1);
+        sfx('build'); spawnFx(this.pos);
+        msg(this.type === 'hatchery' ? 'Hatchery complete' : 'Spore Colony online');
+      }
+    } else {
+      this.hpbar.set(this.hp / this.maxHp, this.hp < this.maxHp ? 0x62e05a : 0x2f4a26);
+      if (this.type === 'hatchery' && this.queue.length){
+        this.prod -= dt;
+        if (this.prod <= 0){
+          const type = this.queue.shift();
+          const p = new THREE.Vector3(this.pos.x + rand(-2.5, 2.5), 0, this.pos.z + rand(-2.5, 2.5));
+          p.y = terrainHeight(p.x, p.z);
+          spawnUnit(type, p);
+          sfx('born');
+          this.prod = TYPES[type].trainTime;
+        }
+      }
+    }
+    this.hpbar.g.quaternion.copy(camera.quaternion);
+    this.hpbar.g.position.set(this.pos.x, this.pos.y + this.hpY, this.pos.z);
+    this.hpbar.g.visible = this.hp < this.maxHp || this.state === 'building';
+  }
+  takeDamage(d){
+    if (this.dead) return;
+    this.hp -= d;
+    if (this.hp <= 0){
+      this.dead = true;
+      explode(this.pos, this.r > 2 ? 1.6 : 1);
+      sfx('boom');
+      if (this.isMain) msg('MAIN HATCHERY DESTROYED');
+      else msg(this.type === 'hatchery' ? 'Hatchery destroyed' : 'Spore Colony destroyed');
+      if (this.isMain) defeat();
+    }
+  }
+}
+
+/* ---------------- Unit ---------------- */
+function acquireNearest(u, range){
+  let best = null, bd = range;
+  for (const v of units){
+    if (v.side === u.side || v.dead) continue;
+    const d = Math.hypot(v.pos.x - u.pos.x, v.pos.z - u.pos.z);
+    if (d < bd - v.r*0.2){ bd = d; best = v; }
+  }
+  for (const b of buildings){
+    if (b.side === u.side || b.dead || b.state !== 'built') continue;
+    const d = Math.hypot(b.pos.x - u.pos.x, b.pos.z - u.pos.z);
+    if (d < bd - b.r*0.5){ bd = d; best = b; }
+  }
+  return best;
+}
+
+class Unit {
+  constructor(type, side, pos){
+    const t = TYPES[type];
+    this.type = type; this.side = side;
+    this.pos = new THREE.Vector3(pos.x, 0, pos.z);
+    this.hp = t.hp; this.maxHp = t.hp;
+    this.r = t.r; this.dmg = t.dmg; this.cd = t.cd;
+    this.range = t.range; this.speed = t.speed; this.aggro = t.aggro;
+    this.melee = !!t.melee; this.supply = t.supply || 0;
+    this.cdT = rand(0.1, 0.4);
+    this.yaw = rand(0, Math.PI*2);
+    this.anim = rand(0, 20); this.lunge = 0;
+    this.waypoint = null; this.target = null;
+    this.dead = false; this.sel = false;
+    this.barY = t.barY;
+    const builder = type === 'zergling' ? modelZergling
+      : type === 'hydralisk' ? modelHydra
+      : type === 'marine' ? modelMarine : modelCyclone;
+    this.mesh = builder();
+    this.mesh.position.set(pos.x, terrainHeight(pos.x, pos.z), pos.z);
+    scene.add(this.mesh);
+    this.ring = makeRing(side === 'zerg' ? 0x7dff6a : 0xff5544);
+    this.ring.userData.s = this.r * 1.5 + 0.3;
+    this.hpbar = makeHpBar(type === 'cyclone' ? 3.4 : 2, side === 'zerg' ? 0x62e05a : 0xff5040);
+    scene.add(this.hpbar.g);
+  }
+  steer(dx, dz, dt){
+    const d = Math.hypot(dx, dz) || 0.001;
+    const step = Math.min(this.speed * dt, d);
+    this.pos.x += dx/d * step;
+    this.pos.z += dz/d * step;
+    this.pos.x = clamp(this.pos.x, -120, 120);
+    this.pos.z = clamp(this.pos.z, -120, 120);
+  }
+  face(dx, dz, dt){
+    this.yaw = lerpAngle(this.yaw, Math.atan2(dx, dz), clamp(dt*6, 0, 1));
+  }
+  attack(T){
+    if (this.melee){
+      T.takeDamage(this.dmg, this);
+      this.lunge = 1;
+      sfx('squish');
+    } else {
+      const color = this.side === 'zerg' ? 0x8dff5a : 0xffe08a;
+      projectiles.push(new Proj(this, T, this.dmg, color));
+      sfx('zap');
+    }
+  }
+  takeDamage(d){
+    if (this.dead) return;
+    this.hp -= d;
+    if (this.hp <= 0) this.die();
+  }
+  die(){
+    this.dead = true;
+    if (this.side === 'terran') kills++;
+    explode(this.pos, this.r > 1.2 ? 1.4 : 1);
+    sfx('boom');
+  }
+  update(dt){
+    this.anim += dt; this.cdT -= dt;
+    this.lunge = Math.max(0, this.lunge - dt*2.5);
+    if (this.target && (this.target.dead || this.target.hp <= 0)) this.target = null;
+    let moving = false;
+    const T = this.target;
+    if (T){
+      const dx = T.pos.x - this.pos.x, dz = T.pos.z - this.pos.z;
+      const d = Math.hypot(dx, dz) || 0.001;
+      const stop = this.range + T.r * 0.35;
+      if (d > stop){
+        this.steer(dx, dz, dt); this.face(dx, dz, dt*4); moving = true;
+      } else {
+        this.face(dx, dz, dt*6);
+        if (this.cdT <= 0){ this.cdT = this.cd; this.attack(T); }
+      }
+    } else if (this.waypoint){
+      const dx = this.waypoint.x - this.pos.x, dz = this.waypoint.z - this.pos.z;
+      const d = Math.hypot(dx, dz);
+      if (d < 0.8) this.waypoint = null;
+      else {
+        this.steer(dx, dz, dt); this.face(dx, dz, dt*4); moving = true;
+        const e = acquireNearest(this, this.range + 0.6);
+        if (e) this.target = e;
+      }
+    } else {
+      const e = acquireNearest(this, this.aggro);
+      if (e) this.target = e;
+    }
+    const gy = terrainHeight(this.pos.x, this.pos.z);
+    const bob = moving ? Math.abs(Math.sin(this.anim * this.speed * 1.4)) * 0.1 : Math.sin(this.anim * 2) * 0.03;
+    this.mesh.position.set(this.pos.x, gy + bob, this.pos.z);
+    const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);
+    this.mesh.position.x += fx * this.lunge * 0.5;
+    this.mesh.position.z += fz * this.lunge * 0.5;
+    this.mesh.rotation.y = this.yaw;
+    if (this.mesh.userData.legs){
+      const w = moving ? Math.sin(this.anim * 12) * 0.35 : Math.sin(this.anim * 2) * 0.05;
+      this.mesh.userData.legs.forEach((l, i) => { l.rotation.x = l.userData.base + (i%2 ? w : -w); });
+    }
+    this.ring.visible = this.sel;
+    if (this.sel){
+      this.ring.position.set(this.mesh.position.x, gy + 0.06, this.mesh.position.z);
+      this.ring.scale.setScalar(this.ring.userData.s * (1 + 0.06*Math.sin(gameTime*4)));
+    }
+    this.hpbar.g.quaternion.copy(camera.quaternion);
+    this.hpbar.g.position.set(this.mesh.position.x, gy + this.barY, this.mesh.position.z);
+    this.hpbar.g.visible = this.hp < this.maxHp || this.sel || this.side === 'terran';
+    this.hpbar.set(this.hp / this.maxHp, null);
+  }
+}
+
+/* ---------------- Projectile ---------------- */
+class Proj {
+  constructor(owner, target, dmg, color){
+    this.target = target; this.dmg = dmg; this.life = 0; this.done = false;
+    this.color = color;
+    this.aimPos = new THREE.Vector3(target.pos.x, target.pos.y + 0.8, target.pos.z);
+    const f = new THREE.Vector3(Math.sin(owner.yaw), 0, Math.cos(owner.yaw));
+    this.pos = owner.pos.clone().add(new THREE.Vector3(0, 1.1, 0)).addScaledVector(f, 0.5);
+    this.mesh = new THREE.Mesh(new THREE.SphereGeometry(0.16, 6, 6), new THREE.MeshBasicMaterial({ color }));
+    this.mesh.position.copy(this.pos);
+    scene.add(this.mesh);
+  }
+  update(dt){
+    this.life += dt;
+    const T = this.target;
+    const alive = T && !T.dead && T.hp > 0;
+    const dest = alive ? new THREE.Vector3(T.pos.x, T.pos.y + 0.8, T.pos.z) : this.aimPos;
+    const d = dest.sub(this.pos);
+    if (d.length() < 1.0){
+      this.done = true;
+      if (alive){ T.takeDamage(this.dmg, this); impactFx(this.pos, this.color); }
+      return;
+    }
+    const vel = d.normalize().multiplyScalar(26);
+    this.pos.addScaledVector(vel, dt);
+    this.mesh.position.copy(this.pos);
+    if (this.life > 3) this.done = true;
+  }
+}
+
+/* ---------------- wave director ---------------- */
+const W = { n:0, phase:'pre', t:25, queue:[], spawnT:0 };
+function startWave(){
+  W.n++;
+  const mar = 3 + W.n, cyc = W.n >= 4 ? W.n - 3 : 0;
+  W.queue = [];
+  for (let i=0;i<mar;i++) W.queue.push('marine');
+  for (let i=0;i<cyc;i++) W.queue.push('cyclone');
+  for (let i=W.queue.length-1;i>0;i--){
+    const k = Math.floor(Math.random()*(i+1));
+    [W.queue[i], W.queue[k]] = [W.queue[k], W.queue[i]];
+  }
+  W.phase = 'spawning'; W.spawnT = 0.5;
+  msg(`WAVE ${W.n}/${MAX_WAVES} — ${mar} marines${cyc ? ` · ${cyc} cyclones` : ''} inbound`);
+  sfx('alarm');
+}
+function waveDirector(dt){
+  if (W.phase === 'pre'){
+    W.t -= dt;
+    if (W.t <= 0) startWave();
+  } else if (W.phase === 'spawning'){
+    W.spawnT -= dt;
+    if (W.spawnT <= 0 && W.queue.length){
+      const p = PORTALS[Math.floor(Math.random()*PORTALS.length)];
+      const pos = new THREE.Vector3(p.x + rand(-5,5), 0, p.z + rand(-5,5));
+      spawnUnit(W.queue.shift(), pos);
+      W.spawnT = 0.55;
+    }
+    if (!W.queue.length) W.phase = 'active';
+  } else if (W.phase === 'active'){
+    if (!units.some(u => u.side === 'terran' && !u.dead)){
+      if (W.n >= MAX_WAVES){ victory(); return; }
+      const rew = 40 + 10*W.n;
+      minerals += rew;
+      msg(`Wave ${W.n} cleared · +${rew} minerals`);
+      W.phase = 'pre'; W.t = 45;
+    }
+  }
+}
+
+/* ---------------- commands: train / build ---------------- */
+function train(type){
+  if (gameOver || !started) return;
+  const t = TYPES[type];
+  if (minerals < t.cost){ msg('Not enough minerals'); return; }
+  if (supplyUsed() + 1 > supplyCap()){ msg('Supply cap reached — build another hatchery [B]'); return; }
+  const h = buildings.find(b => b.side === 'zerg' && b.state === 'built' && b.type === 'hatchery' && b.queue.length < 4);
+  if (!h){ msg('No hatchery with a free queue slot'); return; }
+  minerals -= t.cost;
+  h.queue.push(type);
+  sfx('blip');
+}
+function startBuild(type){
+  if (gameOver || !started) return;
+  if (ghost){ cancelGhost(); return; }
+  const spec = BUILD[type];
+  if (minerals < spec.cost){ msg('Not enough minerals'); return; }
+  ghost = { type, mesh:makeGhost(type), pos:new THREE.Vector3(0,0,0), valid:false };
+  scene.add(ghost.mesh);
+  msg(type === 'hatchery' ? 'Place Hatchery — RMB to build · Esc to cancel' : 'Place Spore Colony — RMB to build · Esc to cancel');
+}
+function cancelGhost(){
+  if (!ghost) return;
+  scene.remove(ghost.mesh);
+  ghost = null;
+}
+function ghostValid(p){
+  for (const b of buildings)
+    if (!b.dead && Math.hypot(b.pos.x - p.x, b.pos.z - p.z) < b.r + BUILD[ghost.type].r) return false;
+  if (Math.hypot(p.x, p.z) > 105) return false;
+  return minerals >= BUILD[ghost.type].cost;
+}
+function moveGhostTo(e){
+  const g = groundPick(e.clientX, e.clientY);
+  if (g){
+    ghost.pos.copy(g);
+    ghost.mesh.position.set(g.x, terrainHeight(g.x, g.z), g.z);
+    ghost.valid = ghostValid(g);
+  } else ghost.valid = false;
+  const c = ghost.valid ? 0x7dff6a : 0xff5544;
+  ghost.mesh.traverse(o => { if (o.isMesh) o.material.color.set(c); });
+}
+function tryPlaceGhost(){
+  if (!ghost.valid){ msg('Cannot build there'); return; }
+  minerals -= BUILD[ghost.type].cost;
+  addBuilding(ghost.type, ghost.pos, 'building');
+  sfx('blip');
+  cancelGhost();
+}
+
+/* ---------------- input ---------------- */
+const keys = {};
+addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (e.code === 'KeyP' && !gameOver && started) togglePause();
+  if (e.code === 'Escape'){ if (ghost) cancelGhost(); else { selected = []; refreshSel(); } }
+  if (e.code === 'KeyR' && gameOver) location.reload();
+  if (gameOver || !started) return;
+  if (e.code === 'Digit1') train('zergling');
+  if (e.code === 'Digit2') train('hydralisk');
+  if (e.code === 'KeyB') startBuild('hatchery');
+  if (e.code === 'KeyC') startBuild('spore');
+});
+addEventListener('keyup', e => { keys[e.code] = false; });
+
+$('btnZerg').onclick  = () => train('zergling');
+$('btnHydra').onclick = () => train('hydralisk');
+$('btnHatch').onclick = () => startBuild('hatchery');
+$('btnSpore').onclick = () => startBuild('spore');
+
+let drag = null;
+const selbox = $('selbox');
+canvas.addEventListener('mousedown', e => {
+  audio();
+  if (e.button === 0) drag = { x0:e.clientX, y0:e.clientY, moved:false };
+  if (e.button === 1){ mdrag = { dx:0, dy:0 }; e.preventDefault(); }
+  if (e.button === 2) handleRMB(e);
+});
+addEventListener('mousemove', e => {
+  if (drag && (e.buttons & 1)){
+    const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
+    if (Math.abs(dx) > 6 || Math.abs(dy) > 6) drag.moved = true;
+    if (drag.moved){
+      selbox.style.display = 'block';
+      selbox.style.left = Math.min(drag.x0, e.clientX) + 'px';
+      selbox.style.top = Math.min(drag.y0, e.clientY) + 'px';
+      selbox.style.width = Math.abs(dx) + 'px';
+      selbox.style.height = Math.abs(dy) + 'px';
+    }
+  }
+  if (mdrag && (e.buttons & 2)){
+    mdrag.dx += e.movementX;
+    mdrag.dy += e.movementY;
+  }
+  if (ghost) moveGhostTo(e);
+});
+addEventListener('mouseup', e => {
+  if (e.button === 1) mdrag = null;
+  if (e.button === 0 && drag){
+    if (drag.moved) doBoxSelect(drag.x0, drag.y0, e.clientX, e.clientY);
+    else doClick(e);
+    drag = null;
+    selbox.style.display = 'none';
+  }
+});
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  camDist = clamp(camDist + (e.deltaY > 0 ? 6 : -6), 28, 130);
+}, { passive:false });
+
+function handleRMB(e){
+  if (!started || gameOver || paused) return;
+  if (ghost){ tryPlaceGhost(); return; }
+  if (!selected.length) return;
+  const g = groundPick(e.clientX, e.clientY);
+  if (!g) return;
+  const en = pickEnemy(e.clientX, e.clientY);
+  if (en){
+    for (const u of selected){ u.target = en; u.waypoint = null; }
+  } else {
+    selected.forEach((u, i) => {
+      const a = i * 2.39996, r = 1.4 * Math.sqrt(i + 1);
+      u.waypoint = new THREE.Vector3(clamp(g.x + Math.cos(a)*r, -118, 118), 0, clamp(g.z + Math.sin(a)*r, -118, 118));
+      u.target = null;
+    });
+  }
+}
+function pickEnemy(cx, cy){
+  _v2.set((cx/innerWidth)*2-1, -(cy/innerHeight)*2+1);
+  _ray.setFromCamera(_v2, camera);
+  const ro = _ray.ray.origin, rd = _ray.ray.direction;
+  let best = null, bd = 2.6;
+  for (const u of units){
+    if (u.side !== 'terran' || u.dead) continue;
+    const vx = u.pos.x - ro.x, vy = u.pos.y + 0.8 - ro.y, vz = u.pos.z - ro.z;
+    const c = vx*rd.x + vy*rd.y + vz*rd.z;
+    if (c < 0) continue;
+    const dist = Math.hypot(vx - rd.x*c, vy - rd.y*c, vz - rd.z*c);
+    if (dist < bd + u.r*0.4){ bd = dist; best = u; }
+  }
+  return best;
+}
+function doClick(e){
+  const g = groundPick(e.clientX, e.clientY);
+  let best = null, bd = 2.4;
+  if (g) for (const u of units){
+    if (u.side !== 'zerg' || u.dead) continue;
+    const d = Math.hypot(u.pos.x - g.x, u.pos.z - g.z);
+    if (d < bd){ bd = d; best = u; }
+  }
+  if (best) selected = [best];
+  else selected = [];
+  refreshSel();
+}
+function doBoxSelect(x0, y0, x1, y1){
+  const a = Math.min(x0, x1), b = Math.min(y0, y1), c = Math.max(x0, x1), d = Math.max(y0, y1);
+  const sel = [];
+  const v = new THREE.Vector3();
+  for (const u of units){
+    if (u.side !== 'zerg' || u.dead) continue;
+    v.copy(u.mesh.position).project(camera);
+    if (v.z > 1) continue;
+    const px = (v.x*0.5 + 0.5) * innerWidth, py = (-v.y*0.5 + 0.5) * innerHeight;
+    if (px >= a && px <= c && py >= b && py <= d) sel.push(u);
+  }
+  selected = sel;
+  refreshSel();
+}
+function refreshSel(){
+  for (const u of units) u.sel = u.side === 'zerg' && selected.includes(u);
+}
+
+/* ---------------- messages / end states ---------------- */
+function msg(text){
+  const box = $('msgs');
+  const d = document.createElement('div');
+  d.className = 'msg';
+  d.textContent = text;
+  box.appendChild(d);
+  while (box.children.length > 4) box.removeChild(box.firstChild);
+  setTimeout(() => { d.classList.add('out'); setTimeout(() => d.remove(), 600); }, 3800);
+}
+function togglePause(){
+  paused = !paused;
+  $('paused').style.display = paused ? 'block' : 'none';
+}
+function showEnd(title, sub, win){
+  $('endTitle').textContent = title;
+  $('endSub').textContent = sub;
+  $('endStats').innerHTML = `Waves survived: <b>${win ? MAX_WAVES : W.n}</b> · Kills: <b>${kills}</b>`;
+  $('restartBtn').textContent = win ? 'PLAY AGAIN [R]' : 'RESPAWN [R]';
+  $('endScreen').style.display = 'flex';
+  gameOver = true;
+}
+function victory(){ showEnd('THE SWARM PREVAILS', 'Eight Terran waves broken against the colony', true); }
+function defeat(){ showEnd('THE BROOD FALLS', 'The main hatchery was destroyed', false); }
+$('restartBtn').onclick = () => location.reload();
+$('startScreen').onclick = () => {
+  audio();
+  started = true;
+  $('startScreen').style.display = 'none';
+  msg('First wave in 25s — train units [1][2] and build spore colonies [C]');
+};
+
+/* ---------------- HUD ---------------- */
+const hudCache = {};
+function setTxt(id, v){ if (hudCache[id] !== v){ hudCache[id] = v; $(id).textContent = v; } }
+function fmtTime(s){
+  s = Math.max(0, Math.ceil(s));
+  return Math.floor(s/60) + ':' + String(s%60).padStart(2, '0');
+}
+let fps = 60;
+function hud(){
+  setTxt('matVal', String(Math.floor(minerals)));
+  setTxt('supVal', supplyUsed() + '/' + supplyCap());
+  setTxt('killsEl', String(kills));
+  let zu = 0, tu = 0;
+  for (const u of units) u.side === 'zerg' ? zu++ : tu++;
+  setTxt('unitsEl', String(zu));
+  setTxt('enemyEl', String(tu));
+  setTxt('waveVal', `WAVE ${Math.max(1, W.n)}/${MAX_WAVES}`);
+  let wtxt;
+  if (W.phase === 'pre') wtxt = W.n === 0 ? `FIRST WAVE IN ${fmtTime(W.t)}` : `NEXT WAVE IN ${fmtTime(W.t)}`;
+  else wtxt = W.phase === 'spawning' ? 'HOSTILES SPAWNING…' : 'HOSTILES ACTIVE';
+  setTxt('waveTimer', wtxt);
+  $('waveTimer').classList.toggle('alert', W.phase !== 'pre' || W.t < 5);
+  let q = 0, slots = 0;
+  for (const b of buildings) if (b.side === 'zerg' && b.state === 'built' && b.type === 'hatchery'){
+    q += b.queue.length; slots += 4;
+  }
+  setTxt('queueVal', q + '/' + slots);
+  const over = supplyUsed() + 1 > supplyCap();
+  $('btnZerg').classList.toggle('dis', minerals < TYPES.zergling.cost || over);
+  $('btnHydra').classList.toggle('dis', minerals < TYPES.hydralisk.cost || over);
+  $('btnHatch').classList.toggle('dis', minerals < BUILD.hatchery.cost);
+  $('btnSpore').classList.toggle('dis', minerals < BUILD.spore.cost);
+  const info = {};
+  for (const u of selected) info[u.type] = (info[u.type] || 0) + 1;
+  setTxt('selInfo', Object.entries(info).map(([k, v]) => v + '× ' + cap(k)).join('  '));
+  setTxt('debug', `units ${units.length} · fx ${particles.length} · proj ${projectiles.length} · ${Math.round(fps)}fps`);
+}
+
+/* ---------------- main loop ---------------- */
+function separation(dt){
+  for (let i=0;i<units.length;i++){
+    const a = units[i];
+    if (a.dead) continue;
+    for (let j=i+1;j<units.length;j++){
+      const b = units[j];
+      if (b.dead || b.side !== a.side) continue;
+      const dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z;
+      const d = Math.hypot(dx, dz), min = (a.r + b.r) * 0.75;
+      if (d < min && d > 0.001){
+        const push = (min - d) * 0.5 * 2 * dt;
+        const nx = dx/d, nz = dz/d;
+        a.pos.x -= nx*push; a.pos.z -= nz*push;
+        b.pos.x += nx*push; b.pos.z += nz*push;
+      }
+    }
+  }
+}
+function removeUnit(u){
+  scene.remove(u.mesh); scene.remove(u.hpbar.g); scene.remove(u.ring);
+  const i = units.indexOf(u);
+  if (i >= 0) units.splice(i, 1);
+  selected = selected.filter(s => s !== u);
+  for (const v of units) if (v.target === u) v.target = null;
+  for (const p of projectiles) if (p.target === u) p.target = null;
+}
+function removeBuilding(b){
+  scene.remove(b.mesh); scene.remove(b.hpbar.g);
+  if (b.marker) scene.remove(b.marker);
+  const i = buildings.indexOf(b);
+  if (i >= 0) buildings.splice(i, 1);
+  for (const v of units) if (v.target === b) v.target = null;
+}
+function update(dt){
+  gameTime += dt;
+  /* 1 · resources */
+  let inc = 0;
+  for (const b of buildings) if (b.side === 'zerg' && b.state === 'built' && b.type === 'spore') inc += BUILD.spore.income;
+  minerals += inc * dt;
+  /* 2 · buildings: construction + production */
+  for (const b of buildings) if (!b.dead) b.update(dt);
+  /* 3 · wave director */
+  waveDirector(dt);
+  /* 4 · unit AI */
+  for (const u of units) if (!u.dead) u.update(dt);
+  separation(dt);
+  /* 5 · projectiles */
+  for (const p of projectiles) p.update(dt);
+  for (let i=projectiles.length-1;i>=0;i--)
+    if (projectiles[i].done){ scene.remove(projectiles[i].mesh); projectiles.splice(i, 1); }
+  /* 6 · death cleanup + fx */
+  for (let i=units.length-1;i>=0;i--) if (units[i].dead) removeUnit(units[i]);
+  for (let i=buildings.length-1;i>=0;i--) if (buildings[i].dead) removeBuilding(buildings[i]);
+  updateParticles(dt);
+  /* 7 · HUD */
+  hud();
+}
+
+let last = performance.now();
+function tick(){
+  requestAnimationFrame(tick);
+  const now = performance.now();
+  const raw = (now - last) / 1000;
+  last = now;
+  fps = lerp(fps, raw > 0 ? 1/raw : 60, 0.05);
+  const dt = Math.min(raw, 0.05);
+  updateCamera(dt);
+  if (started && !paused && !gameOver) update(dt);
+  renderer.render(scene, camera);
+}
+
+/* ---------------- initial deployment ---------------- */
+mainHatch = addBuilding('hatchery', new THREE.Vector3(0, 0, 0));
+mainHatch.isMain = true;
+mainHatch.marker = new THREE.Mesh(new THREE.OctahedronGeometry(0.5), new THREE.MeshBasicMaterial({ color:0xffd24d }));
+scene.add(mainHatch.marker);
+addBuilding('spore', new THREE.Vector3(-7, 3));
+addBuilding('spore', new THREE.Vector3(7, -3));
+for (let i=0;i<3;i++) spawnUnit('zergling', new THREE.Vector3(rand(-4,4), 0, rand(6,9)));
+
+tick();
+</script>
+</body>
+</html>
