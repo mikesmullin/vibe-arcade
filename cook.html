@@ -321,11 +321,11 @@ function menuBoard(){
 }
 menuBoard();
 
-// counter
+// counter (narrowed + shifted right so the trash can has open floor beside it)
 const SURF=1.17;
-box(13,1.05,1.3,0xf4f6f8,0,.55,2.2,scene,true);
-box(13.4,.14,1.6,0xffffff,0,SURF-.07,2.2,scene,false);
-box(13,.18,.03,0xffd166,0,.8,3.03,scene,false);
+box(12,1.05,1.3,0xf4f6f8,.4,.55,2.2,scene,true);
+box(12.4,.14,1.6,0xffffff,.4,SURF-.07,2.2,scene,false);
+box(12,.18,.03,0xffd166,.4,.8,3.03,scene,false);
 
 // plate / assembly spot
 const plateGroup=new THREE.Group();plateGroup.position.set(5.0,SURF,2.2);scene.add(plateGroup);
@@ -339,8 +339,8 @@ const SLOTS=[
   new THREE.Vector3(.42,PLATE_TOP+.05,.2)
 ];
 
-// trash
-const trash=new THREE.Group();trash.position.set(-5.4,0,2.9);scene.add(trash);
+// trash (in open floor space left of the counter, no longer clipping it)
+const trash=new THREE.Group();trash.position.set(-6.4,0,2.9);scene.add(trash);
 const trashCan=cyl(.55,.45,.9,0x8d99ae,0,.45,0,trash);
 cyl(.6,.6,.06,0x5b6675,0,.93,0,trash);
 const trashHit=new THREE.Mesh(new THREE.BoxGeometry(1.6,1.5,1.6),new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false}));
@@ -373,7 +373,14 @@ const cRawCheese=new THREE.Color(0xffd166),cDoneCheese=new THREE.Color(0xf4a300)
 
 class Machine{
   constructor(kind,x){
-    this.kind=kind;this.state='idle';this.t=0;this.readyT=0;this.prevState='idle';
+    this.kind=kind;
+    this.state='idle';       // idle | cooking | ready | burnt
+    this.food=null;          // patty/cheese/fries mesh currently ON this machine (or null)
+    this.t=0;                // cooking progress (0..time)
+    this.readyT=0;           // time spent in 'ready'
+    this.item=null;          // reusable container (fryer basket / soda glass)
+    this.hitMesh=null;       // invisible pick/click volume over the station
+    this.itemPos=new THREE.Vector3(0,0,0); // home position of the container in this.group
     this.cfg={
       stove:{item:'patty',time:3.2,burn:5},
       grill:{item:'cheese',time:2.6,burn:5},
@@ -401,10 +408,9 @@ class Machine{
       const pan=cyl(.68,.62,.16,0x2b303b,-.35,1.23,0,g);
       box(1.15,.09,.16,0x232833,1.05,1.25,0,g); // pan handle
       const panRim=cyl(.7,.7,.03,0x3a3f4a,-.35,1.315,0,g);
-      // patty (sits ON the pan, clearly visible)
-      this.patty=cyl(.5,.52,.22,0xc47a52,-.35,1.44,0,g);
-      this.patty.visible=false;
-      this.patty.userData.part='patty';
+      // patty (sits ON the pan, clearly visible) — the food mesh lives on the machine until used
+      this.food=this._makePatty();
+      this.food.userData.part='patty';
       // burner flames: ring of short cones UNDER the pan
       this.flames=[];
       for(let i=0;i<8;i++){
