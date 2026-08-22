@@ -368,8 +368,8 @@ const DISH={
   soda:{name:'Soda',icon:'🥤',base:16},
 };
 const machineList=[];
-const cRawPatty=new THREE.Color(0xc0713f),cDonePatty=new THREE.Color(0x8a4d1f);
-const cRawCheese=new THREE.Color(0xffc94d),cDoneCheese=new THREE.Color(0xffb703);
+const cRawPatty=new THREE.Color(0xc47a52),cDonePatty=new THREE.Color(0x6f3f18);
+const cRawCheese=new THREE.Color(0xffd166),cDoneCheese=new THREE.Color(0xf4a300);
 
 class Machine{
   constructor(kind,x){
@@ -395,25 +395,54 @@ class Machine{
     if(this.kind==='stove'){
       const base=box(2.3,1,1.8,0x8f9db3,0,.5,0,g);
       const top=box(2.36,.1,1.86,0x5b6675,0,1.05,0,g);
-      cyl(.85,.85,.08,0x2f3542,-.35,1.12,0,g);
-      cyl(.68,.68,.14,0x3a3f4a,-.35,1.19,0,g);
-      box(.6,.06,.16,0x2f3542,.5,1.2,0,g);
-      this.patty=cyl(.46,.46,.18,0xc0713f,-.35,1.3,0,g);
+      // round burner ring + cast-iron pan
+      cyl(.95,.95,.07,0x232833,-.35,1.11,0,g);
+      cyl(.82,.82,.05,0x14171d,-.35,1.16,0,g);
+      const pan=cyl(.68,.62,.16,0x2b303b,-.35,1.23,0,g);
+      box(1.15,.09,.16,0x232833,1.05,1.25,0,g); // pan handle
+      const panRim=cyl(.7,.7,.03,0x3a3f4a,-.35,1.315,0,g);
+      // patty (sits ON the pan, clearly visible)
+      this.patty=cyl(.5,.52,.22,0xc47a52,-.35,1.44,0,g);
       this.patty.visible=false;
-      this.flames=[-1,0,1].map(i=>{
-        const f=new THREE.Mesh(new THREE.ConeGeometry(.09,.3,8),M(0xff9f1c));
-        f.position.set(-.35+i*.3,1.3,0);f.visible=false;g.add(f);return f;
+      this.patty.userData.part='patty';
+      // burner flames: ring of short cones UNDER the pan
+      this.flames=[];
+      for(let i=0;i<8;i++){
+        const a=i/8*Math.PI*2;
+        const f=new THREE.Mesh(new THREE.ConeGeometry(.1,.4,8),M(0xff8c1a));
+        f.position.set(-.35+Math.cos(a)*.85,1.14,Math.sin(a)*.85);
+        f.visible=false;f.castShadow=false;g.add(f);this.flames.push(f);
+      }
+      // steam wisps while cooking
+      this.steam=[0,1,2].map(i=>{
+        const s=new THREE.Mesh(new THREE.SphereGeometry(.16,10,8),new THREE.MeshToonMaterial({color:0xffffff,transparent:true,opacity:.55,depthWrite:false}));
+        s.scale.setScalar(.5);s.visible=false;g.add(s);return s;
       });
-      this.item=this.patty;this.hitMesh=this.patty;this.itemPos=new THREE.Vector3(-.35,1.3,0);
-      this.bodyMeshes=[base,top];
+      this.item=this.patty;this.hitMesh=this.patty;this.itemPos=new THREE.Vector3(-.35,1.44,0);
+      this.bodyMeshes=[base,top,pan];
     }
     else if(this.kind==='grill'){
-      const base=box(2.1,1,1.7,0x6d7b8d,0,.5,0,g);
-      const top=box(2.16,.12,1.76,0x9aa7b8,0,1.06,0,g);
-      for(let i=0;i<4;i++)box(.05,.05,1.6,0x5b6675,-.75+i*.5,1.14,0,g,false);
-      this.cheese=box(.72,.12,.56,0xffc94d,0,1.2,0,g);
+      const base=box(2.1,1,1.7,0x4b5563,0,.5,0,g);
+      const top=box(2.2,.14,1.8,0x6d7b8d,0,1.06,0,g);
+      // raised steel rim so it reads as a grill, not a counter
+      box(2.2,.18,.1,0x39424e,0,1.17,-.85,g,false);
+      box(2.2,.18,.1,0x39424e,0,1.17,.85,g,false);
+      box(.1,.18,1.7,0x39424e,-1.05,1.17,0,g,false);
+      box(.1,.18,1.7,0x39424e,1.05,1.17,0,g,false);
+      // glowing coal bed (lit while cooking)
+      this.coal=box(1.7,.1,1.3,0x3a3f4a,0,1.12,0,g,false);
+      // grate: parallel bars with gaps + two cross bars
+      for(let i=0;i<7;i++)box(.07,.06,1.5,0x2f3542,-.9+i*.3,1.21,0,g,false);
+      box(1.9,.05,.07,0x2f3542,0,1.235,-.7,g,false);
+      box(1.9,.05,.07,0x2f3542,0,1.235,.7,g,false);
+      const hood=box(2.3,.5,.35,0x6d7b8d,0,1.62,-.95,g);
+      hood.rotation.x=.35;
+      // cheese block: thick, clearly visible, melts/spreads while cooking
+      this.cheese=box(.72,.2,.56,0xffd166,0,1.33,0,g);
       this.cheese.visible=false;
-      this.item=this.cheese;this.hitMesh=this.cheese;this.itemPos=new THREE.Vector3(0,1.2,0);
+      this.cheese.userData.part='cheese';
+      this.melt=0;
+      this.item=this.cheese;this.hitMesh=this.cheese;this.itemPos=new THREE.Vector3(0,1.33,0);
       this.bodyMeshes=[base,top];
     }
     else if(this.kind==='fryer'){
@@ -457,10 +486,26 @@ class Machine{
     this.hitMesh.userData.machine=this;
     this.bodyMeshes.forEach(m=>m.userData.machine=this);
   }
+  makeItem(){
+    // fresh food mesh so the machine can cook again after its item moved to the plate
+    if(this.kind==='stove'){
+      const p=cyl(.5,.52,.22,0xc47a52,-.35,1.44,0,this.group);
+      p.visible=false;p.userData.part='patty';
+      this.patty=p;return p;
+    }
+    if(this.kind==='grill'){
+      const q=box(.72,.2,.56,0xffd166,0,1.33,0,this.group);
+      q.visible=false;q.userData.part='cheese';
+      this.cheese=q;return q;
+    }
+    return null;
+  }
   start(){
     if(this.state!=='idle')return;
     this.state='cooking';this.t=0;AudioSys.sfx.cook();
     if(this.kind==='fryer')this.fries.visible=true;
+    else if(this.kind==='stove'){this.patty.visible=true;this.patty.material.color.copy(cRawPatty);}
+    else if(this.kind==='grill'){this.cheese.visible=true;this.cheese.material.color.copy(cRawCheese);this.cheese.scale.set(1,1,1);}
     this.applyItem(0);
     refreshPickables();
   }
@@ -480,6 +525,7 @@ class Machine{
       this.readyT+=dt;
       const s=1+Math.sin(this.readyT*6)*.06;
       if(this.kind==='fryer')this.item.scale.set(s,1,s);
+      else if(this.kind==='grill')this.item.scale.y=Math.max(.45,1-.5*this.melt)*s; // pulse, keep melt
       else this.item.scale.setScalar(s);
       if(this.kind==='fryer'){
         this.bubbles.forEach((b,i)=>{b.visible=this.state==='cooking';b.position.y=1.28+Math.abs(Math.sin(this.t*10+i*2))*.08;});
@@ -493,8 +539,28 @@ class Machine{
         refreshPickables();
       }
     }
-    if(this.kind==='stove'&&this.state==='cooking'){
-      this.flames.forEach(f=>{f.visible=true;f.scale.y=.7+Math.random()*.6;});
+    if(this.kind==='stove'){
+      const cook=this.state==='cooking';
+      this.flames.forEach(f=>{f.visible=cook;});
+      if(cook)this.flames.forEach((f,i)=>{f.scale.y=.6+Math.random()*.7;});
+      if(this.steam)this.steam.forEach((s,i)=>{
+        s.visible=cook;
+        if(cook){
+          const ph=(G.elapsed*1.4+i/3)%1;
+          s.position.set(-.35+Math.sin(i*2.1+G.elapsed)*.28,1.62+ph*.55,Math.cos(i*2.7)*.2);
+          s.scale.setScalar(.35+ph*.6);
+          s.material.opacity=.5*(1-ph);
+        }
+      });
+    }
+    if(this.kind==='grill'){
+      if(this.coal){
+        if(this.state==='cooking'){
+          this.melt=Math.min(1,this.melt+dt/this.cfg.time);
+          this.coal.material.color.setHex(0xb3401a);
+        }
+        else this.coal.material.color.setHex(0x3a3f4a);
+      }
     }
     if(this.kind==='fryer'&&this.state==='cooking'){
       this.bubbles.forEach((b,i)=>{b.visible=true;b.position.y=1.28+Math.abs(Math.sin(this.t*10+i*2))*.08;});
@@ -504,7 +570,13 @@ class Machine{
     this.fill.scale.x=Math.max(.001,p);
     switch(this.kind){
       case 'stove':this.patty.material.color.lerpColors(cRawPatty,cDonePatty,clamp(p,0,1));break;
-      case 'grill':this.cheese.material.color.lerpColors(cRawCheese,cDoneCheese,clamp(p,0,1));this.cheese.scale.y=1-.35*clamp(p*1.2,0,1);break;
+      case 'grill':{
+        const mel=clamp(p*1.15,0,1);
+        this.melt=mel;
+        this.cheese.material.color.lerpColors(cRawCheese,cDoneCheese,mel);
+        this.cheese.scale.set(1+.4*mel,Math.max(.45,1-.5*mel),1+.4*mel); // melt & spread
+        break;
+      }
       case 'fryer':{
         const pop=p<.65?.15:lerp(.15,1,(p-.65)/.35);
         this.fries.scale.y=pop;break;
@@ -515,7 +587,7 @@ class Machine{
   applyBurnt(){
     switch(this.kind){
       case 'stove':this.patty.material.color.setHex(0x241a12);break;
-      case 'grill':this.cheese.material.color.setHex(0x4a3018);break;
+      case 'grill':this.cheese.material.color.setHex(0x4a3018);this.melt=1;this.cheese.scale.set(1.3,.5,1.3);break;
       case 'fryer':this.friesMeshes.forEach(f=>f.material.color.setHex(0x6b4a1f));break;
       case 'drinker':this.liquid.material.color.setHex(0x7f5539);break;
     }
@@ -523,8 +595,8 @@ class Machine{
   resetToIdle(){
     this.state='idle';this.t=0;this.readyT=0;this.fill.scale.x=.001;
     switch(this.kind){
-      case 'stove':this.patty.visible=false;this.patty.material.color.copy(cRawPatty);this.flames.forEach(f=>f.visible=false);break;
-      case 'grill':this.cheese.visible=false;this.cheese.material.color.copy(cRawCheese);break;
+      case 'stove':this.patty.visible=false;this.patty.material.color.copy(cRawPatty);this.flames.forEach(f=>f.visible=false);if(this.steam)this.steam.forEach(s=>s.visible=false);break;
+      case 'grill':this.cheese.visible=false;this.cheese.material.color.copy(cRawCheese);this.cheese.scale.set(1,1,1);this.melt=0;if(this.coal)this.coal.material.color.setHex(0x3a3f4a);break;
       case 'fryer':this.fries.visible=false;this.fries.scale.y=.15;this.friesMeshes.forEach(f=>f.material.color.setHex(0xffd166));this.bubbles.forEach(b=>b.visible=false);break;
       case 'drinker':this.liquid.scale.y=.001;this.liquid.material.color.setHex(0xe63946);this.straw.visible=false;break;
     }
@@ -532,6 +604,7 @@ class Machine{
     this.item.position.copy(this.itemPos);
     this.item.rotation.set(0,0,0);
     this.item.scale.setScalar(1);
+    if(this.item.material&&this.item.material.emissive)this.item.material.emissive.setHex(0);
   }
 }
 new Machine('stove',-5);
@@ -556,14 +629,15 @@ function assembleBurger(){
   const patty=g.children.find(c=>c.userData.part==='patty');
   const bun=g.children.find(c=>c.userData.part==='bun');
   const cheese=g.children.find(c=>c.userData.part==='cheese');
+  // bottom bun occupies y .02–~.42; stack patty & cheese ON TOP of it
   const pairs=[];
   if(bun)pairs.push([bun,new THREE.Vector3(0,PLATE_TOP+.02,0)]);
-  if(patty)pairs.push([patty,new THREE.Vector3(0,PLATE_TOP+.2,0)]);
-  if(cheese)pairs.push([cheese,new THREE.Vector3(0,PLATE_TOP+.36,0)]);
+  if(patty)pairs.push([patty,new THREE.Vector3(0,PLATE_TOP+.5,0)]);
+  if(cheese)pairs.push([cheese,new THREE.Vector3(0,PLATE_TOP+.68,0)]);
   pairs.forEach(([o,t])=>tween(o,t,.4));
   if(bun){
     const topHemi=bun.children.find(c=>c.userData.isTop);
-    if(topHemi)tween(topHemi,new THREE.Vector3(0,.46,0),.4);
+    if(topHemi)tween(topHemi,new THREE.Vector3(0,.86,0),.4);
   }
   plate.dish='burger';plate.dishMesh=g;
   AudioSys.sfx.ding();
@@ -690,17 +764,30 @@ function updateCustomer(c,dt){
     if(c.mesh.position.z>7.6)c.dead=true;
   }
 }
-// machine's item was consumed (served/discarded): reset it without re-attaching the mesh
-function consumeFromMachine(m){
+// machine's food was consumed (served / placed on plate): make the machine usable again
+function machineRefill(m){
   m.state='idle';m.t=0;m.readyT=0;m.fill.scale.x=.001;
-  if(m.kind==='stove'){m.patty.visible=false;m.flames.forEach(f=>f.visible=false);}
-  else if(m.kind==='grill')m.cheese.visible=false;
-  else if(m.kind==='fryer'){m.fries.visible=false;m.bubbles.forEach(b=>b.visible=false);}
-  else if(m.kind==='drinker'){m.liquid.scale.y=.001;m.straw.visible=false;}
+  if(m.kind==='stove'||m.kind==='grill'){
+    // the food was used up: the old mesh now lives on the plate (leave it be),
+    // mint a fresh one for the machine to cook the next round
+    const fresh=m.makeItem();
+    m.item=fresh;m.hitMesh=fresh;fresh.userData.machine=m;
+    if(m.kind==='stove'){m.patty=fresh;m.flames.forEach(f=>f.visible=false);if(m.steam)m.steam.forEach(s=>s.visible=false);}
+    else{m.cheese=fresh;m.melt=0;if(m.coal)m.coal.material.color.setHex(0x3a3f4a);}
+  }
+  else{
+    // reusable container (fries basket / soda glass): hand it back to the machine
+    m.group.attach(m.item);
+    m.item.position.copy(m.itemPos);
+    m.item.rotation.set(0,0,0);m.item.scale.setScalar(1);
+    if(m.kind==='fryer'){m.fries.visible=false;m.fries.scale.y=.15;m.friesMeshes.forEach(f=>f.material.color.setHex(0xffd166));m.bubbles.forEach(b=>b.visible=false);}
+    if(m.kind==='drinker'){m.liquid.scale.y=.001;m.liquid.material.color.setHex(0xe63946);m.straw.visible=false;}
+  }
+  refreshPickables();
 }
 function serve(c,kind,mesh,d){
   scene.remove(mesh);
-  if(d&&d.from==='machine'&&d.m)consumeFromMachine(d.m);
+  if(d&&d.from==='machine'&&d.m)machineRefill(d.m);
   const p=c.patience;
   let coins=Math.round(DISH[kind].base*(0.6+p));
   if(p>.75)coins+=10;
@@ -859,7 +946,8 @@ function startDrag(o){
     m=o.userData.machine;kind=m.cfg.item;mesh=m.item;from='machine';
     m.prevState=m.state;m.state='held';
     scene.attach(mesh);
-    mesh.scale.setScalar(1);
+    mesh.scale.setScalar(1.15);
+    if(mesh.material&&mesh.material.emissive)mesh.material.emissive.setHex(0x442200);
   }
   else if(o.userData.dragKind){
     kind=o.userData.dragKind;
@@ -938,6 +1026,7 @@ function updateDrag(dt){
 function reject(d,msg){
   toast(msg);AudioSys.sfx.error();returnItem(d);
 }
+function clearHeldGlow(d){if(d.mesh.material&&d.mesh.material.emissive)d.mesh.material.emissive.setHex(0);}
 function returnItem(d){
   if(d.from==='machine'){
     const m=d.m;
@@ -945,6 +1034,7 @@ function returnItem(d){
     d.mesh.position.copy(m.itemPos);
     d.mesh.rotation.set(0,0,0);d.mesh.scale.setScalar(1);
     m.state=d.prevState;
+    clearHeldGlow(d);
   }
   else if(d.from==='tray'){
     scene.remove(d.mesh);
@@ -975,7 +1065,9 @@ function placeOnPlate(d){
   plateGroup.attach(d.mesh);
   const slot=SLOTS[plate.items.length];
   d.mesh.position.copy(slot);d.mesh.rotation.set(0,0,0);d.mesh.scale.setScalar(1);
+  clearHeldGlow(d);
   plate.items.push({kind,mesh:d.mesh});
+  if(d.from==='machine'&&d.m)machineRefill(d.m); // machine mints fresh food
   AudioSys.sfx.place();
   if(plate.items.length===3)assembleBurger();
 }
