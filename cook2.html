@@ -260,7 +260,7 @@ const ASSETS={
   cheese:A+'cheese_slice/cheese_slice.png',fries:A+'fries/fries.png',plate:A+'plate/plate.png',
   cup_empty:A+'cup/cup_empty.png',cup_full:A+'cup/cup_full.png',
   mug_empty:A+'coffee_mug/coffee_mug_empty.png',mug_full:A+'coffee_mug/coffee_mug_full.png',
-  grill:A+'grill/grill.png',pan:A+'frying_pan/frying_pan.png',soda_machine:A+'icecream_machine/icecream_machine.png',
+  grill:A+'grill/grill.png',pan:A+'frying_pan/frying_pan.png',soda_machine:A+'soda_machine/soda_machine.png',
   trash:A+'trash_bin/trash_bin.png',prep_tray:A+'prep_tray/prep_tray.png',napkins:A+'napkin_dispenser/napkin_dispenser.png',ketchup:A+'ketchup_bottle/ketchup_bottle.png',
   coin:A+'coin/coin.png',coin_stack:A+'coin_stack/coin_stack.png',bubble:A+'speech_bubble/speech_bubble.png',
   hud_coins:A+'hud_coins/hud_coins.png',hud_star_on:A+'hud_star/hud_star_on.png',hud_star_off:A+'hud_star/hud_star_off.png',
@@ -506,12 +506,12 @@ class Puppet{
 /* ======================================================================
    items, stations, plates, customers (shared by storybook + game)
    ====================================================================== */
-const ITEM_W={patty:88,sausage:120,bun_bottom:96,bun_top:96,bun_whole:100,cheese:80,fries:96,cup:64,mug:70,plate:128,burger:100,hotdog:120};
+const ITEM_W={patty:88,sausage:120,bun_bottom:96,bun_top:96,bun_whole:100,cheese:80,fries:96,cup:75,mug:70,plate:128,burger:100,hotdog:120};
 const DISH={
   burger:{icon:'bun_whole',label:'Burger',base:22},
   hotdog:{icon:'sausage_cooked',label:'Hot dog',base:20},
   fries:{icon:'fries',label:'Fries',base:16},
-  soda:{icon:'cup_full',label:'Soda',base:12},
+  soda:{icon:'cup_full',label:'Soda',base:12,iconW:60,iconX:-.4,iconY:6.7}, // hand-posed in the bubble 2026-09-05
   coffee:{icon:'mug_full',label:'Coffee',base:12},
 };
 const interactives=[];   // objects with {mesh, onTap?, drag?, drop?(item), priority}
@@ -681,7 +681,7 @@ class PlateRack{
 
 /** Soda machine: tap → cup fills → full cup pickable. */
 class SodaMachine extends Station{
-  constructor(x,y){super('soda_machine',x,y,220,{ay:0});this.cup=null;this.t=0;this.fillT=3;this.bar=makeBar(70);this.bar.position.set(x-40,y+112,0);scene.add(this.bar);this.cupPos={x:x-40,y:y+56};}
+  constructor(x,y){super('soda_machine',x,y,220,{ay:0});this.cup=null;this.t=0;this.fillT=3;this.bar=makeBar(70);this.cupPos={x:x-28,y:y+92};/* cup on the grate under the nozzle, hand-posed 2026-09-05 */this.bar.position.set(this.cupPos.x,this.cupPos.y+62,0);scene.add(this.bar);}
   onTap(){if(this.cup)return false;this.cup=new Item('cup','empty',this.cupPos.x,this.cupPos.y);this.cup.station=this;this.t=0;SFX.pop();return true;}
   poseState(st){ // poser: none | empty | filling | full
     if(this.cup){this.cup.dispose();this.cup=null;this.bar.visible=false;}
@@ -719,7 +719,8 @@ class Customer{
     // speech bubble with dish icon + patience bar
     this.bub=new THREE.Group();this.bub.position.set(SLOT_X[slot]-150,CUST_Y+270,0);
     const b=sprite('bubble',{w:130,layer:L.BUBBLE});this.bub.add(b);
-    const icon=sprite(DISH[dish].icon,{w:74,layer:L.BUBBLE+1,x:-6,y:14});this.bub.add(icon);
+    const d=DISH[dish];
+    const icon=sprite(d.icon,{w:d.iconW||74,layer:L.BUBBLE+1,x:d.iconX??-6,y:d.iconY??14});this.bub.add(icon);
     this.bar=makeBar(84,12);this.bar.position.set(-6,-58,0);this.bar.visible=true;this.bar.set(1,0x4ade80);this.bub.add(this.bar);
     this.bub.visible=false;this.bub.scale.setScalar(.01);scene.add(this.bub);
     this.i=addI({owner:this,mesh:()=>this.p.bodyG,priority:.5,customer:true});

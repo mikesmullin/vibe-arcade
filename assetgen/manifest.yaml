@@ -79,9 +79,9 @@ assets:
     size: [1536, 1024]
     seed: 42304
 
-  - id: icecream_machine
+  - id: soda_machine
     type: prop
-    refs: [refs/crop_icecream_machine.png]
+    refs: [refs/crop_soda_machine.png]
     bg: solid bright green
     cutout: key
     prompt: >-
@@ -114,13 +114,24 @@ assets:
     bg: solid bright green
     cutout: key
     type: stateful
-    chain: edit
-    prompt: a single small white paper cup with a red stripe, cartoon game prop
-    size: 1024
-    seed: 42801
+    pair: true          # one image, left=empty right=full, then slice (locks camera and scale)
+    size: [1792, 1152]
+    seed: 45003          # pair s2: tightest empty/full size match, comma swoosh, packed orange ice
+    refs: [refs/ref_cup_swoosh.png]   # keeper look: paper cup + comma swoosh + packed orange ice
+    template: >-
+      {ref_clause} Two copies of the SAME paper soda cup standing side by side, identical in shape,
+      size, camera angle and lighting, a gap of empty {bg} between them. Match the cup in the last
+      reference: medium-tall tapered waxed paper, rolled white rim, a simple red-orange comma-shaped
+      swoosh printed flat on the front. Same 3/4 elevated camera on both. LEFT cup is empty, white
+      paper interior visible through the open mouth, no liquid, no ice. RIGHT cup is {object}
+      Cartoon game prop on a plain flat {bg} background. No ground shadow, no table, no scene, no text, no UI.
+    prompt: >-
+      filled to the brim with bright saturated orange soda, the open mouth crowded with ice cubes
+      jammed together, every cube stained bright translucent orange like the soda, sitting
+      three-quarters submerged so only their top corners poke through a calm glossy orange surface
     states:
-      empty: empty cup, seen from a 3/4 elevated angle so the inside is visible
-      full:  the same cup filled to the brim with orange soda and a few bubbles
+      empty: ""
+      full: ""
 
   - id: sausage
     type: stateful
@@ -260,6 +271,9 @@ assets:
     seed: 51001
   - id: speech_bubble
     type: prop
+    # white fill: rembg eats it; green bar: green key would eat that. Magenta key keeps both.
+    bg: solid bright magenta
+    cutout: key
     prompt: an empty white rounded rectangular speech bubble with a small green vertical bar on its right edge and a small pointer tail at the bottom right, flat game UI element, no text
     size: [1024, 1280]
     seed: 51101

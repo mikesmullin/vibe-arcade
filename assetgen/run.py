@@ -202,6 +202,38 @@ def cutout(im: Image.Image, pad=24, export=None, mode="rembg", trim=False) -> Im
     return rgba
 
 
+def split_pair(rgba: Image.Image, n=2, pad=24) -> list:
+    """Split a keyed pair/strip into n sprites by cutting at occupancy minima between objects."""
+    import numpy as np
+    a = np.asarray(rgba)
+    vis = a[..., 3] > 40
+    occ = vis.sum(0).astype(np.float32)
+    xs = np.where(occ > 2)[0]
+    if len(xs) == 0:
+        raise SystemExit("split_pair: no opaque content")
+    x0, x1 = int(xs[0]), int(xs[-1])
+    k = max(3, (x1 - x0) // 40)
+    occ_s = np.convolve(occ, np.ones(k) / k, mode="same")
+    cuts = []
+    for i in range(1, n):
+        lo = x0 + int((x1 - x0) * (i - 0.35) / n)
+        hi = x0 + int((x1 - x0) * (i + 0.35) / n)
+        lo, hi = max(x0 + 8, lo), min(x1 - 8, hi)
+        cuts.append(lo + int(np.argmin(occ_s[lo:hi + 1])))
+    bounds = [0] + cuts + [a.shape[1]]
+    out = []
+    for i in range(n):
+        piece = rgba.crop((bounds[i], 0, bounds[i + 1], rgba.height))
+        box = piece.getchannel("A").point(lambda v: 255 if v > 8 else 0).getbbox()
+        if box:
+            l, t, r, b = box
+            piece = piece.crop((max(0, l - pad), max(0, t - pad),
+                                min(piece.width, r + pad), min(piece.height, b + pad)))
+        out.append(piece)
+        print(f"   split[{i}] x={bounds[i]}..{bounds[i+1]}  {piece.size}")
+    return out
+
+
 # --------------------------------------------------------------------- main
 def main():
     ap = argparse.ArgumentParser()
@@ -244,6 +276,42 @@ def main():
         (adir / "raw").mkdir(parents=True, exist_ok=True)
         asset_refs = [] if a.no_refs else [upload(HERE / p) for p in asset.get("refs", [])]
         prev_raw = None
+
+        if asset.get("pair"):
+            # one image with every state left-to-right, then slice. Keeps camera/scale locked.
+            state_names = list(states.keys())
+            finals = [adir / (f"{aid}_{s}.png" if s else f"{aid}.png") for s in state_names]
+            raw_path = adir / "raw" / f"{aid}_pair.png"
+            if all(p.exists() for p in finals) and not a.force:
+                print(f"skip {aid} pair (exists)")
+                continue
+            bg = asset.get("bg", style.get("bg", "pure white"))
+            tmpl = asset.get("template", style["template"])
+            prompt = tmpl.format(object=asset["prompt"], ref_clause=ref_clause, bg=bg)
+            if asset.get("suffix"):
+                prompt += " " + asset["suffix"]
+            if trigger:
+                prompt = trigger + ", " + prompt
+            seed = seed0
+            refs = style_refs + asset_refs
+            print(f"[{aid}] {aid}_pair  seed={seed}  refs={len(refs)}  {w}x{h}  pair={len(state_names)}")
+            t = time.time()
+            imgs = run_graph(build_graph(cfg, prompt, seed, w, h, refs, None, 1.0,
+                                         prefix=f"assetgen/{aid}/{aid}_pair", lora=lora))
+            imgs[0].save(raw_path)
+            (adir / "raw" / f"{aid}_pair.txt").write_text(prompt + f"\nseed={seed}\n")
+            keyed = cutout(imgs[0], pad=8, export=None, mode=asset.get("cutout", "rembg"),
+                           trim=asset.get("trim_neck", False))
+            pieces = split_pair(keyed, n=len(state_names), pad=24)
+            if asset.get("export"):
+                for p in pieces:
+                    p.thumbnail((asset["export"], asset["export"]), Image.LANCZOS)
+            for st, piece, final in zip(state_names, pieces, finals):
+                piece.save(final)
+                print(f"   -> {final.relative_to(HERE)}  {piece.size}")
+            print(f"   pair done in {time.time()-t:.1f}s")
+            continue
+
         for i, (state, state_val) in enumerate(states.items()):
             sdict = state_val if isinstance(state_val, dict) else {"text": state_val}
             state_text = sdict.get("text", "")
