@@ -80,6 +80,9 @@ button:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.15)}
 #story input[type=range]{flex:1}
 #story input[type=number]{width:56px;background:#0e1620;color:#fff;border:1px solid #2f4a68;border-radius:6px;padding:3px 5px}
 #story .kv{font-family:ui-monospace,monospace;font-size:11.5px;color:#8fd3ff;white-space:pre-wrap}
+#story header .hbtns{display:flex;gap:6px}
+#story header button.on{background:#3a86ff;color:#fff}
+#storyRestore{position:fixed;left:calc(10px + env(safe-area-inset-left,0px));bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:30;background:#1d2436;color:#cfe3ff;border:1px solid #3a4a75;border-radius:10px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer}
 /* ---------- debug harness (?debug) ---------- */
 #dbgToggle{position:fixed;right:calc(10px + env(safe-area-inset-right,0px));bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:30;background:#1d2436;color:#cfe3ff;border:1px solid #3a4a75;border-radius:10px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer}
 #dbgPanel{position:fixed;right:10px;bottom:48px;z-index:30;background:#1d2436ee;color:#cfe3ff;border:1px solid #3a4a75;border-radius:14px;padding:12px 14px;font-size:13px;width:270px;display:none}
@@ -124,7 +127,7 @@ body.ed-move #game canvas{cursor:move}body.ed-scale #game canvas{cursor:nwse-res
 </div>
 
 <div id="story" class="hidden">
-  <header><span>📖 Storybook</span><button id="storyClose">✕ close</button></header>
+  <header><span>📖 Storybook</span><span class="hbtns"><button id="labelToggle" class="on" title="Toggle labels">Aa</button><button id="storyHide" title="Hide sidebar">⟨</button></span></header>
   <nav id="storyNav"></nav>
   <div class="body" id="storyBody"></div>
 </div>
@@ -136,7 +139,7 @@ body.ed-move #game canvas{cursor:move}body.ed-scale #game canvas{cursor:nwse-res
     <div class="row"><div class="stat" id="menuLevel">Level 1</div><div class="stat" id="menuCoins">🪙 0</div></div>
     <div class="starsBig" id="menuStars"><span>★</span><span>★</span><span>★</span></div>
     <div class="howto">🍔 Tap the patty tray, then a pan — or drag. Cooked patty → plate with a bun.<br>🥤 Tap the soda machine to pour. 🍟 Tap the fryer.<br>🙂 Drag finished dishes to the customer who ordered them. 🪙 Tap tips to collect.</div>
-    <div class="row"><button class="big" id="playBtn">Play</button><button class="ghost" id="storyBtn">📖 Storybook</button><button class="ghost" id="resetBtn">Reset save</button></div>
+    <div class="row"><button class="big" id="playBtn">Play</button><button class="ghost" id="resetBtn">Reset save</button></div>
   </div>
 </div>
 <div id="end" class="overlay hidden">
@@ -152,6 +155,7 @@ body.ed-move #game canvas{cursor:move}body.ed-scale #game canvas{cursor:nwse-res
   <div class="panel"><h1>Paused</h1><div class="row"><button class="big" id="resumeBtn">Resume</button><button class="ghost" id="quitBtn">Quit to menu</button></div></div>
 </div>
 <div id="toast"></div>
+<button id="storyRestore" class="hidden" title="Show storybook sidebar">📖</button>
 <button id="dbgToggle" class="hidden">⏱ Debug</button>
 <div id="edtool" class="hidden">
   <button data-tool="" data-icon="pointer" title="Pointer (game input, Esc)"><img alt="pointer"></button>
@@ -506,7 +510,8 @@ class Puppet{
 /* ======================================================================
    items, stations, plates, customers (shared by storybook + game)
    ====================================================================== */
-const ITEM_W={patty:88,sausage:120,bun_bottom:96,bun_top:96,bun_whole:100,cheese:80,fries:96,cup:75,mug:70,plate:128,burger:100,hotdog:120};
+const ITEM_W={patty:88,sausage:120,bun_bottom:96,bun_top:96,bun_whole:100,cheese:160,fries:96,cup:75,mug:70,plate:128,burger:100,hotdog:120};
+const PAN_FOOD_S=0.5909,PAN_FOOD_DX=-10,PAN_FOOD_DY=-4.5;   // food-in-pan pose, 52px patty slightly left of pan centre (posed 2026-09-05)
 const DISH={
   burger:{icon:'bun_whole',label:'Burger',base:22},
   hotdog:{icon:'sausage_cooked',label:'Hot dog',base:20},
@@ -520,7 +525,7 @@ function removeI(o){const i=interactives.indexOf(o);if(i>=0)interactives.splice(
 function clearWorld(){
   for(const o of interactives.slice())removeI(o);
   for(const c of scene.children.slice())if(c!==bgSprite&&c!==counterSprite)scene.remove(c);
-  stations.length=0;customers.length=0;piles.length=0;fxList.length=0;tweens.length=0;
+  stations.length=0;customers.length=0;piles.length=0;fxList.length=0;tweens.length=0;labels.length=0;
   document.querySelectorAll('#fx .fl,#fx .flyCoin').forEach(e=>e.remove());
   drag=null;selected=null;
 }
@@ -546,17 +551,21 @@ class Item{
     for(const p of this.parts)removeObj(p);this.parts=[];removeObj(this.spr);
     if(this.kind==='plate'){this.buildPlate();return;}
     this.spr=sprite(this.key(),{w:ITEM_W[this.kind]||90,ax:.5,ay:.5,layer:this.layer});this.spr.userData.editName='Item('+this.kind+':'+this.state+')';this.g.add(this.spr);
+    if(this.station instanceof Grill&&this.slot){const u=this.spr.userData;this.spr.scale.set(u.w*PAN_FOOD_S,u.h*PAN_FOOD_S,1);this.spr.position.set(PAN_FOOD_DX,PAN_FOOD_DY,0);}   // pan pose, idempotent: survives raw->cooking->cooked->burnt recreations
   }
   /** plate stack: this.stack = ['bun_bottom','patty','bun_top'] etc. */
   buildPlate(){
     const st=this.stack||[];
     const plate=sprite('plate',{w:ITEM_W.plate,ax:.5,ay:.5,layer:this.layer});plate.userData.sub=0;plate.userData.editName='Plate.plate';this.g.add(plate);this.spr=plate;
-    let y=8,i=1;
+    // stack layer y in design px (from plate centre). hand-posed 2026-09-05 with the edit tools:
+    // tight stack: bun_bottom @ (0.1, -1), patty @ (-0.4, 27.2), cheese w 100.5 @ (0, 22.5) overhanging with its
+    // melt drip, bun_top @ (-0.3, 49.3) tucked onto the cheese; bun_whole/sausage keep their original values
+    const Y={bun_bottom:-1,bun_whole:8,patty:27.2,sausage:26,cheese:22.5,bun_top:49.3},X={bun_bottom:0.1,patty:-0.4,cheese:0,bun_top:-0.3},W={cheese:100.5};
+    let i=1;
     for(const k of st){
       const key=k==='patty'?'patty_cooked':k==='sausage'?'sausage_cooked':k;
-      const s=sprite(key,{w:ITEM_W[k==='patty'?'patty':k==='sausage'?'sausage':k]||90,layer:this.layer});
-      s.position.y=y;s.userData.sub=i++;s.userData.editName='Plate.stack['+k+']';s.renderOrder=this.layer+i;this.g.add(s);this.parts.push(s);
-      y+= (k==='bun_bottom'?26:k==='bun_whole'?18:k==='patty'?22:k==='cheese'?12:20);
+      const s=sprite(key,{w:W[k]||ITEM_W[k==='patty'?'patty':k==='sausage'?'sausage':k]||90,layer:this.layer});
+      s.position.set(X[k]||0,Y[k]??8,0);s.userData.sub=i++;s.userData.editName='Plate.stack['+k+']';s.renderOrder=this.layer+i;this.g.add(s);this.parts.push(s);
     }
   }
   set(state){this.state=state;this.refresh();}
@@ -605,10 +614,10 @@ class Grill extends Station{
   drop(item,slot){
     if(!this.accepts(item,slot))return false;
     slot.item=item;item.station=this;item.slot=slot;slot.t=0;item.home=null;
-    item.g.position.set(slot.x,slot.y+8,0);item.set('cooking');item.setLayer(L.ITEM);
+    item.g.position.set(slot.x,slot.y+8,0);item.set('cooking');item.setLayer(L.ITEM);   // set() refreshes, which applies the pan pose
     SFX.sizzle();return true;
   }
-  take(item){const s=item.slot;if(s){s.item=null;s.bar.visible=false;}item.station=null;item.slot=null;}
+  take(item){const s=item.slot;if(s){s.item=null;s.bar.visible=false;}item.station=null;item.slot=null;item.g.scale.setScalar(1);}
   update(dt){
     for(const s of this.slots){
       if(!s.item)continue;
@@ -637,11 +646,12 @@ class Tray extends Station{
   constructor(kind,x,y,{count=3,w=150,tray=true}={}){
     super('prep_tray',x,y,w,{ay:.5});
     this.kind=kind;
+    this.spr.userData.editName='Tray('+kind+')';
     if(!tray)this.spr.material.opacity=0;   // invisible but still tappable
     this.decor=[];
     for(let i=0;i<count;i++){
-      const key=kind==='patty'?'patty_raw':kind==='sausage'?'sausage_raw':'bun_whole';
-      const s=sprite(key,{w:(ITEM_W[kind]||90)*.85,layer:L.STATION+1,x:x+(i-(count-1)/2)*26,y:y+12+i*3});s.renderOrder=L.STATION+1+i;scene.add(s);this.decor.push(s);
+      const key=kind==='patty'?'patty_raw':kind==='sausage'?'sausage_raw':kind==='bun'?'bun_whole':'cheese';
+      const s=sprite(key,{w:(ITEM_W[kind]||90)*.85,layer:L.STATION+1,x:x+(i-(count-1)/2)*26,y:y+12+i*3});s.renderOrder=L.STATION+1+i;s.userData.editName='Tray('+kind+').decor['+i+']';scene.add(s);this.decor.push(s);
     }
     this.i.priority=1.2;
   }
@@ -662,13 +672,14 @@ class PlateRack{
     if(item.kind==='bun_bottom')return st.length===0;
     if(item.kind==='patty')return item.state==='cooked'&&st.length===1&&st[0]==='bun_bottom';
     if(item.kind==='sausage')return item.state==='cooked'&&st.length===1&&st[0]==='bun_bottom';
-    if(item.kind==='cheese')return st.includes('patty')&&!st.includes('cheese')&&!st.includes('bun_top');
+    if(item.kind==='cheese')return st.includes('bun_top')&&st.includes('patty')&&!st.includes('cheese');
     return false;
   }
   drop(item,slot){
     if(!this.accepts(item,slot))return false;
     const p=slot.item,st=p.stack;
-    if(item.kind==='sausage'){st[0]='bun_whole';st.push('sausage');}
+    if(item.kind==='cheese'){st.splice(st.indexOf('bun_top'),0,'cheese');}
+    else if(item.kind==='sausage'){st[0]='bun_whole';st.push('sausage');}
     else{st.push(item.kind);if(item.kind==='patty')st.push('bun_top');}
     item.dispose();p.refresh();SFX.place();if(p.dish())SFX.ding();
     return true;
@@ -944,7 +955,7 @@ try{const s=localStorage.getItem(SAVE_KEY);if(s)SAVE=Object.assign(SAVE,JSON.par
 const save=()=>{try{localStorage.setItem(SAVE_KEY,JSON.stringify(SAVE));}catch(e){}};
 const G={
   mode:'menu',level:1,cfg:null,coins:0,score:0,served:0,lost:0,time:0,elapsed:0,queue:[],spawnIdx:0,nextSpawnAt:0,
-  inputEnabled(){return this.mode==='playing'||this.mode==='story'||this.mode==='pose';},
+  inputEnabled(){return this.mode==='playing'||this.mode==='story'||this.mode==='pose'||this.mode==='studio';},
   addCoins(n,x,y,{fly=false}={}){this.coins+=n;this.score+=n;floatText(x,y,'+'+n,'coin');if(fly)flyCoins(x,y,Math.min(8,2+Math.round(n/6)));else bumpHud();updateHUD();},
   onServed:null,
 };
@@ -961,10 +972,11 @@ function buildKitchen(cfg={grillSlots:3}){
   new Decor('ketchup',610,-70,64);
   new Tray('bun',-200,-340,{count:3,w:170,tray:false});
   new PlateRack([[-250,-190],[-95,-190],[60,-190]]);
-  const pans=[[300,-100],[455,-100],[350,-222]].slice(0,cfg.grillSlots);
+  const pans=[[284.3,-120.4],[498.8,-114.6],[386,-167.5]].slice(0,cfg.grillSlots);   // left, right, front grates of the 2x2-diamond range, posed 2026-09-05
   new Grill(380,-340,pans,{cook:4,burn:5});
   new Tray('patty',360,-450,{count:3,w:180});
   new Tray('sausage',590,-450,{count:2,w:170});
+  new Tray('cheese',790,-450,{count:3,w:180});
   new Fryer(660,-265);
   new Trash(-640,-470);
 }
@@ -1015,7 +1027,7 @@ function endLevel(win){
 }
 function showMenu(){
   G.mode='menu';clearWorld();
-  $('end').classList.add('hidden');$('paused').classList.add('hidden');$('hud').classList.add('hidden');$('story').classList.add('hidden');
+  $('end').classList.add('hidden');$('paused').classList.add('hidden');$('hud').classList.add('hidden');$('story').classList.add('hidden');$('storyRestore').classList.add('hidden');
   const sp=$('menuStars').children,best=SAVE.best[SAVE.level]||0;for(let i=0;i<3;i++)sp[i].classList.toggle('on',i<best);
   $('menuLevel').textContent='Level '+SAVE.level;$('menuCoins').textContent='🪙 '+SAVE.coins;$('menu').classList.remove('hidden');
   // decorative: kitchen behind the menu
@@ -1027,7 +1039,8 @@ $('nextBtn').onclick=()=>startLevel(G.level+1);$('retryBtn').onclick=()=>startLe
 $('menuBtn').onclick=()=>{if(G.mode==='playing'){G.mode='paused';$('paused').classList.remove('hidden');}else if(G.mode==='story')showMenu();};
 $('resumeBtn').onclick=()=>{G.mode='playing';$('paused').classList.add('hidden');};$('quitBtn').onclick=showMenu;
 $('muteBtn').onclick=()=>{Audio.muted=!Audio.muted;$('muteBtn').textContent=Audio.muted?'🔇':'🔊';};
-$('storyBtn').onclick=()=>openStory();$('storyClose').onclick=showMenu;
+$('storyHide').onclick=()=>setStorySidebar(true);$('storyRestore').onclick=()=>setStorySidebar(false);
+$('labelToggle').onclick=()=>{setLabelVisibility(!labelVisible);$('labelToggle').classList.toggle('on',labelVisible);};
 
 /* ======================================================================
    storybook: every asset, every state, composites, interactive stations, rig, HUD
@@ -1035,11 +1048,17 @@ $('storyBtn').onclick=()=>openStory();$('storyClose').onclick=showMenu;
 const PAGES=[];
 function page(name,desc,build){PAGES.push({name,desc,build});}
 let storyCleanup=null,storyPage=null,storyTick=null;
+function setStorySidebar(hidden){
+  $('story').classList.toggle('hidden',hidden);
+  $('storyRestore').classList.toggle('hidden',!hidden);
+  $('edtool').classList.toggle('hidden',!hidden);   // edit toolbar ⇄ sidebar: mutually exclusive
+}
 function openStory(pageIdx=0){
   G.mode='story';clearWorld();
-  $('menu').classList.add('hidden');$('story').classList.remove('hidden');$('hud').classList.remove('hidden');
+  $('menu').classList.add('hidden');$('hud').classList.remove('hidden');
   G.cfg={goal:10,patience:20,slots:4};G.served=0;G.coins=0;G.score=0;G.time=90;G.level=1;updateHUD();
-  const nav=$('storyNav');nav.innerHTML='';PAGES.forEach((p,i)=>{const b=document.createElement('button');b.textContent=p.name;b.onclick=()=>showPage(i);nav.appendChild(b);});
+  setStorySidebar(false);
+  const nav=$('storyNav');nav.innerHTML='';PAGES.forEach((p,i)=>{const b=document.createElement('button');b.textContent=p.name;b.onclick=()=>Studio.active?Studio.showPage(i):showPage(i);nav.appendChild(b);});
   showPage(pageIdx);
 }
 function showPage(i){
@@ -1048,9 +1067,11 @@ function showPage(i){
   const p=PAGES[i];storyPage=p;const body=$('storyBody');body.innerHTML=`<h3>${p.name}</h3><p>${p.desc}</p>`;
   p.build(body);
 }
+const labels=[];let labelVisible=true;
+function setLabelVisibility(v){labelVisible=!!v;for(const m of labels)m.visible=labelVisible;}
 function label(x,y,txt,size=20){ // canvas text sprite
   const cv=document.createElement('canvas');const g=cv.getContext('2d');const font=`700 ${size*2}px Fredoka, sans-serif`;g.font=font;const w=Math.ceil(g.measureText(txt).width)+24;cv.width=w;cv.height=size*2+20;g.font=font;g.textBaseline='middle';g.textAlign='center';g.lineWidth=8;g.strokeStyle='rgba(0,0,0,.55)';g.strokeText(txt,w/2,cv.height/2);g.fillStyle='#fff';g.fillText(txt,w/2,cv.height/2);
-  const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;const m=new THREE.Mesh(planeGeo(),new THREE.MeshBasicMaterial({map:t,transparent:true,depthTest:false}));m.renderOrder=L.FX+5;m.scale.set(cv.width/2,cv.height/2,1);m.position.set(x,y,0);scene.add(m);return m;
+  const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;const m=new THREE.Mesh(planeGeo(),new THREE.MeshBasicMaterial({map:t,transparent:true,depthTest:false}));m.renderOrder=L.FX+5;m.scale.set(cv.width/2,cv.height/2,1);m.position.set(x,y,0);m.userData.key='label';m.userData.editName="Label:'"+txt+"'";m.visible=labelVisible;labels.push(m);scene.add(m);return m;
 }
 function ctl(body,buttons){const d=document.createElement('div');d.className='ctl';for(const [t,fn] of buttons){const b=document.createElement('button');b.textContent=t;b.onclick=()=>{fn(b);SFX.click();};d.appendChild(b);}body.appendChild(d);return d;}
 function slider(body,name,min,max,val,step,fn){const l=document.createElement('label');l.innerHTML=`<span style="width:70px">${name}</span>`;const r=document.createElement('input');r.type='range';r.min=min;r.max=max;r.step=step;r.value=val;r.oninput=()=>fn(parseFloat(r.value));l.appendChild(r);body.appendChild(l);return r;}
@@ -1079,9 +1100,9 @@ page('Composites','Dishes assembled from individual sprites on a plate: bun bott
   const order=['bun_bottom','patty','cheese','bun_top'];let i=0;
   ctl(body,[['Add next ingredient',()=>{if(i<order.length){p.stack.push(order[i++]);p.refresh();SFX.place();}}],['Reset',()=>{p.stack=[];i=0;p.refresh();}]]);
 });
-page('Stations','Interactive: tap the patty tray then a pan (or drag). Patties cook, then burn. Tap buns then a plate; cooked patty onto the bun → burger. Tap soda machine / fryer. Trash anything.',body=>{
+page('Stations','Interactive: tap the patty tray then a pan (or drag). Patties cook, then burn. Tap buns then a plate; cooked patty onto the bun → burger. Tap a finished burger with a cheese slice for a cheeseburger. Tap soda machine / fryer. Trash anything.',body=>{
   buildKitchen({grillSlots:3});
-  label(-470,110,'soda machine',15);label(-90,-40,'plates',15);label(-190,-260,'buns',15);label(400,120,'grill (3 pans)',15);label(370,-330,'raw patties',15);label(600,-330,'sausages',15);label(620,-170,'fryer',15);label(-640,-250,'trash',15);
+  label(-470,160,'soda machine',15);label(-90,-165,'plates',15);label(-190,-320,'buns',15);label(380,-15,'grill (3 pans)',15);label(360,-420,'raw patties',15);label(590,-425,'sausages',15);label(790,-425,'cheese',15);label(660,-185,'fryer',15);label(-560,-245,'trash',15);
   ctl(body,[['Cook speed ×3',b=>{for(const s of stations)if(s instanceof Grill){s.cookT=s.cookT>2?1.3:4;s.burnT=s.burnT>2?1.7:5;b.classList.toggle('on');}}],['Spawn cooked patty',()=>{const it=new Item('patty','cooked',0,-400);}],['Spawn burnt patty',()=>{new Item('patty','burnt',80,-400);}]]);
 });
 page('Customers rig','Paper-puppet customers: ear/eye/brow mirrored across the vertical axis, plus nose, mouth, head and body. Pose tweens FRONT ↔ SIDE for a parallax turn; expressions swap mouth sprites and offset brows; eyes blink and gaze.',body=>{
@@ -1123,7 +1144,7 @@ page('Scene','The background plate is one image edited from the reference screen
   ctl(body,[['Toggle counter overlay',()=>counterSprite.visible=!counterSprite.visible]]);
 });
 
-window.__cook={toDesign:(cx,cy)=>clientToDesign(cx,cy),hoverAt(x,y){const c=designToClient(x,y);renderer.domElement.dispatchEvent(new PointerEvent('pointermove',{clientX:c.x,clientY:c.y,pointerId:1,bubbles:true}));},hit(x,y){const h=hitTest(x,y);return h&&(h.owner.constructor.name+(h.owner.kind?':'+h.owner.kind:''));},tapAt(x,y){const c=designToClient(x,y);const cv=renderer.domElement;const ev=t=>new PointerEvent(t,{clientX:c.x,clientY:c.y,pointerId:1,bubbles:true,cancelable:true});cv.dispatchEvent(ev('pointerdown'));cv.dispatchEvent(ev('pointerup'));},
+window.__cook={toDesign:(cx,cy)=>clientToDesign(cx,cy),toClient:(x,y)=>designToClient(x,y),hoverAt(x,y){const c=designToClient(x,y);renderer.domElement.dispatchEvent(new PointerEvent('pointermove',{clientX:c.x,clientY:c.y,pointerId:1,bubbles:true}));},hit(x,y){const h=hitTest(x,y);return h&&(h.owner.constructor.name+(h.owner.kind?':'+h.owner.kind:''));},tapAt(x,y){const c=designToClient(x,y);const cv=renderer.domElement;const ev=t=>new PointerEvent(t,{clientX:c.x,clientY:c.y,pointerId:1,bubbles:true,cancelable:true});cv.dispatchEvent(ev('pointerdown'));cv.dispatchEvent(ev('pointerup'));},
   dragTo(x0,y0,x1,y1){const a=designToClient(x0,y0),b=designToClient(x1,y1);const cv=renderer.domElement;const ev=(t,p)=>new PointerEvent(t,{clientX:p.x,clientY:p.y,pointerId:1,bubbles:true,cancelable:true});cv.dispatchEvent(ev('pointerdown',a));for(let i=1;i<=6;i++)cv.dispatchEvent(ev('pointermove',{x:lerp(a.x,b.x,i/6),y:lerp(a.y,b.y,i/6)}));cv.dispatchEvent(ev('pointerup',b));},
   state(){return {mode:G.mode,sel:selected&&selected.kind+':'+selected.state,items:scene.children.length,customers:customers.map(c=>c.state+':'+c.dish+':'+c.patience.toFixed(2)),stations:stations.map(s=>s.constructor.name+(s.slots?':'+s.slots.map(x=>x.item?x.item.kind+'/'+x.item.state:(x.item===null&&x.pan?'-':'plate['+(x.item&&x.item.stack||[]).join('+')+']')).join(','):'')),coins:G.coins,served:G.served};},
   G,scene,customers,stations};
@@ -1143,7 +1164,7 @@ const poseTicks=[];   // objects with update(dt) that live only in the poser stu
 function tick(dt){
   updateTweens(dt);
   if(G.mode==='playing')updateGame(dt);
-  else if(G.mode==='story'){updateWorld(dt);storyTick&&storyTick(dt);}
+  else if(G.mode==='story'||G.mode==='studio'){updateWorld(dt);storyTick&&storyTick(dt);}
   else if(G.mode==='menu')updateWorld(dt);
   else if(G.mode==='pose'){updateWorld(dt);for(const o of poseTicks)o.update(dt);}
 }
@@ -1161,14 +1182,14 @@ function backdropTexture(kind,opts={}){
   return t;
 }
 const Pose={
-  active:false,obj:null,spec:null,plane:null,saved:null,zoom:1,
+  active:false,sceneMode:false,obj:null,spec:null,plane:null,saved:null,zoom:1,
   /** spec: 'puppet:man' | 'customer:woman:burger' | 'item:patty:cooked' | 'plate:bun_bottom+patty+bun_top' | 'station:grill' | 'key:hud_star_on' | any asset key */
   enter(spec,{bg='white',zoom=1,colors,cells}={}){
     if(this.active)this.exit();
     this.saved={mode:G.mode,hud:$('hud').className,story:$('story').className,menu:$('menu').className,children:scene.children.slice(),vis:scene.children.map(c=>c.visible)};
     for(const c of scene.children)c.visible=false;
     $('hud').classList.add('hidden');$('story').classList.add('hidden');$('menu').classList.add('hidden');$('end').classList.add('hidden');
-    G.mode='pose';this.active=true;this.spec=spec;poseTicks.length=0;
+    G.mode='pose';this.active=true;this.sceneMode=false;this.spec=spec;poseTicks.length=0;
     this.plane=new THREE.Mesh(planeGeo(),new THREE.MeshBasicMaterial({map:backdropTexture(bg,{colors,cells}),depthTest:false}));this.plane.renderOrder=-10;scene.add(this.plane);
     const [type,a,b]=spec.split(':');
     let o;
@@ -1193,15 +1214,29 @@ const Pose={
     this.obj=o;this.zoom=zoom;this.pan={x:0,y:0};this.frame();render();
     return this.info();
   },
-  frame(){ // center on the object's bounds, scale the view so it fills ~70% of the height
-    if(!this.obj||!this.obj.root)return;scene.updateMatrixWorld();
-    const b=new THREE.Box3().setFromObject(this.obj.root);const c=b.getCenter(new THREE.Vector3()),sz=b.getSize(new THREE.Vector3());
+  frame(){ // center on the object's bounds (scene mode: on all visible content), scale the view so it fills ~70% of the height
+    scene.updateMatrixWorld();
+    let b;
+    if(this.sceneMode&&!this.obj){ // studio: fit over every visible named sprite (stations, items, labels)
+      b=new THREE.Box3();let any=false;
+      scene.traverse(o=>{
+        if(!o.isMesh||!o.userData.key||o===bgSprite||o===counterSprite||o===this.plane)return;
+        let q=o,vis=true;while(q){if(!q.visible){vis=false;break;}q=q.parent;}if(!vis)return;
+        b.expandByObject(o);any=true;
+      });
+      if(!any)return;
+    }
+    else if(this.obj&&this.obj.root){b=new THREE.Box3().setFromObject(this.obj.root);}
+    else return;
+    const c=b.getCenter(new THREE.Vector3()),sz=b.getSize(new THREE.Vector3());
     const fit=Math.max(sz.x/(view.fw*.7),sz.y/(view.fh*.7),1e-3)/this.zoom;
     const px=(this.pan&&this.pan.x)||0,py=(this.pan&&this.pan.y)||0;
     camera.left=-view.fw/2*fit;camera.right=view.fw/2*fit;camera.top=view.fh/2*fit;camera.bottom=-view.fh/2*fit;camera.position.x=c.x+px;camera.position.y=c.y+py;camera.updateProjectionMatrix();
-    this.plane.position.set(c.x+px,c.y+py,0);
-    const fw=camera.right-camera.left,fh=camera.top-camera.bottom;this.plane.scale.set(fw,fh,1);
-    const map=this.plane.material.map;if(map.userData.tilePx){map.repeat.set(fw/map.userData.tilePx,fh/map.userData.tilePx);map.needsUpdate=true;}
+    if(this.plane){
+      this.plane.position.set(c.x+px,c.y+py,0);
+      const fw=camera.right-camera.left,fh=camera.top-camera.bottom;this.plane.scale.set(fw,fh,1);
+      const map=this.plane.material.map;if(map.userData.tilePx){map.repeat.set(fw/map.userData.tilePx,fh/map.userData.tilePx);map.needsUpdate=true;}
+    }
   },
   setZoom(z){this.zoom=z;this.frame();render();},
   center(x,y){ // pan the studio camera (design units, relative to the object's bounds center)
@@ -1214,6 +1249,7 @@ const Pose={
     for(const n of ['headF','headS','bodyF','bodyS']){const m=p[n];const r=worldRect(m);out[n]={key:m.userData.key,vis:m.visible,alpha:+m.material.opacity.toFixed(2),rect:[+r.x0.toFixed(0),+r.y0.toFixed(0),+r.x1.toFixed(0),+r.y1.toFixed(0)],order:m.renderOrder};}return out;},
   exit(){
     if(!this.active)return;
+    if(this.sceneMode){Studio.exit();return;}   // studio drives its own teardown
     removeObj(this.plane);this.plane=null;
     if(this.obj&&!(this.spec||'').startsWith('station')){if(this.obj.side)this.obj.side.dispose();if(this.obj.dispose)this.obj.dispose();if(this.obj.root)removeObj(this.obj.root);}
     if(this._builtKitchen){clearWorld();this._builtKitchen=false;}
@@ -1230,7 +1266,8 @@ function applyQueryPose(){
   const q=new URLSearchParams(location.search);if(!q.has('pose'))return;
   const opts={bg:q.get('bg')||'white',zoom:parseFloat(q.get('zoom'))||1};
   if(q.get('colors'))opts.colors=q.get('colors').split(',');if(q.get('cells'))opts.cells=parseInt(q.get('cells'));
-  Pose.enter(q.get('pose'),opts);
+  const spec=(q.get('pose')||'').replace(/ /g,'+');   // URLSearchParams decodes '+' as space; stack specs use '+'
+  Pose.enter(spec,opts);
   if(q.get('pan')){const [x,y]=q.get('pan').split(',').map(Number);Pose.center(x||0,y||0);}
   const p=Pose.obj&&(Pose.obj.parts?Pose.obj:Pose.obj.p);   // puppet, or a customer's puppet
   const both=fn=>{fn(p);if(Pose.obj&&Pose.obj.side)fn(Pose.obj.side);};
@@ -1245,6 +1282,56 @@ function applyQueryPose(){
   $('dbgPanel').classList.toggle('open',q.get('panel')==='1');
   if(q.get('tool'))Editor.setTool(q.get('tool'));
 }
+/* ---------- studio: storybook sidebar + pose camera over a whole page (scene mode) ---------- */
+const Studio={
+  active:false,pageIdx:0,bg:'grid',plane:null,
+  enter(pageIdx=2,{bg='grid',zoom=1}={}){
+    if(this.active)this.exit();
+    this.active=true;this.bg=bg;
+    G.mode='studio';
+    G.cfg={goal:10,patience:20,slots:4};G.served=0;G.coins=0;G.score=0;G.time=90;G.level=1;updateHUD();
+    $('menu').classList.add('hidden');$('end').classList.add('hidden');$('paused').classList.add('hidden');$('hud').classList.add('hidden');
+    setStorySidebar(false);   // sidebar open ⇒ edtool hidden (mutually exclusive)
+    const nav=$('storyNav');nav.innerHTML='';PAGES.forEach((p,i)=>{const b=document.createElement('button');b.textContent=p.name;b.onclick=()=>Studio.showPage(i);nav.appendChild(b);});
+    Pose.sceneMode=true;Pose.active=true;Pose.obj=null;Pose.spec=null;Pose.zoom=zoom||1;Pose.pan={x:0,y:0};
+    this.showPage(pageIdx,{bg});
+  },
+  showPage(i,{bg=null,zoom=null}={}){
+    if(!this.active)return;
+    i=clamp(i|0,0,PAGES.length-1);this.pageIdx=i;
+    [...$('storyNav').children].forEach((b,j)=>b.classList.toggle('on',j===i));
+    const p=PAGES[i];const body=$('storyBody');body.innerHTML=`<h3>${p.name}</h3><p>${p.desc}</p>`;
+    storyTick=null;
+    clearWorld();                    // nukes the backdrop plane (it's a scene child) — re-add below
+    this.setBg(bg||this.bg);
+    p.build(body);
+    if(zoom!=null)Pose.zoom=zoom;
+    Pose.frame();render();
+  },
+  setBg(bg){
+    this.bg=bg;
+    if(this.plane){scene.remove(this.plane);this.plane=null;Pose.plane=null;}
+    const on=(bg==='scene');
+    if(bgSprite)bgSprite.visible=on;
+    if(counterSprite)counterSprite.visible=on;
+    if(!on){
+      this.plane=new THREE.Mesh(planeGeo(),new THREE.MeshBasicMaterial({map:backdropTexture(bg),depthTest:false}));
+      this.plane.renderOrder=-10;scene.add(this.plane);
+      Pose.plane=this.plane;
+    }
+  },
+  exit(){
+    if(!this.active)return;
+    this.active=false;
+    Pose.sceneMode=false;Pose.active=false;
+    if(this.plane){scene.remove(this.plane);this.plane=null;Pose.plane=null;}
+    if(bgSprite)bgSprite.visible=true;
+    if(counterSprite)counterSprite.visible=true;
+    $('edtool').classList.add('hidden');
+    showMenu();                      // hides #story, builds the menu kitchen, mode='menu'
+  },
+};
+window.__cook.studio=Studio;
 /* ---------- edit tools: move / scale / rotate any sprite (debug) ---------- */
 const Editor={
   tool:'',hover:null,sel:null,drag:null,edits:[],
@@ -1318,7 +1405,9 @@ const Editor={
     const after=this.values(d.o);const name=this.name(d.o);
     const entry={name,tool:this.tool,before:d.before,after,t:+Time.T.toFixed(2)};
     if(JSON.stringify(d.before)!==JSON.stringify(after)){this.edits.push(entry);
-      const hint=after.kind==='headGroup'?'\n  paste into CHAR: headY:'+after.headY+(after.dx?' (sideHead/dx '+after.dx+')':'')+(after.scale!==1?' headW:'+Math.round(after.headW*after.scale):''):after.off?'\n  paste into POSE/editOff: '+JSON.stringify(after.off):'';
+      let hint=after.kind==='headGroup'?'\n  paste into CHAR: headY:'+after.headY+(after.dx?' (sideHead/dx '+after.dx+')':'')+(after.scale!==1?' headW:'+Math.round(after.headW*after.scale):''):after.off?'\n  paste into POSE/editOff: '+JSON.stringify(after.off):'';
+      if(name.startsWith('Label:'))hint+='\n  paste into page("Stations") label(x,y,...)';
+      else if(name.startsWith('Tray(')||['Grill','SodaMachine','Fryer','Trash','PlateRack'].includes(name))hint+='\n  paste into buildKitchen()';
       console.debug('[edit]',name,this.tool,'\n  before',JSON.stringify(d.before),'\n  after ',JSON.stringify(after),hint);}
     this.box(d.o,true);
   },
@@ -1369,9 +1458,10 @@ __cook.pose — studio
   pose.setBg(bg,opts)  pose.setZoom(z)  pose.center(dx,dy)  pose.frame()  pose.exit()   (mouse wheel = zoom at cursor, middle-drag = pan)
   pose.show({ears:false,head:false,body:false})  hide/show puppet layers
 __cook.tapAt(x,y) / dragTo(x0,y0,x1,y1)  design-space input (0,0 = screen center, y up)
-URL: cook2.html?pose=station:sodamachine:full&bg=grid&zoom=1.6&pan=0,0&freeze=1   (also posev, expr, gaze, walk, show, t, step, panel, nocache)
+URL: cook2.html?pose=station:sodamachine:full&bg=grid&zoom=1.6&pan=0,0&freeze=1   (also posev, expr, gaze, walk, show, t, step, panel, nocache; '+' in plate stacks is fine: ?pose=plate:bun_bottom+patty+bun_top)
+     cook2.html?studio=1&page=2&bg=grid&zoom=1   (storybook sidebar + pose camera over the whole page; bg: grid|white|gradient|scene; sidebar 'Aa' button toggles labels)
      station states: sodamachine none|empty|filling|full · grill none|raw|cooking|cooked|burnt|sausage_cooked · fryer none|cooking|ready`;
-function dbgInfoUpdate(){const i=Time.info();$('dbgInfo').textContent=`frozen: ${i.frozen} · T=${i.T.toFixed(2)}s · frames=${i.frames} · mode=${i.mode}`+(Pose.active?` · pose=${Pose.spec}`:'');$('dbgFreeze').textContent=i.frozen?'▶ Resume':'⏸ Freeze';}
+function dbgInfoUpdate(){const i=Time.info();const extra=Pose.active?(Pose.sceneMode?` · studio=${PAGES[Studio.pageIdx]?PAGES[Studio.pageIdx].name:''}`:` · pose=${Pose.spec}`):'';$('dbgInfo').textContent=`frozen: ${i.frozen} · T=${i.T.toFixed(2)}s · frames=${i.frames} · mode=${i.mode}`+extra;$('dbgFreeze').textContent=i.frozen?'▶ Resume':'⏸ Freeze';}
 $('dbgToggle').onclick=()=>$('dbgPanel').classList.toggle('open');
 $('dbgFreeze').onclick=()=>Time.toggle();
 $('dbgStep1').onclick=()=>Time.step(1);
@@ -1398,7 +1488,13 @@ window.__cook.pose=Pose;window.__cook.help=()=>DBG_HELP;
   if(location.hash.startsWith('#story')){const n=parseInt(location.hash.slice(6))||0;openStory(n);}
   Time.last=performance.now();dbgInfoUpdate();
   frame();
-  applyQueryPose();
+  const q0=new URLSearchParams(location.search);
+  if(q0.has('studio')){
+    Studio.enter(parseInt(q0.get('page'))||2,{bg:q0.get('bg')||'grid',zoom:parseFloat(q0.get('zoom'))||1});
+    if(q0.get('panel')==='1')$('dbgPanel').classList.add('open');
+    if(q0.get('tool'))Editor.setTool(q0.get('tool'));
+  }
+  else applyQueryPose();
 })();
 </script>
 </body>

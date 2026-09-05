@@ -62,20 +62,27 @@ assets:
 
   - id: bun_bottom
     type: prop
+    # klein fills the canvas we give it: a square frame + "thick cylinder / hockey puck" words made a TALL puck.
+    # Short wide frame + no height trigger words -> a low wide base (same lesson as the cheese slice).
     prompt: >-
-      cartoon game food, one single thick round flat slice of golden bread, like a short cylinder or hockey puck of bread:
-      golden crust around the side, soft pale cream-colored crumb on the flat top face. One solid piece, no layers, no dome,
-      nothing stacked on top, no seeds
-    size: 1024
+      cartoon game food, one single low wide round slice of golden bread, the flat base half of a hamburger bun:
+      golden crust around the side, soft pale cream-colored crumb on the flat top face. It is much wider than it is tall,
+      one solid piece, no layers, nothing stacked on top, no seeds
+    size: [1024, 640]
     seed: 42223
 
   - id: grill
     type: prop
-    refs: [refs/crop_grill.png]
+    bg: solid bright green
+    cutout: key
+    # commercial-galley redesign 2026-09-05: square cast-iron grates hold a regular grid better than round rings;
+    # per-asset screenshot ref dropped so klein designs freely (global style strip still locks the look).
     prompt: >-
-      the diner griddle station from the reference, redrawn cleanly on white: a long wide rectangular brushed stainless steel
-      flat-top counter unit seen from the front at a slightly elevated angle, with eight round black burner rings in two rows
-      of four on the steel top, a red rectangular drip tray along the right side, chrome trim, the unit spanning the whole width of the frame
+      a commercial galley gas range for a cartoon diner kitchen, seen from the front at a slightly elevated angle:
+      a heavy low rectangular brushed stainless steel countertop unit with a flat cooktop holding four identical square
+      black cast-iron burner grates arranged in a regular symmetric grid of two straight columns by two straight rows,
+      evenly spaced and neatly aligned; a row of round black control knobs across the steel front face, chrome trim edges,
+      the unit spanning the whole width of the frame
     size: [1536, 1024]
     seed: 42304
 
@@ -151,6 +158,8 @@ assets:
     seed: 42401
   - id: prep_tray
     type: prop
+    bg: solid bright green
+    cutout: key
     prompt: an empty rectangular stainless steel hotel pan prep tray with rounded corners, seen from a 3/4 elevated angle, cartoon game prop
     size: [1280, 1024]
     seed: 43001
@@ -165,9 +174,17 @@ assets:
 
   - id: cheese_slice
     type: prop
-    prompt: a single square slice of yellow-orange american cheese with softly melting drooping corners, seen from a 3/4 elevated angle, cartoon game food
-    size: 1024
+    # klein fills whatever rectangle we hand it: a square canvas + "filling most of the frame" came out as a
+    # cheese CUBE. Short wide canvas + a template that leaves headroom above/below the slice (no "square" word).
+    prompt: a single thin flat slice of yellow-orange american cheese, a wide flat slab much wider than it is thick, with softly melting drooping corners, cartoon game food
+    size: [1024, 640]
     seed: 43201
+    template: >-
+      {ref_clause} A single isolated 2D game asset for a casual mobile cooking game: {object}.
+      Bright saturated cel-shaded cartoon illustration with clean outlines and soft glossy highlights,
+      seen from a 3/4 elevated angle. The slice must look thin and flat: it occupies only the middle band of
+      the frame and leaves a large amount of empty background space above and below it.
+      on a plain flat {bg} background. No ground shadow, no scene, no table, no kitchen, no text, no UI.
 
   - id: fries
     type: prop
@@ -177,6 +194,8 @@ assets:
 
   - id: ketchup_bottle
     type: prop
+    bg: solid bright green
+    cutout: key
     prompt: a red squeeze ketchup bottle with a white cap and a small label, seen from a 3/4 elevated angle, cartoon game prop
     size: [1024, 1280]
     seed: 43401
