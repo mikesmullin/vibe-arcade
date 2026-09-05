@@ -3,8 +3,5 @@ server.lock
 /tmp/
 assetgen/.venv/
 assetgen/out/*/raw/
-assetgen/out_explore*/
-assetgen/out_ab/
-assetgen/out_norefs/
-assetgen/out_practice/
+assetgen/scratch/
 assetgen/__pycache__/

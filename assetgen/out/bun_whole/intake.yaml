@@ -1,0 +1,10 @@
+id: bun_whole
+date: 2026-09-05
+game_keys:
+  bun_whole: bun_whole.png
+seed: 42204
+copy_as: |
+  cp assetgen/out/bun_whole/bun_whole.png assets/art/bun_whole/bun_whole.png
+assets_snippet: |
+  bun_whole: A+'art/bun_whole/bun_whole.png',
+pose_verify: "cook2.html?pose=key:bun_whole&bg=grid&zoom=2&freeze=1&nocache"

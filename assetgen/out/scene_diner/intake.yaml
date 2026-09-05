@@ -1,0 +1,11 @@
+id: scene_diner
+date: 2026-09-05
+game_keys:
+  scene: scene_diner.png
+seed: 50003
+cutout: none
+copy_as: |
+  cp assetgen/out/scene_diner/scene_diner.png assets/art/scene_diner/scene_diner.png
+assets_snippet: |
+  scene: A+'art/scene_diner/scene_diner.png',
+pose_verify: "cook2.html?pose=key:scene&bg=grid&zoom=2&freeze=1&nocache"

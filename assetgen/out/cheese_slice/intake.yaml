@@ -1,0 +1,10 @@
+id: cheese_slice
+date: 2026-09-05
+game_keys:
+  cheese: cheese_slice.png
+seed: 43201
+copy_as: |
+  cp assetgen/out/cheese_slice/cheese_slice.png assets/art/cheese_slice/cheese_slice.png
+assets_snippet: |
+  cheese: A+'art/cheese_slice/cheese_slice.png',
+pose_verify: "cook2.html?pose=key:cheese&bg=grid&zoom=2&freeze=1&nocache"

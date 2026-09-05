@@ -11,13 +11,16 @@ evening on 2026-09-04.
 
 | Path | What |
 |---|---|
-| [`manifest.yaml`](manifest.yaml) | The source of truth: style prompt skeletons, reference images, and one entry per asset (17 assets, 24 sprites). |
+| [`manifest.yaml`](manifest.yaml) | The ART manifest (art-owned): style prompt skeletons, reference images, one entry per asset. The code side keeps its own ledger at `../assets/manifest.yaml` — never edit that file from here. |
 | [`run.py`](run.py) | The runner: builds a ComfyUI API graph per asset/state, submits it, pulls the render, removes the background, crops, saves. |
 | [`train.py`](train.py) | Trains a style LoRA on the keepers with ComfyUI's built-in trainer (optional, see verdict below). |
 | [`ab.py`](ab.py), [`sheet.py`](sheet.py) | A/B comparison sheets and contact sheets for review. |
 | [`refs/`](refs/) | The Cooking Fever screenshot that started this ([`screenshot_diner.png`](refs/screenshot_diner.png)), object crops from it, and the [`style_sheet.png`](refs/style_sheet.png) strip used as the global style reference. |
-| [`out/<id>/`](out/) | Final sprites, e.g. [`out/patty/`](out/patty/). Raw renders and prompts live in `out/<id>/raw/` (git-ignored). |
+| [`out/<id>/`](out/) | Final-final outbox, e.g. [`out/patty/`](out/patty/): keeper PNGs plus siblings `intake.yaml` (handoff card: game keys, copy lines, snippet, pose URL) and `sheet.png` (proof). Raw renders and prompts live in `out/<id>/raw/` (git-ignored). |
 | [`docs/`](docs/) | Review sheets from the iterations, and the [planning conversation](docs/plan_conversation.md) this implements. |
+| [`scratch/`](scratch/) | ALL intermediate/temp output (git-ignored): `practice/` seed explores, `explore*` seed sweeps, `ab/` A/B runs, `norefs/` flag tests. Never referenced by the game or the handoff. |
+| [`INDEX.yaml`](INDEX.yaml) | Index of finished outbox ids (files + game keys); `draft_*` entries are marked internal edit-pass sources, not game art. |
+| [`AGENTS.md`](AGENTS.md) | Guide for the art assistant working in this folder (sandbox scope, GPU handover, outbox contract). |
 
 Assets of interest:
 
@@ -151,14 +154,14 @@ cd /workspace/vibe-arcade/assetgen
 .venv/bin/python run.py                  # all assets (skips ones already in out/)
 .venv/bin/python run.py patty grill      # just these ids
 .venv/bin/python run.py --force patty    # regenerate
-.venv/bin/python run.py --no-refs --out out_norefs patty   # A/B without style refs
+.venv/bin/python run.py --no-refs --out scratch/norefs patty   # A/B without style refs
 .venv/bin/python run.py --seed-offset 7 patty              # quick re-roll
 .venv/bin/python sheet.py out/_sheet.png # contact sheet of everything in out/
 
 # explore seeds for one asset, then set the winner's seed in the manifest:
-for k in 0 1 2 3; do .venv/bin/python run.py --force --seed-offset $k --out out_explore/s$k bun_top; done
+for k in 0 1 2 3; do .venv/bin/python run.py --force --seed-offset $k --out scratch/explore/s$k bun_top; done
 
-# A/B several flag sets on the same assets -> out_ab/_ab.png
+# A/B several flag sets on the same assets -> scratch/ab/_ab.png
 .venv/bin/python ab.py coffee_mug -- "--no-lora --no-refs" "--no-lora" "--lora dinerart_v2.safetensors --lora-strength 0.5"
 
 # train a style LoRA on the keepers in out/, then try it:
@@ -180,7 +183,15 @@ Setup was: `uv venv .venv -p 3.12 && uv pip install "rembg[cpu]" pillow pyyaml r
   the object stays the same; `chain: img2img` also uses it as the init latent (`denoise`); `chain: none` draws each
   state independently.
 
-Outputs: `out/<id>/<id>_<state>.png` (rembg cutout, cropped), `out/<id>/raw/` (untouched render + the exact prompt used).
+Outputs: `out/<id>/<id>_<state>.png` (rembg cutout, cropped), `out/<id>/raw/` (untouched render + the exact prompt used), plus `out/<id>/intake.yaml` + `sheet.png` (handoff card + proof, backfilled for all keepers 2026-09-05).
+
+## Handoff to the game (code side pulls, art never pushes)
+
+The game serves `../assets/`, never `out/`. When the code assistant wants a keeper it
+copies the PNGs into `../assets/art/<id>/`, logs the accept in `../assets/manifest.yaml`
+and regens `../assets/assets.json` + `../assets/art/atlas.json` (via `../assets/regen.py` + `../assets/atlas.py`). Unused outbox output is fine — most of what gets
+made may never ship. Wishes from the code side arrive via `../assets/wishlist.md`
+(read-only for art: ideas, not orders).
 
 ## Lessons so far
 

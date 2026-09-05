@@ -1,0 +1,15 @@
+id: cust_woman_body
+date: 2026-09-05
+game_keys:
+  woman_body_front: cust_woman_body_front.png
+  woman_body_side: cust_woman_body_side.png
+seed: 52111
+bg: solid bright green
+cutout: key
+copy_as: |
+  cp assetgen/out/cust_woman_body/cust_woman_body_front.png assets/art/cust_woman_body/cust_woman_body_front.png
+  cp assetgen/out/cust_woman_body/cust_woman_body_side.png assets/art/cust_woman_body/cust_woman_body_side.png
+assets_snippet: |
+  woman_body_front: A+'art/cust_woman_body/cust_woman_body_front.png',
+  woman_body_side: A+'art/cust_woman_body/cust_woman_body_side.png',
+pose_verify: "cook2.html?pose=key:woman_body_front&bg=grid&zoom=2&freeze=1&nocache"

@@ -1,0 +1,14 @@
+id: hotdog_bun
+date: 2026-09-05
+game_keys:
+  hotdog_bun: hotdog_bun_empty.png
+  hotdog: hotdog_bun_assembled.png
+seed: 43701
+copy_as: |
+  cp assetgen/out/hotdog_bun/hotdog_bun_empty.png assets/art/hotdog_bun/hotdog_bun_empty.png
+  cp assetgen/out/hotdog_bun/hotdog_bun_assembled.png assets/art/hotdog_bun/hotdog_bun_assembled.png
+assets_snippet: |
+  hotdog_bun: A+'art/hotdog_bun/hotdog_bun_empty.png',
+  hotdog: A+'art/hotdog_bun/hotdog_bun_assembled.png',
+pose_verify: "cook2.html?pose=key:hotdog&bg=grid&zoom=2&freeze=1&nocache"
+notes: chain-edit pair so the empty bun and the assembled dog share the same bun; sausage wording echoes sausage_cooked

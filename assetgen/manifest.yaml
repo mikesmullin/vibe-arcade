@@ -616,6 +616,65 @@ assets:
     states:
       'off': the badge is a deep navy blue
       'on':  the badge is a bright amber orange-yellow
+  - id: hotdog_bun
+    type: stateful
+    chain: edit
+    # long roll: wide canvas so klein fills sideways, not tall (same lesson as bun_bottom / cheese_slice).
+    # "NOT a round hamburger bun" guards the burger prior; assembled state echoes the sausage_cooked
+    # wording (reddish-brown, dark grill lines, glossy) so the sausage reads as the same food.
+    prompt: cartoon game food, one single long oblong split-top hot dog bun roll (NOT a round hamburger bun), golden-brown crust outside, soft pale cream crumb, hinged opening slit along the top running lengthwise, sitting alone lengthwise
+    size: [1024, 640]
+    seed: 43701
+    states:
+      empty: empty bun with the top slit open showing the soft pale interior, nothing inside, no sausage, no filling
+      assembled: the same bun with a single cooked reddish-brown plump hot dog sausage with dark grill lines nestled lengthwise in the slit, glossy and juicy
+
+  - id: fry_station
+    type: stateful
+    chain: edit
+    # single-vat redesign (2026-09-05): floor-standing one-basket station replaces the old countertop box.
+    # Green key like the old fryer: polished steel carries near-white highlights that rembg would eat.
+    bg: solid bright green
+    cutout: key
+    prompt: >-
+      a one-basket commercial restaurant deep fryer station for a cartoon diner kitchen, seen from a 3/4 front
+      angle slightly elevated: a single rectangular stainless fry vat with rounded inner corners set into a brushed
+      stainless steel top deck; in the vat one empty rectangular stainless wire-mesh fry basket with coarse woven
+      mesh walls, reinforced wire rim and slightly flared top edge; a single front-mounted handle made of bent
+      stainless rod hooking over the front lip and ending in a thick black heat-resistant plastic grip pointing
+      toward the viewer slightly left; a slatted stainless drain grate recessed into the front deck; brushed steel
+      splashback behind the vat; stainless cabinet body with a row of round black control knobs across the front face.
+      One vat only, one basket only, no food, no second anything
+    size: [1280, 1024]
+    seed: 43802   # explore s1 winner (offset 0 lowered blew the oil out of the vat)
+    states:
+      raised: basket hooked in the raised position above the oil, basket empty, oil in the vat calm and hot with a smooth glossy surface and a faint heat shimmer, no bubbles
+      lowered: basket lowered down into the oil, basket filled with pale creamy-yellow uncooked french-fry sticks (real food, warm yellow sticks lying at natural angles half-submerged in the oil, not grey, not metal, not standing upright), the oil simmering with small bubbles and light froth hugging the basket, all oil and bubbles stay inside the vat, no splash, no spill, no puddle, no steam
+
+  - id: fries_pile
+    type: stateful
+    chain: edit
+    # de-cartoned fries (2026-09-05): loose piles with NO container, so the rig can drop them into a carton.
+    # Stick wording echoes the in-carton keepers so they read as the same food. Magenta key: raw sticks are
+    # near-white and rembg would eat them.
+    bg: solid bright magenta
+    cutout: key
+    prompt: a loose pile of thick-cut french fries lying in a heap with no container whatsoever, no carton, no box, no tray, no plate, no paper, just the pile of sticks, seen from a 3/4 elevated angle, cartoon game food
+    size: 1024
+    seed: 43901
+    states:
+      raw: pale uncooked frozen fries, very light creamy yellow-white sticks, matte and frosty with no browning and no crisp edges
+      cooked: golden crispy cooked fries, deep golden-yellow sticks with lightly browned crisp edges, appetizing
+
+  - id: fry_carton_empty
+    type: prop
+    # empty red-BLACK striped carton matching the in-carton fry keepers; magenta key keeps the white interior.
+    bg: solid bright magenta
+    cutout: key
+    prompt: an empty tall paper french-fry carton with red and black vertical stripes, open top showing the empty white paper interior, standing alone seen from a 3/4 elevated angle, no fries, no food, cartoon game prop
+    size: 1024
+    seed: 43911
+
   - id: tool_log
     type: stateful
     chain: none

@@ -1,0 +1,10 @@
+id: bun_top
+date: 2026-09-05
+game_keys:
+  bun_top: bun_top.png
+seed: 42211
+copy_as: |
+  cp assetgen/out/bun_top/bun_top.png assets/art/bun_top/bun_top.png
+assets_snippet: |
+  bun_top: A+'art/bun_top/bun_top.png',
+pose_verify: "cook2.html?pose=key:bun_top&bg=grid&zoom=2&freeze=1&nocache"

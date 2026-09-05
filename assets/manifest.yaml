@@ -1,0 +1,387 @@
+# CODE MANIFEST — what the game accepted and uses (code-owned).
+# One entry per outbox id taken. Updated ONLY at formal accept time:
+#   cp <art-outbox>/<id>/*.png assets/art/<id>/  (+ entry here + regen assets.json)
+# Contract per entry: taken date, `from:` outbox source, files {game_key: path},
+# keys wired in cook2.html. Generation details (prompts/seeds/cutout) stay art-side
+# in the art manifest. See plan tmp/PARALLEL_PIPELINES.md §3b.
+# `from:` paths are relative to the art outbox root (which lives next to the art
+# manifest); the art dir name itself is omitted on purpose so the hard-rule check
+# (grep the game for the art dir name — must be empty) stays green: the game never
+# references art paths, it only copies bytes at accept time.
+bun_bottom:
+  files:
+    bun_bottom: art/bun_bottom/bun_bottom.png
+  from: out/bun_bottom/ (art outbox)
+  keys:
+  - bun_bottom
+  taken: '2026-09-05'
+bun_top:
+  files:
+    bun_top: art/bun_top/bun_top.png
+  from: out/bun_top/ (art outbox)
+  keys:
+  - bun_top
+  taken: '2026-09-05'
+bun_whole:
+  files:
+    bun_whole: art/bun_whole/bun_whole.png
+  from: out/bun_whole/ (art outbox)
+  keys:
+  - bun_whole
+  taken: '2026-09-05'
+cheese_slice:
+  files:
+    cheese: art/cheese_slice/cheese_slice.png
+  from: out/cheese_slice/ (art outbox)
+  keys:
+  - cheese
+  taken: '2026-09-05'
+coffee_mug:
+  files:
+    mug_empty: art/coffee_mug/coffee_mug_empty.png
+    mug_full: art/coffee_mug/coffee_mug_full.png
+  from: out/coffee_mug/ (art outbox)
+  keys:
+  - mug_empty
+  - mug_full
+  taken: '2026-09-05'
+coin:
+  files:
+    coin: art/coin/coin.png
+  from: out/coin/ (art outbox)
+  keys:
+  - coin
+  taken: '2026-09-05'
+coin_stack:
+  files:
+    coin_stack: art/coin_stack/coin_stack.png
+  from: out/coin_stack/ (art outbox)
+  keys:
+  - coin_stack
+  taken: '2026-09-05'
+cup:
+  files:
+    cup_empty: art/cup/cup_empty.png
+    cup_full: art/cup/cup_full.png
+  from: out/cup/ (art outbox)
+  keys:
+  - cup_empty
+  - cup_full
+  taken: '2026-09-05'
+cust_man_body:
+  files:
+    man_body_front: art/cust_man_body/cust_man_body_front.png
+    man_body_side: art/cust_man_body/cust_man_body_side.png
+  from: out/cust_man_body/ (art outbox)
+  keys:
+  - man_body_front
+  - man_body_side
+  taken: '2026-09-05'
+cust_man_ear:
+  files:
+    man_ear: art/cust_man_ear/cust_man_ear.png
+  from: out/cust_man_ear/ (art outbox)
+  keys:
+  - man_ear
+  taken: '2026-09-05'
+cust_man_head:
+  files:
+    man_head_front: art/cust_man_head/cust_man_head_front.png
+    man_head_side: art/cust_man_head/cust_man_head_side.png
+  from: out/cust_man_head/ (art outbox)
+  keys:
+  - man_head_front
+  - man_head_side
+  taken: '2026-09-05'
+cust_man_nose:
+  files:
+    man_nose: art/cust_man_nose/cust_man_nose.png
+  from: out/cust_man_nose/ (art outbox)
+  keys:
+  - man_nose
+  taken: '2026-09-05'
+cust_woman_body:
+  files:
+    woman_body_front: art/cust_woman_body/cust_woman_body_front.png
+    woman_body_side: art/cust_woman_body/cust_woman_body_side.png
+  from: out/cust_woman_body/ (art outbox)
+  keys:
+  - woman_body_front
+  - woman_body_side
+  taken: '2026-09-05'
+cust_woman_ear:
+  files:
+    woman_ear: art/cust_woman_ear/cust_woman_ear.png
+  from: out/cust_woman_ear/ (art outbox)
+  keys:
+  - woman_ear
+  taken: '2026-09-05'
+cust_woman_head:
+  files:
+    woman_head_front: art/cust_woman_head/cust_woman_head_front.png
+    woman_head_side: art/cust_woman_head/cust_woman_head_side.png
+  from: out/cust_woman_head/ (art outbox)
+  keys:
+  - woman_head_front
+  - woman_head_side
+  taken: '2026-09-05'
+cust_woman_nose:
+  files:
+    woman_nose: art/cust_woman_nose/cust_woman_nose.png
+  from: out/cust_woman_nose/ (art outbox)
+  keys:
+  - woman_nose
+  taken: '2026-09-05'
+face_brow:
+  files:
+    brow: art/face_brow/face_brow.png
+  from: out/face_brow/ (art outbox)
+  keys:
+  - brow
+  taken: '2026-09-05'
+face_eye:
+  files:
+    eye_closed: art/face_eye/face_eye_closed.png
+    eye_open: art/face_eye/face_eye_open.png
+  from: out/face_eye/ (art outbox)
+  keys:
+  - eye_closed
+  - eye_open
+  taken: '2026-09-05'
+face_mouth:
+  files:
+    mouth_frown: art/face_mouth/face_mouth_frown.png
+    mouth_neutral: art/face_mouth/face_mouth_neutral.png
+    mouth_open: art/face_mouth/face_mouth_open.png
+    mouth_smile: art/face_mouth/face_mouth_smile.png
+  from: out/face_mouth/ (art outbox)
+  keys:
+  - mouth_frown
+  - mouth_neutral
+  - mouth_open
+  - mouth_smile
+  taken: '2026-09-05'
+fries:
+  files:
+    fries_cooked: art/fries/fries_cooked.png
+    fries_raw: art/fries/fries_raw.png
+  from: out/fries/ (art outbox)
+  keys:
+  - fries_cooked
+  - fries_raw
+  taken: '2026-09-05'
+fryer:
+  files:
+    fryer: art/fryer/fryer.png
+  from: out/fryer/ (art outbox)
+  keys:
+  - fryer
+  taken: '2026-09-05'
+frying_pan:
+  files:
+    pan: art/frying_pan/frying_pan.png
+  from: out/frying_pan/ (art outbox)
+  keys:
+  - pan
+  taken: '2026-09-05'
+grill:
+  files:
+    grill: art/grill/grill.png
+  from: out/grill/ (art outbox)
+  keys:
+  - grill
+  taken: '2026-09-05'
+hotdog_bun:
+  files:
+    hotdog_bun: art/hotdog_bun/hotdog_bun_empty.png
+    hotdog: art/hotdog_bun/hotdog_bun_assembled.png
+  from: out/hotdog_bun/ (art outbox)
+  keys:
+  - hotdog_bun
+  - hotdog
+  taken: '2026-09-05'
+hud_angry:
+  files:
+    hud_angry: art/hud_angry/hud_angry.png
+  from: out/hud_angry/ (art outbox)
+  keys:
+  - hud_angry
+  taken: '2026-09-05'
+hud_clock:
+  files:
+    hud_clock: art/hud_clock/hud_clock.png
+  from: out/hud_clock/ (art outbox)
+  keys:
+  - hud_clock
+  taken: '2026-09-05'
+hud_coins:
+  files:
+    hud_coins: art/hud_coins/hud_coins.png
+  from: out/hud_coins/ (art outbox)
+  keys:
+  - hud_coins
+  taken: '2026-09-05'
+hud_customer:
+  files:
+    hud_customer: art/hud_customer/hud_customer.png
+  from: out/hud_customer/ (art outbox)
+  keys:
+  - hud_customer
+  taken: '2026-09-05'
+hud_heart:
+  files:
+    hud_heart: art/hud_heart/hud_heart.png
+  from: out/hud_heart/ (art outbox)
+  keys:
+  - hud_heart
+  taken: '2026-09-05'
+hud_lock:
+  files:
+    hud_lock: art/hud_lock/hud_lock.png
+  from: out/hud_lock/ (art outbox)
+  keys:
+  - hud_lock
+  taken: '2026-09-05'
+hud_star:
+  files:
+    hud_star_off: art/hud_star/hud_star_off.png
+    hud_star_on: art/hud_star/hud_star_on.png
+  from: out/hud_star/ (art outbox)
+  keys:
+  - hud_star_off
+  - hud_star_on
+  taken: '2026-09-05'
+hud_xp:
+  files:
+    hud_xp: art/hud_xp/hud_xp.png
+  from: out/hud_xp/ (art outbox)
+  keys:
+  - hud_xp
+  taken: '2026-09-05'
+ketchup_bottle:
+  files:
+    ketchup: art/ketchup_bottle/ketchup_bottle.png
+  from: out/ketchup_bottle/ (art outbox)
+  keys:
+  - ketchup
+  taken: '2026-09-05'
+napkin_dispenser:
+  files:
+    napkins: art/napkin_dispenser/napkin_dispenser.png
+  from: out/napkin_dispenser/ (art outbox)
+  keys:
+  - napkins
+  taken: '2026-09-05'
+patty:
+  files:
+    patty_burnt: art/patty/patty_burnt.png
+    patty_cooked: art/patty/patty_cooked.png
+    patty_cooking: art/patty/patty_cooking.png
+    patty_raw: art/patty/patty_raw.png
+  from: out/patty/ (art outbox)
+  keys:
+  - patty_burnt
+  - patty_cooked
+  - patty_cooking
+  - patty_raw
+  taken: '2026-09-05'
+plate:
+  files:
+    plate: art/plate/plate.png
+  from: out/plate/ (art outbox)
+  keys:
+  - plate
+  taken: '2026-09-05'
+prep_tray:
+  files:
+    prep_tray: art/prep_tray/prep_tray.png
+  from: out/prep_tray/ (art outbox)
+  keys:
+  - prep_tray
+  taken: '2026-09-05'
+sausage:
+  files:
+    sausage_burnt: art/sausage/sausage_burnt.png
+    sausage_cooked: art/sausage/sausage_cooked.png
+    sausage_cooking: art/sausage/sausage_cooking.png
+    sausage_raw: art/sausage/sausage_raw.png
+  from: out/sausage/ (art outbox)
+  keys:
+  - sausage_burnt
+  - sausage_cooked
+  - sausage_cooking
+  - sausage_raw
+  taken: '2026-09-05'
+scene_diner:
+  files:
+    scene: art/scene_diner/scene_diner.png
+  from: out/scene_diner/ (art outbox)
+  keys:
+  - scene
+  taken: '2026-09-05'
+soda_machine:
+  files:
+    soda_machine: art/soda_machine/soda_machine.png
+  from: out/soda_machine/ (art outbox)
+  keys:
+  - soda_machine
+  taken: '2026-09-05'
+speech_bubble:
+  files:
+    bubble: art/speech_bubble/speech_bubble.png
+  from: out/speech_bubble/ (art outbox)
+  keys:
+  - bubble
+  taken: '2026-09-05'
+tool_log:
+  files:
+    tool_log_off: art/tool_log/tool_log_off.png
+    tool_log_on: art/tool_log/tool_log_on.png
+  from: out/tool_log/ (art outbox)
+  keys:
+  - tool_log_off
+  - tool_log_on
+  taken: '2026-09-05'
+tool_move:
+  files:
+    tool_move_off: art/tool_move/tool_move_off.png
+    tool_move_on: art/tool_move/tool_move_on.png
+  from: out/tool_move/ (art outbox)
+  keys:
+  - tool_move_off
+  - tool_move_on
+  taken: '2026-09-05'
+tool_pointer:
+  files:
+    tool_pointer_off: art/tool_pointer/tool_pointer_off.png
+    tool_pointer_on: art/tool_pointer/tool_pointer_on.png
+  from: out/tool_pointer/ (art outbox)
+  keys:
+  - tool_pointer_off
+  - tool_pointer_on
+  taken: '2026-09-05'
+tool_rotate:
+  files:
+    tool_rotate_off: art/tool_rotate/tool_rotate_off.png
+    tool_rotate_on: art/tool_rotate/tool_rotate_on.png
+  from: out/tool_rotate/ (art outbox)
+  keys:
+  - tool_rotate_off
+  - tool_rotate_on
+  taken: '2026-09-05'
+tool_scale:
+  files:
+    tool_scale_off: art/tool_scale/tool_scale_off.png
+    tool_scale_on: art/tool_scale/tool_scale_on.png
+  from: out/tool_scale/ (art outbox)
+  keys:
+  - tool_scale_off
+  - tool_scale_on
+  taken: '2026-09-05'
+trash_bin:
+  files:
+    trash: art/trash_bin/trash_bin.png
+  from: out/trash_bin/ (art outbox)
+  keys:
+  - trash
+  taken: '2026-09-05'

@@ -1,0 +1,15 @@
+id: face_eye
+date: 2026-09-05
+game_keys:
+  eye_closed: face_eye_closed.png
+  eye_open: face_eye_open.png
+seed: 53001
+bg: solid bright green
+cutout: key
+copy_as: |
+  cp assetgen/out/face_eye/face_eye_closed.png assets/art/face_eye/face_eye_closed.png
+  cp assetgen/out/face_eye/face_eye_open.png assets/art/face_eye/face_eye_open.png
+assets_snippet: |
+  eye_closed: A+'art/face_eye/face_eye_closed.png',
+  eye_open: A+'art/face_eye/face_eye_open.png',
+pose_verify: "cook2.html?pose=key:eye_closed&bg=grid&zoom=2&freeze=1&nocache"

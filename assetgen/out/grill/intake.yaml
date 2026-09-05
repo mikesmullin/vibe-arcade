@@ -1,0 +1,12 @@
+id: grill
+date: 2026-09-05
+game_keys:
+  grill: grill.png
+seed: 42304
+bg: solid bright green
+cutout: key
+copy_as: |
+  cp assetgen/out/grill/grill.png assets/art/grill/grill.png
+assets_snippet: |
+  grill: A+'art/grill/grill.png',
+pose_verify: "cook2.html?pose=station:grill:cooked&bg=grid&zoom=2&freeze=1&nocache"

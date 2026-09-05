@@ -1,0 +1,12 @@
+id: face_brow
+date: 2026-09-05
+game_keys:
+  brow: face_brow.png
+seed: 53101
+bg: solid bright green
+cutout: key
+copy_as: |
+  cp assetgen/out/face_brow/face_brow.png assets/art/face_brow/face_brow.png
+assets_snippet: |
+  brow: A+'art/face_brow/face_brow.png',
+pose_verify: "cook2.html?pose=key:brow&bg=grid&zoom=2&freeze=1&nocache"

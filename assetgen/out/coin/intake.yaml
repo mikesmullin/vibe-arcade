@@ -1,0 +1,10 @@
+id: coin
+date: 2026-09-05
+game_keys:
+  coin: coin.png
+seed: 50201
+copy_as: |
+  cp assetgen/out/coin/coin.png assets/art/coin/coin.png
+assets_snippet: |
+  coin: A+'art/coin/coin.png',
+pose_verify: "cook2.html?pose=key:coin&bg=grid&zoom=2&freeze=1&nocache"

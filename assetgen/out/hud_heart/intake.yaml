@@ -1,0 +1,10 @@
+id: hud_heart
+date: 2026-09-05
+game_keys:
+  hud_heart: hud_heart.png
+seed: 50901
+copy_as: |
+  cp assetgen/out/hud_heart/hud_heart.png assets/art/hud_heart/hud_heart.png
+assets_snippet: |
+  hud_heart: A+'art/hud_heart/hud_heart.png',
+pose_verify: "cook2.html?pose=key:hud_heart&bg=grid&zoom=2&freeze=1&nocache"

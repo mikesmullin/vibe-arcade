@@ -1,72 +1,59 @@
-# AGENTS.md — vibe-arcade
+# AGENTS.md — vibe-arcade (code assistant)
 
-Notes for agentic collaborators working in this repo. Required reading before
-touching assets or the puppet rig: `tmp/LESSONS.md` (+ addendum). Pipeline
-details: `assetgen/README.md`. Debug harness: `__cook.help()` in the
-`cook2.html` console.
+You are the **code assistant**. You own everything except `assetgen/` — notably
+`cook2.html`, `assets/`, and this file. Never write inside `assetgen/`.
 
-## One GPU: hand it back and forth
+Required reading: `tmp/LESSONS.md` (+ addendum) before touching the puppet rig.
+Debug harness: `__cook.help()` in the `cook2.html` console.
 
-This machine has a single 32 GB RTX 5090 shared by two models that cannot both
-be loaded at once:
+## The art assistant (exists, but its pipeline is not your problem)
 
-- the text LLM serving this chat (llama-server on 127.0.0.1:1234, ~31 GB VRAM)
-- the ComfyUI diffusion stack used by `assetgen/` (FLUX.2 klein 4B + Qwen3-4B
-  encoder + VAE, ~17 GB)
+A separate art assistant owns `assetgen/` (cwd-rooted sandbox, own guide at
+`assetgen/AGENTS.md`, own manifest with prompts/seeds/cutout, own GPU handover).
+You need no ComfyUI / klein / rembg knowledge. The interface is files only:
 
-Before **any** GPU workload (`assetgen/run.py` generations, `train.py`,
-`ab.py`), hand the GPU over and back in **one** bash tool call:
+- **Read-only outbox:** `assetgen/out/<id>/{*.png,intake.yaml,sheet.png}`.
+  Finished keepers + handoff card (game keys, `copy_as` lines, snippet, pose URL).
+- **Accept = copy + rebuild:** `cp assetgen/out/<id>/*.png assets/art/<id>/` per the card's
+  `copy_as`, append one entry to `assets/manifest.yaml`, then run
+  `assets/regen.py && assets/atlas.py` (manifest → `assets.json` → atlas pages).
+  Then verify in the studio
+  (`cook2.html?debug` / `?pose=...&nocache`). Unused outbox output is harmless —
+  take 1 of 10 or 0.
+- **Hard rule: `cook2.html` refers only to `assets/`, never to `assetgen/`.**
+  No fetch, texture load, img src, or pose path may point under the art dir.
+  Check: `grep -rn "assetgen" cook2.html assets/` must print nothing.
+  (`from:` provenance in `assets/manifest.yaml` is outbox-relative for this reason.)
+- **Referencing accepted assets:** `const A='assets/'`, game keys overlaid at boot
+  from `assets/assets.json` onto the `ASSETS` literal (which stays as fallback);
+  the WebGL scene renders from the atlas (`assets/art/atlas-*.png` + `art/atlas.json`),
+  (room beside them for future `assets/sfx/`, `assets/music/`),
+  DOM icons are runtime atlas slices (`iconURL()`); missing keys render the magenta
+  `fallbackTex()` so you can code against future keys before the bytes land.
+- **Wishlist (you write, art reads):** `assets/wishlist.md` is your bullet list of
+  prospective wants — one line per wish with the game key it would live under and
+  a one-line why. Ideas, not orders. Delete a line as you accept the asset.
+- You never trigger GPU work. Intake is plain `cp`.
 
-```sh
-trap '~/inference.mjs last' EXIT
-~/inference.mjs kill || exit 1
-~/inference.mjs comfy || exit 1
-<assetgen workload>          # e.g. .venv/bin/python -u run.py --force --out out_practice patty
-rc=$?
-~/inference.mjs comfy-kill
-exit $rc
-```
+## Web app + browser (yours alone)
 
-Why one tool call: killing the text LLM mid-turn is safe because the shell
-outlives it; the EXIT trap guarantees `last` relaunches the LLM even if the
-workload fails. `last` blocks until /health is 200, so the session is usable
-as soon as the call returns.
-
-Subcommands of `~/inference.mjs` (config: `~/.config/inference/config.yaml`):
-
-| cmd | does |
-|---|---|
-| `kill` | stop the tracked llama-server; blocks until the process is gone (SIGTERM → 10 s → SIGKILL → hard error if still alive) |
-| `comfy [args...]` | launch ComfyUI in the background (log `~/.cache/inference/comfy.log`, tracked in `comfy.lock`); passthrough args are appended, a passthrough `--listen`/`--port` overrides the defaults; blocks until `/system_stats` is 200; refuses to double-launch; warns if the GPU is >75% full (LLM still loaded?) |
-| `comfy-kill` | stop the tracked ComfyUI; blocks until the process is gone |
-| `last` | relaunch the last LLM profile; blocks until /health is 200 |
-
-Gotchas learned the hard way (2026-09-05):
-
-- Probe `/system_stats`, never `/system`: ComfyUI 0.30.0 has no `/system`
-  route (404), so a `/system` health check waits forever on a healthy server.
-- Never gate on a VRAM level: other processes may hold gigabytes, making any
-  "wait until free" target unreachable. Process death is the completion
-  signal — the driver reclaims VRAM on exit.
-- `pgrep -f "ComfyUI/main"` false-negatives: the real argv is
-  `.../ComfyUI/.venv/bin/python main.py`, which lacks that literal substring
-  (and the pattern self-matches the searcher's own shell). Prefer the lock pid
-  (`~/.cache/inference/comfy.lock`) or the port probe.
-- Scratch generations go to `--out out_practice` (git-ignored). Never
-  `--force` over the keepers in `assetgen/out/` without being asked.
+- You — never the art side — start/restart the web app (`npm start` → :8080,
+  or `python -m http.server` fallback; see Local servers) and drive the browser
+  for every visual check: screenshots, console, network, poser URLs, `__cook` evals.
+- The art assistant never launches the game, opens pages, or screenshots. Its pose
+  URLs in intake cards are requests for YOU to verify, not something it already ran.
 
 ## Local servers
 
 - Game: `npm start` → :8080 (`server.mjs`, PID guard in `server.lock`). If the
   port is squatted, use `python -m http.server 8090` instead.
-- ComfyUI is never autostarted; models live in `/workspace/tmp/ComfyUI/models`
-  (`diffusion_models/`, `text_encoders/`, `vae/`). Start it only via
-  `~/inference.mjs comfy` (after `kill`), stop it via `comfy-kill`.
+- ComfyUI is art-side and never autostarted by you.
 
 ## Process
 
 - No commits unless asked. Batch small fixes, verify each in the studio
   (`cook2.html?debug` / `?pose=...`), report what is uncommitted.
 - When the user reports a visual bug, isolate the object in the poser first,
-  then decide asset problem (regenerate/re-cut) vs rig problem (layering,
-  placement, clipping). Most character bugs so far were rig problems.
+  then decide asset problem (regenerate/re-cut → wishlist it if no outbox fix
+  exists) vs rig problem (layering, placement, clipping). Most character bugs
+  so far were rig problems.

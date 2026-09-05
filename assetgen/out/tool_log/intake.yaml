@@ -1,0 +1,15 @@
+id: tool_log
+date: 2026-09-05
+game_keys:
+  tool_log_off: tool_log_off.png
+  tool_log_on: tool_log_on.png
+seed: 64102
+bg: solid bright green
+cutout: key
+copy_as: |
+  cp assetgen/out/tool_log/tool_log_off.png assets/art/tool_log/tool_log_off.png
+  cp assetgen/out/tool_log/tool_log_on.png assets/art/tool_log/tool_log_on.png
+assets_snippet: |
+  tool_log_off: A+'art/tool_log/tool_log_off.png',
+  tool_log_on: A+'art/tool_log/tool_log_on.png',
+pose_verify: "cook2.html?pose=key:tool_log_off&bg=grid&zoom=2&freeze=1&nocache"

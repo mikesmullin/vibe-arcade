@@ -1,0 +1,13 @@
+id: hud_star
+date: 2026-09-05
+game_keys:
+  hud_star_off: hud_star_off.png
+  hud_star_on: hud_star_on.png
+seed: 50401
+copy_as: |
+  cp assetgen/out/hud_star/hud_star_off.png assets/art/hud_star/hud_star_off.png
+  cp assetgen/out/hud_star/hud_star_on.png assets/art/hud_star/hud_star_on.png
+assets_snippet: |
+  hud_star_off: A+'art/hud_star/hud_star_off.png',
+  hud_star_on: A+'art/hud_star/hud_star_on.png',
+pose_verify: "cook2.html?pose=key:hud_star_off&bg=grid&zoom=2&freeze=1&nocache"

@@ -1,0 +1,10 @@
+id: cust_man_nose
+date: 2026-09-05
+game_keys:
+  man_nose: cust_man_nose.png
+seed: 52301
+copy_as: |
+  cp assetgen/out/cust_man_nose/cust_man_nose.png assets/art/cust_man_nose/cust_man_nose.png
+assets_snippet: |
+  man_nose: A+'art/cust_man_nose/cust_man_nose.png',
+pose_verify: "cook2.html?pose=key:man_nose&bg=grid&zoom=2&freeze=1&nocache"

@@ -1,0 +1,15 @@
+id: cust_woman_head
+date: 2026-09-05
+game_keys:
+  woman_head_front: cust_woman_head_front.png
+  woman_head_side: cust_woman_head_side.png
+seed: 52022
+bg: solid bright green
+cutout: key
+copy_as: |
+  cp assetgen/out/cust_woman_head/cust_woman_head_front.png assets/art/cust_woman_head/cust_woman_head_front.png
+  cp assetgen/out/cust_woman_head/cust_woman_head_side.png assets/art/cust_woman_head/cust_woman_head_side.png
+assets_snippet: |
+  woman_head_front: A+'art/cust_woman_head/cust_woman_head_front.png',
+  woman_head_side: A+'art/cust_woman_head/cust_woman_head_side.png',
+pose_verify: "cook2.html?pose=key:woman_head_front&bg=grid&zoom=2&freeze=1&nocache"
