@@ -2,16 +2,39 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <title>Cook Fever 3D — Fast Food Court</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Cook Fever">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#8fd8e8">
+<link rel="manifest" href="./manifest.webmanifest">
+<script>
+(function(){
+  function isUi(e){
+    var t=e.target;
+    if(!t||!t.closest)return false;
+    return !!t.closest('button,input,textarea,a,.overlay,.panel,#dbgPanel,#dbgToggle,#hud .hudRight');
+  }
+  function block(e){
+    if(e.touches&&e.touches.length>1)e.preventDefault();
+    else if(!isUi(e))e.preventDefault();
+  }
+  var o={passive:false,capture:true};
+  ['touchstart','touchmove','touchend','touchcancel','gesturestart','gesturechange','gestureend'].forEach(function(t){
+    document.addEventListener(t,block,o);
+  });
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{width:100%;height:100%;overflow:hidden}
+html,body{width:100%;height:100%;height:100dvh;overflow:hidden;overscroll-behavior:none;touch-action:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
 body{font-family:'Fredoka',system-ui,sans-serif;background:#8fd8e8;user-select:none;-webkit-user-select:none;touch-action:none}
-#game{position:fixed;inset:0;z-index:0}
-#game canvas{display:block}
+#game{position:fixed;inset:0;z-index:0;width:100vw;height:100dvh;touch-action:none;background:#8fd8e8}
+#game canvas{display:block;touch-action:none;-webkit-touch-callout:none}
 #fx{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:4}
 .fx{position:absolute;transform:translate(-50%,-50%);font-weight:700;color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.35);font-size:22px;white-space:nowrap}
 .fx.coin{color:#ffe066}
@@ -26,13 +49,13 @@ body{font-family:'Fredoka',system-ui,sans-serif;background:#8fd8e8;user-select:n
 .bubble.sad .bub{background:#fecaca}
 @keyframes wiggle{0%,100%{transform:rotate(-6deg)}50%{transform:rotate(6deg)}}
 
-#hud{position:fixed;top:10px;left:12px;right:12px;display:flex;justify-content:space-between;align-items:flex-start;z-index:5;pointer-events:none}
+#hud{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));left:calc(12px + env(safe-area-inset-left,0px));right:calc(12px + env(safe-area-inset-right,0px));display:flex;justify-content:space-between;align-items:flex-start;z-index:5;pointer-events:none}
 .pill{background:rgba(255,255,255,.93);border-radius:16px;padding:6px 14px;box-shadow:0 3px 0 rgba(0,0,0,.12);font-weight:600;color:#5b3a1e;display:flex;gap:8px;align-items:center;font-size:18px}
 #levelBadge{background:#ff8c42;color:#fff}
 #timer{font-size:26px;min-width:92px;text-align:center;font-variant-numeric:tabular-nums}
 #timer.low{color:#e11d48;animation:pulse .6s infinite}
 @keyframes pulse{50%{transform:scale(1.09)}}
-#hudCenter{display:flex;flex-direction:column;align-items:center;gap:6px}
+#hudCenter{display:flex;flex-direction:row;align-items:center;gap:8px}
 #starWrap{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.93);border-radius:16px;padding:5px 12px;box-shadow:0 3px 0 rgba(0,0,0,.12)}
 #starWrap .star{font-size:19px;color:#d8cfc2;filter:grayscale(1)}
 #starWrap .star.on{color:#ffb703;filter:none;text-shadow:0 2px 4px rgba(255,183,3,.5)}
@@ -62,8 +85,23 @@ button:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.15)}
 .stat{background:#fff4e0;border-radius:14px;padding:8px 16px;font-size:17px;color:#5b3a1e;font-weight:600}
 .btnRow{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:6px}
 .howto{margin:14px auto 20px;text-align:left;background:#fff8ec;border-radius:14px;padding:12px 16px;font-size:15px;color:#7a5c3e;line-height:1.8}
-#toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:rgba(43,26,63,.87);color:#fff;padding:10px 22px;border-radius:16px;font-size:16px;font-weight:500;z-index:8;opacity:0;transition:opacity .25s;pointer-events:none;max-width:92%;text-align:center}
-#dbgToggle{position:fixed;left:10px;bottom:10px;z-index:30;background:#1d2436;color:#cfe3ff;border:1px solid #3a4a75;border-radius:10px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer}
+@media (max-height:520px){
+  .panel{padding:14px 22px;border-radius:18px}
+  .panel h1{font-size:26px;margin-bottom:2px}
+  .panel .sub{font-size:14px;margin-bottom:6px}
+  .starsBig{font-size:34px;letter-spacing:6px;margin:2px 0}
+  .statRow{margin:6px 0 8px}
+  .howto{margin:6px auto 10px;padding:6px 12px;font-size:13px;line-height:1.45}
+  .iosHint{margin:6px auto 0;padding:6px 10px;font-size:12px}
+  .big{padding:10px 26px;font-size:20px}
+  .ghost{padding:8px 16px;font-size:16px}
+}
+@media (max-height:480px){
+  .howto{display:none}
+}
+#toast{position:fixed;bottom:calc(26px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:rgba(43,26,63,.87);color:#fff;padding:10px 22px;border-radius:16px;font-size:16px;font-weight:500;z-index:8;opacity:0;transition:opacity .25s;pointer-events:none;max-width:92%;text-align:center}
+.iosHint{margin:8px auto 0;max-width:36em;background:#eef6ff;color:#355a86;border-radius:12px;padding:8px 12px;font-size:13px;line-height:1.45;text-align:left}
+#dbgToggle{position:fixed;left:calc(10px + env(safe-area-inset-left,0px));bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:30;background:#1d2436;color:#cfe3ff;border:1px solid #3a4a75;border-radius:10px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer}
 #dbgPanel{position:fixed;left:10px;bottom:48px;z-index:30;background:#1d2436ee;color:#cfe3ff;border:1px solid #3a4a75;border-radius:14px;padding:12px 14px;font-size:13px;width:250px;display:none}
 #dbgPanel.open{display:block}
 #dbgPanel .row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center}
@@ -89,13 +127,14 @@ button:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.15)}
   <div class="hudRight">
     <div class="pill">🪙 <span id="coinText">0</span></div>
     <button class="iconbtn" id="muteBtn" title="Sound (M)">🔊</button>
+    <button class="iconbtn hidden" id="fsBtn" title="Fullscreen">⛶</button>
     <button class="iconbtn" id="pauseBtn" title="Pause (P)">⏸</button>
   </div>
 </div>
 
 <div id="toast"></div>
 
-<button id="dbgToggle">⏱ Debug</button>
+<button id="dbgToggle" class="hidden">⏱ Debug</button>
 <div id="dbgPanel">
   <b style="font-size:14px">Time-Travel Control</b>
   <div class="row">
@@ -126,6 +165,7 @@ button:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.15)}
       🍔 Drag finished dishes to the <b>matching customer</b> before patience runs out!<br>
       🔥 Don't let food burn — drag burnt food to the <b>trash</b>. Tap coins to collect tips!
     </div>
+    <p id="iosHint" class="iosHint hidden">📲 Full screen on iPhone: <b>Share → Add to Home Screen</b>, or rotate landscape and tap <b>Hide Toolbar</b>.</p>
     <div class="btnRow">
       <button class="big" id="playBtn">▶ Play</button>
       <button class="ghost" id="resetBtn">Reset progress</button>
@@ -163,6 +203,63 @@ button:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.15)}
 
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+/* ============================== shell: fullscreen where it works, viewport-fill on iPhone ============================== */
+const UA=navigator.userAgent||'';
+const isIPhone=/iPhone|iPod/.test(UA);
+const isStandalone=navigator.standalone===true||window.matchMedia('(display-mode: standalone)').matches;
+// iPhone Safari: Fullscreen API is not a real game-canvas fullscreen (video-only / no-op).
+const canFullscreen=!(isIPhone)&&!!(document.fullscreenEnabled||document.webkitFullscreenEnabled);
+function isFs(){ return !!(document.fullscreenElement||document.webkitFullscreenElement); }
+function fallbackIOSFullscreen(){
+  document.documentElement.classList.add('shell');
+  applySize();
+}
+function requestShell(){
+  fallbackIOSFullscreen();
+  if(isFs()||!canFullscreen) return;
+  // documentElement, not #game — HUD / overlays live outside #game
+  const el=document.documentElement;
+  const req=el.requestFullscreen||el.webkitRequestFullscreen||el.webkitRequestFullScreen;
+  if(!req) return;
+  try{
+    let p;
+    try{ p=req.call(el,{navigationUI:'hide'}); }
+    catch(_){ p=req.call(el); }
+    if(p&&typeof p.then==='function'){
+      p.then(()=>{
+        try{ screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape').catch(()=>{}); }catch(e){}
+        applySize();
+        syncFsButton();
+      }).catch(()=>fallbackIOSFullscreen());
+    }
+  }catch(_){ fallbackIOSFullscreen(); }
+}
+function exitShell(){
+  const ex=document.exitFullscreen||document.webkitExitFullscreen;
+  if(ex&&isFs()){ try{ const p=ex.call(document); if(p&&p.catch)p.catch(()=>{}); }catch(_){ } }
+}
+function syncFsButton(){
+  const btn=$('fsBtn');
+  if(!btn) return;
+  if(isStandalone){ btn.classList.add('hidden'); return; }
+  btn.classList.remove('hidden');
+  if(isIPhone){
+    btn.textContent='📲';
+    btn.title='Add to Home Screen';
+  }else{
+    btn.textContent=isFs()?'🗗':'⛶';
+    btn.title=isFs()?'Exit fullscreen':'Fullscreen';
+  }
+}
+function onFsButton(){
+  if(isIPhone){
+    toast('Share → Add to Home Screen for a chrome-free game. Or landscape + Hide Toolbar.', 4200);
+    return;
+  }
+  if(isFs()) exitShell();
+  else requestShell();
+}
 
 /* ============================== helpers ============================== */
 const $ = id => document.getElementById(id);
@@ -257,14 +354,35 @@ const Music={
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x9be2ef);
 const camera=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,.1,100);
-camera.position.set(0,10.5,13.0);
-camera.lookAt(0,.7,.4);
+camera.position.set(0,8.0,9.5);
+camera.lookAt(0,.8,-.5);
 const renderer=new THREE.WebGLRenderer({antialias:true});
-renderer.setSize(innerWidth,innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 renderer.shadowMap.enabled=true;
 renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 $('game').appendChild(renderer.domElement);
+renderer.domElement.style.touchAction='none';
+
+function applySize(){
+  const vv=window.visualViewport;
+  const w=Math.max(1,Math.round((vv&&vv.width)||innerWidth));
+  const h=Math.max(1,Math.round((vv&&vv.height)||innerHeight));
+  camera.aspect=w/h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w,h);
+  const canvas=renderer.domElement;
+  const left=Math.round((vv&&vv.offsetLeft)||0);
+  const top=Math.round((vv&&vv.offsetTop)||0);
+  canvas.style.position='fixed';
+  canvas.style.left=left+'px';
+  canvas.style.top=top+'px';
+  canvas.style.right='auto';
+  canvas.style.bottom='auto';
+  canvas.style.width=w+'px';
+  canvas.style.height=h+'px';
+}
+function canvasRect(){ return renderer.domElement.getBoundingClientRect(); }
+applySize();
 
 scene.add(new THREE.HemisphereLight(0xcfefff,0xffd9a8,.95));
 const sun=new THREE.DirectionalLight(0xfff3d6,1.35);
@@ -321,17 +439,21 @@ function menuBoard(){
 }
 menuBoard();
 
-// counter (narrowed + shifted right so the trash can has open floor beside it)
+// counter — narrowed & centered so trash has clear floor on left
 const SURF=1.17;
-box(12,1.05,1.3,0xf4f6f8,.4,.55,2.2,scene,true);
-box(12.4,.14,1.6,0xffffff,.4,SURF-.07,2.2,scene,false);
-box(12,.18,.03,0xffd166,.4,.8,3.03,scene,false);
+const COUNTER_W=10;
+const COUNTER_X=0.9;
+box(COUNTER_W,1.05,1.3,0xf4f6f8,COUNTER_X,.55,2.2,scene,true);
+box(COUNTER_W+0.4,.14,1.6,0xffffff,COUNTER_X,SURF-.07,2.2,scene,false);
+box(COUNTER_W,.18,.03,0xffd166,COUNTER_X,.8,3.03,scene,false);
 
 // plate / assembly spot
 const plateGroup=new THREE.Group();plateGroup.position.set(5.0,SURF,2.2);scene.add(plateGroup);
 cyl(1.05,1.05,.05,0xffe08a,0,.02,0,plateGroup).castShadow=false;
 const plateBase=cyl(.95,.55,.14,0xffffff,0,.09,0,plateGroup);
 plateBase.userData.target='plate';
+const plateHit=new THREE.Mesh(new THREE.BoxGeometry(2.0,1.4,2.0),new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false}));
+plateHit.position.set(0,.4,0);plateHit.userData.target='plate';plateGroup.add(plateHit);
 const PLATE_TOP=.16;
 const SLOTS=[
   new THREE.Vector3(-.42,PLATE_TOP+.05,.2),
@@ -339,14 +461,14 @@ const SLOTS=[
   new THREE.Vector3(.42,PLATE_TOP+.05,.2)
 ];
 
-// trash (in open floor space left of the counter, no longer clipping it)
-const trash=new THREE.Group();trash.position.set(-6.4,0,2.9);scene.add(trash);
+// trash — in open floor left of counter (counter now ends ~ -4.1, trash at -6.2 leaves ~1m gap)
+const trash=new THREE.Group();trash.position.set(-6.3,0,2.9);scene.add(trash);
 const trashCan=cyl(.55,.45,.9,0x8d99ae,0,.45,0,trash);
 cyl(.6,.6,.06,0x5b6675,0,.93,0,trash);
 const trashHit=new THREE.Mesh(new THREE.BoxGeometry(1.6,1.5,1.6),new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false}));
 trashHit.position.y=.6;trashHit.userData.target='trash';trash.add(trashHit);
 
-// bun tray
+// bun tray — infinite supply (replenishes after taken)
 const tray=new THREE.Group();tray.position.set(-3.3,0,-3.5);scene.add(tray);
 box(1.1,.08,.9,0xd9a05b,0,.82,0,tray);
 [[-.45,-.35],[.45,-.35],[-.45,.35],[.45,.35]].forEach(p=>box(.08,.78,.08,0xb07d3f,p[0],.39,p[1],tray));
@@ -357,9 +479,18 @@ function makeBun(){
   g.userData.part='bun';g.userData.dragKind='bun';
   return g;
 }
-const trayBuns=[[-.25,.9,.12],[0,.9,-.2],[.25,.9,.15]].map(p=>{
-  const b=makeBun();b.position.set(p[0],p[1],p[2]);b.userData.home=b.position.clone();tray.add(b);return b;
-});
+const BUN_HOMES=[new THREE.Vector3(-.25,.9,.12),new THREE.Vector3(0,.9,-.2),new THREE.Vector3(.25,.9,.15)];
+function spawnBunAt(home){
+  const b=makeBun();b.position.copy(home);b.userData.home=home.clone();tray.add(b);return b;
+}
+BUN_HOMES.forEach(h=>spawnBunAt(h));
+function replenishBun(home){
+  setTimeout(()=>{
+    // keep 3 buns visible — only spawn if slot is free
+    const occupied=tray.children.some(o=>o.userData&&o.userData.home&&o.userData.home.distanceTo(home)<0.01);
+    if(!occupied){ spawnBunAt(home); refreshPickables(); }
+  },650);
+}
 
 /* ============================== machines ============================== */
 const DISH={
@@ -374,27 +505,25 @@ const cRawCheese=new THREE.Color(0xffd166),cDoneCheese=new THREE.Color(0xf4a300)
 class Machine{
   constructor(kind,x){
     this.kind=kind;
-    this.state='idle';       // idle | cooking | ready | burnt
-    this.food=null;          // patty/cheese/fries mesh currently ON this machine (or null)
+    this.state='idle';       // idle | cooking | ready | burnt | empty | held
     this.t=0;                // cooking progress (0..time)
     this.readyT=0;           // time spent in 'ready'
-    this.item=null;          // reusable container (fryer basket / soda glass)
-    this.hitMesh=null;       // invisible pick/click volume over the station
-    this.itemPos=new THREE.Vector3(0,0,0); // home position of the container in this.group
+    this.item=null;          // draggable mesh/group currently ON this machine (or null if empty/held)
+    this.hitMesh=null;       // pick volume for the food item
+    this.itemPos=new THREE.Vector3(0,0,0);
     this.cfg={
-      stove:{item:'patty',time:3.2,burn:5},
-      grill:{item:'cheese',time:2.6,burn:5},
-      fryer:{item:'fries',time:3.8,burn:5},
-      drinker:{item:'soda',time:3.0,burn:7},
+      stove:{item:'patty',time:3.2,burn:5,grabY:0},
+      grill:{item:'cheese',time:2.6,burn:5,grabY:0},
+      fryer:{item:'fries',time:3.8,burn:5,grabY:0},
+      drinker:{item:'soda',time:3.0,burn:Infinity,grabY:1.0},
     }[kind];
     this.group=new THREE.Group();this.group.position.set(x,0,-3.5);scene.add(this.group);
     this.build();
-    // progress bar
-    const bg=new THREE.Mesh(new THREE.BoxGeometry(1,.13,.05),M(0xffffff,{transparent:true,opacity:.85}));
-    bg.position.set(0,2.9,1.0);this.group.add(bg);
-    const fgeo=new THREE.BoxGeometry(.92,.09,.04);fgeo.translate(.46,0,0);
+    this.barBg=new THREE.Mesh(new THREE.BoxGeometry(2,.26,.05),M(0xffffff,{transparent:true,opacity:.85}));
+    this.barBg.position.set(0,2.9,1.0);this.barBg.visible=false;this.group.add(this.barBg);
+    const fgeo=new THREE.BoxGeometry(1.84,.18,.04);fgeo.translate(.92,0,0);
     this.fill=new THREE.Mesh(fgeo,M(0x4ade80));
-    this.fill.position.set(-.46,2.9,1.02);this.fill.scale.x=.001;this.group.add(this.fill);
+    this.fill.position.set(-.92,2.9,1.02);this.fill.scale.x=.001;this.fill.visible=false;this.group.add(this.fill);
     machineList.push(this);
   }
   build(){
@@ -409,8 +538,8 @@ class Machine{
       box(1.15,.09,.16,0x232833,1.05,1.25,0,g); // pan handle
       const panRim=cyl(.7,.7,.03,0x3a3f4a,-.35,1.315,0,g);
       // patty (sits ON the pan, clearly visible) — the food mesh lives on the machine until used
-      this.food=this._makePatty();
-      this.food.userData.part='patty';
+      this.patty=cyl(.5,.52,.22,0xc47a52,-.35,1.44,0,g);
+      this.patty.visible=false;this.patty.userData.part='patty';
       // burner flames: ring of short cones UNDER the pan
       this.flames=[];
       for(let i=0;i<8;i++){
@@ -491,9 +620,22 @@ class Machine{
     }
     this.hitMesh.userData.machine=this;
     this.bodyMeshes.forEach(m=>m.userData.machine=this);
+    // drop zone for returning half-cooked items (invisible, larger than food)
+    this.dropHit=new THREE.Mesh(new THREE.BoxGeometry(1.7,1.2,1.5), new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false}));
+    this.dropHit.position.set(this.kind==='stove'?-0.1:0,1.15, this.kind==='drinker'?0.3:0);
+    this.dropHit.userData.machine=this;
+    this.dropHit.userData.isDropHit=true;
+    this.group.add(this.dropHit);
+    // Generous invisible tap volume — stations sit at the back of the 3D view
+    // and body meshes alone are easy to miss on a phone.
+    const tapW=this.kind==='drinker'?2.2:2.7;
+    const tapH=this.kind==='drinker'?3.0:2.8;
+    this.tapHit=new THREE.Mesh(new THREE.BoxGeometry(tapW,tapH,2.4),new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false}));
+    this.tapHit.position.set(this.kind==='stove'?-.2:0, tapH/2, this.kind==='drinker'?.35:0);
+    this.tapHit.userData.machine=this;
+    this.group.add(this.tapHit);
   }
   makeItem(){
-    // fresh food mesh so the machine can cook again after its item moved to the plate
     if(this.kind==='stove'){
       const p=cyl(.5,.52,.22,0xc47a52,-.35,1.44,0,this.group);
       p.visible=false;p.userData.part='patty';
@@ -507,12 +649,66 @@ class Machine{
     return null;
   }
   start(){
+    if(this.state==='empty' || this.state==='held'){
+      // a half-cooked item was removed — start fresh batch
+      this.resetToIdle();
+    }
     if(this.state!=='idle')return;
-    this.state='cooking';this.t=0;AudioSys.sfx.cook();
-    if(this.kind==='fryer')this.fries.visible=true;
+    this.state='cooking';this.t=0;this.readyT=0;AudioSys.sfx.cook();
+    if(this.kind==='fryer'){ this.fries.visible=true; this.fries.scale.y=.15; this.friesMeshes.forEach(f=>f.material.color.setHex(0xffd166)); }
     else if(this.kind==='stove'){this.patty.visible=true;this.patty.material.color.copy(cRawPatty);}
-    else if(this.kind==='grill'){this.cheese.visible=true;this.cheese.material.color.copy(cRawCheese);this.cheese.scale.set(1,1,1);}
+    else if(this.kind==='grill'){this.cheese.visible=true;this.cheese.material.color.copy(cRawCheese);this.cheese.scale.set(1,1,1); this.melt=0;}
+    else if(this.kind==='drinker'){ this.liquid.scale.y=.001; this.liquid.material.color.setHex(0xe63946); this.straw.visible=false; }
     this.applyItem(0);
+    refreshPickables();
+  }
+  // detach item for dragging — retains cook progress on the mesh, machine becomes 'held'
+  takeForDrag(){
+    const mesh=this.item;
+    if(!mesh) return null;
+    // stash cook state on the mesh itself for floor / resume
+    mesh.userData.cookT=this.t;
+    mesh.userData.cookState=this.state; // cooking | ready | burnt
+    mesh.userData.burnt=(this.state==='burnt');
+    mesh.userData.progress=clamp(this.t/this.cfg.time,0,1);
+    mesh.userData.machineKind=this.kind;
+    mesh.userData.machineRef=this;
+    // for grill keep melt
+    if(this.kind==='grill') mesh.userData.melt=this.melt;
+    this.prevState=this.state;
+    this.state='held';
+    // detach from machine group to scene — caller will scene.attach
+    // keep visibility
+    this.item=null;
+    this.hitMesh=null;
+    if(this.kind==='stove') this.patty=null;
+    if(this.kind==='grill') this.cheese=null;
+    // hide progress visuals while held (will restore on putBack)
+    refreshPickables();
+    return mesh;
+  }
+  // put a half-cooked mesh back onto this station and resume
+  putBack(mesh){
+    // reattach
+    this.group.attach(mesh);
+    mesh.position.copy(this.itemPos);
+    mesh.rotation.set(0,0,0);
+    mesh.scale.setScalar(1);
+    if(mesh.material&&mesh.material.emissive) mesh.material.emissive.setHex(0);
+    this.item=mesh;
+    this.hitMesh=mesh;
+    mesh.userData.machine=this;
+    // restore state & t from mesh userdata (or default to cooking)
+    const st=mesh.userData.cookState||'cooking';
+    const wasBurnt=!!mesh.userData.burnt;
+    this.t = (mesh.userData.cookT!=null? mesh.userData.cookT : 0);
+    if(wasBurnt){ this.state='burnt'; this.readyT=this.cfg.burn+0.1; this.applyBurnt(); }
+    else if(st==='ready'){ this.state='ready'; this.readyT=0; this.applyItem(1); if(this.kind==='drinker') this.straw.visible=true; }
+    else if(st==='cooking'){ this.state='cooking'; this.applyItem(clamp(this.t/this.cfg.time,0,1)); }
+    else { this.state='ready'; this.applyItem(1); }
+    if(this.kind==='grill' && mesh.userData.melt!=null) this.melt=mesh.userData.melt;
+    // clean temp userdata
+    delete mesh.userData.cookT; delete mesh.userData.cookState; delete mesh.userData.burnt; delete mesh.userData.progress; delete mesh.userData.machineKind; delete mesh.userData.machineRef;
     refreshPickables();
   }
   update(dt){
@@ -528,89 +724,139 @@ class Machine{
       }
     }
     else if(this.state==='ready'){
-      this.readyT+=dt;
-      const s=1+Math.sin(this.readyT*6)*.06;
-      if(this.kind==='fryer')this.item.scale.set(s,1,s);
-      else if(this.kind==='grill')this.item.scale.y=Math.max(.45,1-.5*this.melt)*s; // pulse, keep melt
-      else this.item.scale.setScalar(s);
-      if(this.kind==='fryer'){
-        this.bubbles.forEach((b,i)=>{b.visible=this.state==='cooking';b.position.y=1.28+Math.abs(Math.sin(this.t*10+i*2))*.08;});
-      }
-      if(this.readyT>this.cfg.burn){
-        this.state='burnt';
-        this.applyBurnt();
-        AudioSys.sfx.burn();
-        const wp=new THREE.Vector3();this.hitMesh.getWorldPosition(wp);
-        spawnSmoke(wp);
-        refreshPickables();
+      // drink never burns — hold indefinitely
+      if(this.cfg.burn===Infinity){
+        const s=1+Math.sin(this.readyT*6)*.03;
+        // gentle pulse but no burn transition
+        if(this.kind==='fryer') this.item.scale.set(s,1,s);
+        else if(this.item) this.item.scale.setScalar(s);
+        this.readyT+=dt;
+        // keep fries bubbles hidden when ready (only while cooking)
+      } else {
+        this.readyT+=dt;
+        const s=1+Math.sin(this.readyT*6)*.06;
+        if(this.kind==='fryer')this.item.scale.set(s,1,s);
+        else if(this.kind==='grill')this.item.scale.y=Math.max(.45,1-.5*this.melt)*s;
+        else if(this.item) this.item.scale.setScalar(s);
+        if(this.readyT>this.cfg.burn){
+          this.state='burnt';
+          this.applyBurnt();
+          AudioSys.sfx.burn();
+          const wp=new THREE.Vector3();(this.hitMesh||this.dropHit).getWorldPosition(wp);
+          spawnSmoke(wp);
+          refreshPickables();
+        }
       }
     }
-    if(this.kind==='stove'){
-      const cook=this.state==='cooking';
-      this.flames.forEach(f=>{f.visible=cook;});
-      if(cook)this.flames.forEach((f,i)=>{f.scale.y=.6+Math.random()*.7;});
-      if(this.steam)this.steam.forEach((s,i)=>{
-        s.visible=cook;
-        if(cook){
+    // visuals that run only while cooking
+    this.barBg.visible=(this.state==='cooking');
+    this.fill.visible=(this.state==='cooking');
+    if(this.state==='cooking'){
+      if(this.kind==='stove'){
+        this.flames.forEach(f=>{f.visible=true;});
+        this.flames.forEach((f,i)=>{f.scale.y=.6+Math.random()*.7;});
+        if(this.steam) this.steam.forEach((s,i)=>{
+          s.visible=true;
           const ph=(G.elapsed*1.4+i/3)%1;
           s.position.set(-.35+Math.sin(i*2.1+G.elapsed)*.28,1.62+ph*.55,Math.cos(i*2.7)*.2);
           s.scale.setScalar(.35+ph*.6);
           s.material.opacity=.5*(1-ph);
-        }
-      });
-    }
-    if(this.kind==='grill'){
-      if(this.coal){
-        if(this.state==='cooking'){
-          this.melt=Math.min(1,this.melt+dt/this.cfg.time);
-          this.coal.material.color.setHex(0xb3401a);
-        }
-        else this.coal.material.color.setHex(0x3a3f4a);
+        });
       }
-    }
-    if(this.kind==='fryer'&&this.state==='cooking'){
-      this.bubbles.forEach((b,i)=>{b.visible=true;b.position.y=1.28+Math.abs(Math.sin(this.t*10+i*2))*.08;});
+      if(this.kind==='grill' && this.coal){
+        this.melt=Math.min(1,this.melt+dt/this.cfg.time);
+        this.coal.material.color.setHex(0xb3401a);
+      }
+      if(this.kind==='fryer'){
+        this.bubbles.forEach((b,i)=>{b.visible=true;b.position.y=1.28+Math.abs(Math.sin(this.t*10+i*2))*.08;});
+      }
+    } else {
+      if(this.kind==='stove'){
+        const cook=this.state==='cooking';
+        this.flames.forEach(f=>f.visible=cook);
+        if(this.steam) this.steam.forEach(s=>s.visible=cook);
+      }
+      if(this.kind==='grill' && this.coal && this.state!=='cooking'){
+        this.coal.material.color.setHex(0x3a3f4a);
+      }
+      if(this.kind==='fryer' && this.state!=='cooking'){
+        this.bubbles.forEach(b=>b.visible=false);
+      }
     }
   }
   applyItem(p){
     this.fill.scale.x=Math.max(.001,p);
     switch(this.kind){
-      case 'stove':this.patty.material.color.lerpColors(cRawPatty,cDonePatty,clamp(p,0,1));break;
+      case 'stove':if(this.patty) this.patty.material.color.lerpColors(cRawPatty,cDonePatty,clamp(p,0,1));break;
       case 'grill':{
         const mel=clamp(p*1.15,0,1);
         this.melt=mel;
-        this.cheese.material.color.lerpColors(cRawCheese,cDoneCheese,mel);
-        this.cheese.scale.set(1+.4*mel,Math.max(.45,1-.5*mel),1+.4*mel); // melt & spread
+        if(this.cheese){ this.cheese.material.color.lerpColors(cRawCheese,cDoneCheese,mel); this.cheese.scale.set(1+.4*mel,Math.max(.45,1-.5*mel),1+.4*mel); }
         break;
       }
       case 'fryer':{
         const pop=p<.65?.15:lerp(.15,1,(p-.65)/.35);
-        this.fries.scale.y=pop;break;
+        if(this.fries) this.fries.scale.y=pop;break;
       }
-      case 'drinker':this.liquid.scale.y=Math.max(.001,p);break;
+      case 'drinker':if(this.liquid) this.liquid.scale.y=Math.max(.001,p);break;
     }
   }
   applyBurnt(){
     switch(this.kind){
-      case 'stove':this.patty.material.color.setHex(0x241a12);break;
-      case 'grill':this.cheese.material.color.setHex(0x4a3018);this.melt=1;this.cheese.scale.set(1.3,.5,1.3);break;
+      case 'stove':if(this.patty) this.patty.material.color.setHex(0x241a12);break;
+      case 'grill':if(this.cheese){ this.cheese.material.color.setHex(0x4a3018);this.melt=1;this.cheese.scale.set(1.3,.5,1.3);}break;
       case 'fryer':this.friesMeshes.forEach(f=>f.material.color.setHex(0x6b4a1f));break;
-      case 'drinker':this.liquid.material.color.setHex(0x7f5539);break;
+      case 'drinker':if(this.liquid) this.liquid.material.color.setHex(0x7f5539);break;
     }
   }
   resetToIdle(){
-    this.state='idle';this.t=0;this.readyT=0;this.fill.scale.x=.001;
+    // force machine to idle with a fresh invisible item (if stove/grill, mint new one)
+    // remove any lingering held/empty state
+    this.state='idle';this.t=0;this.readyT=0;this.prevState=null;this.fill.scale.x=.001;
+    // detach any stray item that might still be attached (should not happen)
+    // for stove/grill, replace the consumed mesh with a fresh hidden one
     switch(this.kind){
-      case 'stove':this.patty.visible=false;this.patty.material.color.copy(cRawPatty);this.flames.forEach(f=>f.visible=false);if(this.steam)this.steam.forEach(s=>s.visible=false);break;
-      case 'grill':this.cheese.visible=false;this.cheese.material.color.copy(cRawCheese);this.cheese.scale.set(1,1,1);this.melt=0;if(this.coal)this.coal.material.color.setHex(0x3a3f4a);break;
-      case 'fryer':this.fries.visible=false;this.fries.scale.y=.15;this.friesMeshes.forEach(f=>f.material.color.setHex(0xffd166));this.bubbles.forEach(b=>b.visible=false);break;
-      case 'drinker':this.liquid.scale.y=.001;this.liquid.material.color.setHex(0xe63946);this.straw.visible=false;break;
+      case 'stove':{
+        if(this.patty && this.patty.parent === this.group) this.patty.parent.remove(this.patty);
+        const p=cyl(.5,.52,.22,0xc47a52,-.35,1.44,0,this.group);
+        p.visible=false;p.userData.part='patty';p.userData.machine=this;
+        this.patty=p;this.item=p;this.hitMesh=p; this.flames.forEach(f=>f.visible=false);if(this.steam) this.steam.forEach(s=>s.visible=false);
+        break;
+      }
+      case 'grill':{
+        if(this.cheese && this.cheese.parent === this.group) this.cheese.parent.remove(this.cheese);
+        const q=box(.72,.2,.56,0xffd166,0,1.33,0,this.group);
+        q.visible=false;q.userData.part='cheese';q.userData.machine=this;
+        this.cheese=q;this.item=q;this.hitMesh=q; this.melt=0;if(this.coal) this.coal.material.color.setHex(0x3a3f4a);
+        break;
+      }
+      case 'fryer':{
+        if(this.fries.parent !== this.group) this.group.attach(this.fries);
+        this.fries.visible=false;this.fries.scale.set(1,1,1);this.fries.scale.y=.15;
+        this.fries.position.copy(this.itemPos); this.fries.rotation.set(0,0,0);
+        this.friesMeshes.forEach(f=>f.material.color.setHex(0xffd166));
+        this.bubbles.forEach(b=>b.visible=false);
+        this.item=this.fries;
+        // food hit is the invisible box (not the dropHit)
+        const foodHit=this.group.children.find(o=>o.userData&&o.userData.machine&&o.geometry&&o.geometry.type==='BoxGeometry'&&!o.userData.isDropHit);
+        this.hitMesh=foodHit||this.fries;
+        if(this.hitMesh) this.hitMesh.userData.machine=this;
+        break;
+      }
+      case 'drinker':{
+        if(this.glassG.parent !== this.group) this.group.attach(this.glassG);
+        this.glassG.position.copy(this.itemPos); this.glassG.rotation.set(0,0,0); this.glassG.scale.setScalar(1);
+        this.liquid.scale.y=.001;this.liquid.material.color.setHex(0xe63946);this.straw.visible=false;
+        this.item=this.glassG;
+        const drinkHit=this.group.children.find(o=>o.userData&&o.userData.machine&&o.geometry&&o.geometry.type==='BoxGeometry'&&!o.userData.isDropHit);
+        this.hitMesh=drinkHit||this.glassG;
+        if(this.hitMesh) this.hitMesh.userData.machine=this;
+        break;
+      }
     }
-    this.group.attach(this.item);
-    this.item.position.copy(this.itemPos);
-    this.item.rotation.set(0,0,0);
-    this.item.scale.setScalar(1);
-    if(this.item.material&&this.item.material.emissive)this.item.material.emissive.setHex(0);
+    if(this.dropHit) this.dropHit.userData.machine=this;
+    if(this.hitMesh) this.hitMesh.userData.machine=this;
+    if(this.item && this.item.material && this.item.material.emissive) this.item.material.emissive.setHex(0);
   }
 }
 new Machine('stove',-5);
@@ -620,11 +866,13 @@ new Machine('drinker',4.6);
 
 /* ============================== plate state ============================== */
 const plate={items:[],dish:null,dishMesh:null};
-function clearPlate(hard){
+function clearPlate(){
   if(plate.dishMesh){scene.remove(plate.dishMesh);plate.dishMesh=null;}
-  plate.items.forEach(i=>{
-    if(i.mesh.parent)scene.remove(i.mesh);
-  });
+  plate.items.forEach(i=>{ if(i.mesh.parent) scene.remove(i.mesh); });
+  // Also remove any stale assembled group left on the plate if bookkeeping was interrupted.
+  for(const child of plateGroup.children.slice()){
+    if(child!==plateBase && child.userData && (child.userData.dragKind||child.userData.part)) plateGroup.remove(child);
+  }
   plate.items.length=0;plate.dish=null;
 }
 function assembleBurger(){
@@ -645,6 +893,8 @@ function assembleBurger(){
     const topHemi=bun.children.find(c=>c.userData.isTop);
     if(topHemi)tween(topHemi,new THREE.Vector3(0,.86,0),.4);
   }
+  const burgerHit=new THREE.Mesh(new THREE.BoxGeometry(1.4,1.2,1.4),new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false}));
+  burgerHit.position.set(0,0.5,0);g.add(burgerHit);
   plate.dish='burger';plate.dishMesh=g;
   AudioSys.sfx.ding();
   refreshPickables();
@@ -660,7 +910,7 @@ const G={
   state:'menu',level:1,cfg:null,
   coins:0,score:0,served:0,lost:0,
   time:0,elapsed:0,spawnIdx:0,nextSpawnAt:0,queue:[],
-  customers:[],piles:[],drag:null,dragTarget:null,pending:null,
+  customers:[],piles:[],floorItems:[],drag:null,dragTarget:null,pending:null,
 };
 function levelConfig(n){
   const goal=Math.min(5+n,13);
@@ -759,9 +1009,9 @@ function updateCustomer(c,dt){
   }
   else if(c.state==='exiting'){
     c.leaveT+=dt;
+    c.mesh.rotation.y=lerp(c.mesh.rotation.y,0,dt*8);
     c.mesh.position.z+=dt*3.4;
-    c.mesh.scale.setScalar(Math.max(.001,1-c.leaveT*1.1));
-    if(c.leaveT>.95)c.dead=true;
+    if(c.mesh.position.z>7.6)c.dead=true;
   }
   else if(c.state==='leaving'){
     c.leaveT+=dt;
@@ -770,25 +1020,9 @@ function updateCustomer(c,dt){
     if(c.mesh.position.z>7.6)c.dead=true;
   }
 }
-// machine's food was consumed (served / placed on plate): make the machine usable again
+// machine's food was consumed (served / placed on plate / trashed): machine becomes idle with fresh hidden item
 function machineRefill(m){
-  m.state='idle';m.t=0;m.readyT=0;m.fill.scale.x=.001;
-  if(m.kind==='stove'||m.kind==='grill'){
-    // the food was used up: the old mesh now lives on the plate (leave it be),
-    // mint a fresh one for the machine to cook the next round
-    const fresh=m.makeItem();
-    m.item=fresh;m.hitMesh=fresh;fresh.userData.machine=m;
-    if(m.kind==='stove'){m.patty=fresh;m.flames.forEach(f=>f.visible=false);if(m.steam)m.steam.forEach(s=>s.visible=false);}
-    else{m.cheese=fresh;m.melt=0;if(m.coal)m.coal.material.color.setHex(0x3a3f4a);}
-  }
-  else{
-    // reusable container (fries basket / soda glass): hand it back to the machine
-    m.group.attach(m.item);
-    m.item.position.copy(m.itemPos);
-    m.item.rotation.set(0,0,0);m.item.scale.setScalar(1);
-    if(m.kind==='fryer'){m.fries.visible=false;m.fries.scale.y=.15;m.friesMeshes.forEach(f=>f.material.color.setHex(0xffd166));m.bubbles.forEach(b=>b.visible=false);}
-    if(m.kind==='drinker'){m.liquid.scale.y=.001;m.liquid.material.color.setHex(0xe63946);m.straw.visible=false;}
-  }
+  m.resetToIdle();
   refreshPickables();
 }
 function serve(c,kind,mesh,d){
@@ -860,11 +1094,12 @@ function floatText(x,y,z,txt,cls=''){
   floats.push({el,x,y,z,t:0});
 }
 function updateFloats(dt){
+  const r=canvasRect();
   for(let i=floats.length-1;i>=0;i--){
     const f=floats[i];f.t+=dt;
     const v=new THREE.Vector3(f.x,f.y+f.t*.9,f.z).project(camera);
-    f.el.style.left=((v.x*.5+.5)*innerWidth)+'px';
-    f.el.style.top=((-v.y*.5+.5)*innerHeight)+'px';
+    f.el.style.left=(r.left+(v.x*.5+.5)*r.width)+'px';
+    f.el.style.top=(r.top+(-v.y*.5+.5)*r.height)+'px';
     f.el.style.opacity=String(1-Math.max(0,f.t-.55)/.5);
     if(f.t>1.1){f.el.remove();floats.splice(i,1);}
   }
@@ -909,85 +1144,347 @@ function updatePiles(dt){
   }
 }
 
-/* ============================== pickables / input ============================== */
+/* ============================== pickables / input / floor ============================== */
+const FLOOR_Y=0.18;
 const dragMeshes=[],startMeshes=[],coinMeshes=[];
 function refreshPickables(){
   dragMeshes.length=0;startMeshes.length=0;coinMeshes.length=0;
   for(const m of machineList){
-    if(m.state==='ready'||m.state==='burnt')dragMeshes.push(m.hitMesh);
-    else if(m.state==='idle')startMeshes.push(...m.bodyMeshes);
+    if(m.item && (m.state==='cooking'||m.state==='ready'||m.state==='burnt')){
+      if(m.tapHit) dragMeshes.push(m.tapHit);
+      dragMeshes.push(m.hitMesh||m.item);
+      dragMeshes.push(...m.bodyMeshes);
+    }
+    if(m.state==='idle'||m.state==='empty'){
+      if(m.tapHit) startMeshes.push(m.tapHit);
+      startMeshes.push(...m.bodyMeshes);
+    }
   }
-  trayBuns.forEach(b=>dragMeshes.push(b));
-  plate.items.forEach(i=>i.mesh.userData.dragKind=i.kind);
-  plate.items.forEach(i=>dragMeshes.push(i.mesh));
-  if(plate.dishMesh)dragMeshes.push(plate.dishMesh);
+  tray.children.forEach(ch=>{ if(ch.userData&&ch.userData.dragKind==='bun') dragMeshes.push(ch); });
+  plate.items.forEach(i=>{ i.mesh.userData.dragKind=i.kind; dragMeshes.push(i.mesh); });
+  if(plate.dishMesh) dragMeshes.push(plate.dishMesh);
+  G.floorItems.forEach(f=>dragMeshes.push(f.mesh));
   G.piles.forEach(p=>coinMeshes.push(p.el));
 }
 
+const DRAG_Y=1.35;
 const ray=new THREE.Raycaster();
 const ndc=new THREE.Vector2();
-const dragPlane=new THREE.Plane(new THREE.Vector3(0,1,0),-1.4);
-const DRAG_Y=1.75;
-function setNDC(e){
-  ndc.x=(e.clientX/innerWidth)*2-1;
-  ndc.y=-(e.clientY/innerHeight)*2+1;
+const dragPlane=new THREE.Plane(new THREE.Vector3(0,1,0),-DRAG_Y);
+function dragPosition(){
+  ray.setFromCamera(ndc,camera);
+  const p=new THREE.Vector3();
+  return ray.ray.intersectPlane(dragPlane,p)?p:null;
 }
+function safeFloorPosition(p){
+  const out=p.clone();
+  // Keep floor items in front of the counter and away from station bodies/trash.
+  const counterLeft=COUNTER_X-COUNTER_W/2-.7;
+  const counterRight=COUNTER_X+COUNTER_W/2+.7;
+  if(out.z>1.35&&out.z<3.15&&out.x>counterLeft&&out.x<counterRight) out.z=1.3;
+  for(const m of machineList){
+    if(Math.abs(out.z+3.5)<1.1&&Math.abs(out.x-m.group.position.x)<1.3){
+      out.z=-2.3;
+    }
+  }
+  if(Math.abs(out.z-2.9)<1.1&&Math.abs(out.x-trash.position.x)<1.5) out.x=trash.position.x+1.6;
+  return out;
+}
+function setNDC(e){
+  const r=canvasRect();
+  const w=r.width||1,h=r.height||1;
+  ndc.x=((e.clientX-r.left)/w)*2-1;
+  ndc.y=-((e.clientY-r.top)/h)*2+1;
+}
+function isUiTarget(el){
+  return !!(el&&el.closest&&el.closest('button,input,textarea,a,.overlay,.panel,#dbgPanel,#dbgToggle,#hud .hudRight'));
+}
+const TAP_THRESHOLD=28; // px — finger jitter on phones; below this is a tap
+let pendingDragObj=null,pendingDragX=0,pendingDragY=0;
+
 function onDown(e){
-  if(G.state!=='playing'||G.drag)return;
+  if(isUiTarget(e.target)) return;
+  if(e.cancelable) e.preventDefault();
+  if(G.state!=='playing'||G.drag) return;
   AudioSys.ensure();Music.start();
   setNDC(e);ray.setFromCamera(ndc,camera);
+  // If in selected mode, handle tap-to-place
+  if(G.selected){
+    handleSelectedTap(e);return;
+  }
   let hits=ray.intersectObjects(dragMeshes,true);
   if(hits.length){
-    const o=findAncestor(hits[0].object,n=>n.userData.machine||n.userData.dragKind);
-    if(o){startDrag(o);return;}
+    const o=findAncestor(hits[0].object,n=>n.userData.machine||n.userData.dragKind||n.userData.isFloorItem);
+    if(o){ pendingDragObj=o;pendingDragX=e.clientX;pendingDragY=e.clientY;return; }
+    const direct=hits[0].object;
+    if(direct.userData&&direct.userData.isFloorItem){ pendingDragObj=direct;pendingDragX=e.clientX;pendingDragY=e.clientY;return; }
   }
   hits=ray.intersectObjects(coinMeshes,false);
-  if(hits.length){G.pending={type:'pile',pile:hits[0].object.userData.pile,x:e.clientX,y:e.clientY};return;}
+  if(hits.length){ G.pending={type:'pile',pile:hits[0].object.userData.pile,x:e.clientX,y:e.clientY}; return; }
   hits=ray.intersectObjects(startMeshes,false);
-  if(hits.length){G.pending={type:'start',m:hits[0].object.userData.machine,x:e.clientX,y:e.clientY};return;}
+  if(hits.length){
+    const m=hits[0].object.userData.machine;
+    if(m) m.start();
+  }
 }
-function startDrag(o){
+
+function handleSelectedTap(e){
+  setNDC(e);ray.setFromCamera(ndc,camera);
+  // Check if we tapped a valid target
+  const sel=G.selected;
+  const targets=[plateBase,plateHit,trashHit];
+  for(const m of machineList){ if(m.dropHit) targets.push(m.dropHit); }
+  for(const c of G.customers)if(c.state==='waiting')targets.push(c.hit);
+  const hits=ray.intersectObjects(targets,false);
+  const k=sel.kind;
+  const isMachKind=(mk,kk)=> (mk==='stove'&&kk==='patty')||(mk==='grill'&&kk==='cheese')||(mk==='fryer'&&kk==='fries')||(mk==='drinker'&&kk==='soda');
+  const h=hits.find(h=>{
+    const ud=h.object.userData;
+    if(ud.target==='plate')return isPart(k)&&!sel.burnt&&!plate.dish&&plate.items.length<3&&!plate.items.some(i=>i.kind===k);
+    if(ud.target==='trash')return true;
+    if(ud.isDropHit){
+      const m=ud.machine;
+      if(m.state!=='empty'&&m.state!=='held'&&m.state!=='idle') return false;
+      return isMachKind(m.kind,k);
+    }
+    return isComplete(k)&&!sel.burnt&&ud.customer&&ud.customer.dish===k;
+  });
+  if(h){
+    const ud=h.object.userData;
+    // Build a drag-like object for the drop functions
+    const d={kind:sel.kind,from:sel.from,mesh:sel.mesh,m:sel.m,burnt:sel.burnt,bunHome:sel.bunHome};
+    clearHighlights();
+    G.selected=null;
+    if(ud.target==='plate') placeOnPlate(d);
+    else if(ud.target==='trash') discard(d);
+    else if(ud.customer) serve(ud.customer,d.kind,d.mesh,d);
+    else if(ud.isDropHit && ud.machine){ clearHeldGlow(d); ud.machine.putBack(d.mesh); if(d.bunHome) replenishBun(d.bunHome); AudioSys.sfx.place(); }
+    refreshPickables();
+  } else {
+    // No valid target — cancel selection, drop to floor
+    cancelSelection();
+  }
+}
+
+function cancelSelection(){
+  const sel=G.selected;if(!sel)return;
+  G.selected=null;
+  clearHighlights();
+  // Drop to floor
+  const d={kind:sel.kind,from:sel.from,mesh:sel.mesh,m:sel.m,burnt:sel.burnt,cookingProgress:sel.cookingProgress,bunHome:sel.bunHome};
+  dropToFloor(d);
+  refreshPickables();
+}
+
+function enterSelectedMode(obj){
+  // Reuse startDrag logic to detach the item, but keep it in place (hovering)
   let kind,from,mesh,m=null;
-  if(o.userData.machine){
-    m=o.userData.machine;kind=m.cfg.item;mesh=m.item;from='machine';
-    m.prevState=m.state;m.state='held';
+  if(obj.userData.machine && !obj.userData.isDropHit){
+    m=obj.userData.machine;
+    if(!m.item || (m.state!=='cooking'&&m.state!=='ready'&&m.state!=='burnt')) return;
+    mesh=m.takeForDrag();
+    if(!mesh) return;
+    kind=m.cfg.item;
+    from='machine';
     scene.attach(mesh);
     mesh.scale.setScalar(1.15);
-    if(mesh.material&&mesh.material.emissive)mesh.material.emissive.setHex(0x442200);
-  }
-  else if(o.userData.dragKind){
-    kind=o.userData.dragKind;
-    if(kind==='bun'&&o.parent===tray){
-      mesh=o;from='tray';tray.remove(o);scene.add(o);
+    if(mesh.material&&mesh.material.emissive) mesh.material.emissive.setHex(0x442200);
+    const pickup=dragPosition();
+    if(pickup) mesh.position.set(pickup.x,DRAG_Y-(m.cfg.grabY||0),pickup.z);
+    G.selected={kind,from,mesh,m,burnt:!!mesh.userData.burnt,cookingProgress:mesh.userData.progress||0,grabY:m.cfg.grabY||0};
+  } else if(obj.userData.dragKind==='bun' && obj.parent===tray){
+    mesh=obj; kind='bun'; from='tray';
+    const home=obj.userData.home? obj.userData.home.clone(): null;
+    mesh.userData.__home=home;
+    tray.remove(obj); scene.add(obj);
+    mesh.position.y+=.22;
+    G.selected={kind,from,mesh,m:null,burnt:false,bunHome:home};
+    const pickup=dragPosition();
+    if(pickup) mesh.position.set(pickup.x,DRAG_Y,pickup.z);
+  } else if(obj.userData.isFloorItem || G.floorItems.some(f=>f.mesh===obj)){
+    const entry=G.floorItems.find(f=>f.mesh===obj||f.mesh===findAncestor(obj, n=>n&&n.userData&&n.userData.isFloorItem));
+    mesh = entry? entry.mesh : obj;
+    kind = entry? entry.kind : (mesh.userData.part||mesh.userData.dragKind||'unknown');
+    from='floor';
+    G.floorItems=G.floorItems.filter(f=>f.mesh!==mesh);
+    scene.attach(mesh);
+    mesh.scale.setScalar(1.15);
+    G.selected={kind,from,mesh,m:null,burnt:!!mesh.userData.burnt,cookingProgress:mesh.userData.progress||0,floorEntry:entry||null};
+    const pickup=dragPosition();
+    if(pickup) mesh.position.set(pickup.x,DRAG_Y,pickup.z);
+  } else if(obj.userData.dragKind){
+    kind=obj.userData.dragKind;
+    if(kind==='burger' && plate.dishMesh===obj){
+      mesh=obj; from='plate';
+      plate.dish=null; plate.dishMesh=null;
+      scene.attach(mesh);
+      mesh.position.y+=.22;
+      G.selected={kind,from,mesh,m:null,burnt:false};
+      const pickup=dragPosition();
+      if(pickup) mesh.position.set(pickup.x,DRAG_Y,pickup.z);
+    } else {
+      const idx=plate.items.findIndex(i=>i.mesh===obj);
+      if(idx!==-1){
+        mesh=obj; from='plate';
+        plate.items.splice(idx,1);
+        scene.attach(mesh);
+        mesh.position.y+=.22;
+        G.selected={kind,from,mesh,m:null,burnt:!!mesh.userData.burnt};
+        const pickup=dragPosition();
+        if(pickup) mesh.position.set(pickup.x,DRAG_Y,pickup.z);
+      } else return;
     }
-    else{
-      mesh=o;from='plate';
-      if(kind==='burger'){plate.dish=null;plate.dishMesh=null;scene.attach(o);}
-      else{plate.items=plate.items.filter(i=>i.mesh!==o);scene.attach(o);}
-    }
-  }
-  mesh.position.y+=.3;
-  G.drag={kind,from,mesh,m,burnt:!!(m&&m.state==='burnt')};
+  } else return;
   AudioSys.sfx.pop();
   refreshPickables();
 }
+
+function updateSelected(dt){
+  if(!G.selected)return;
+  const sel=G.selected;
+  // Gentle bob
+  sel.mesh.position.y=DRAG_Y-(sel.grabY||0)+Math.sin(G.elapsed*4)*.08;
+  sel.mesh.rotation.y+=dt*1.5;
+  // Highlight valid targets
+  computeSelectedTarget();
+}
+
+function computeSelectedTarget(){
+  if(!G.selected){clearHighlights();return;}
+  // Use last NDC (updated in onMove or onDown)
+  ray.setFromCamera(ndc,camera);
+  const targets=[plateBase,plateHit,trashHit];
+  for(const m of machineList){ if(m.dropHit) targets.push(m.dropHit); }
+  for(const c of G.customers)if(c.state==='waiting')targets.push(c.hit);
+  const hits=ray.intersectObjects(targets,false);
+  const k=G.selected.kind;
+  const isMachKind=(mk,kk)=> (mk==='stove'&&kk==='patty')||(mk==='grill'&&kk==='cheese')||(mk==='fryer'&&kk==='fries')||(mk==='drinker'&&kk==='soda');
+  const h=hits.find(h=>{
+    const ud=h.object.userData;
+    if(ud.target==='plate')return isPart(k)&&!G.selected.burnt&&!plate.dish&&plate.items.length<3&&!plate.items.some(i=>i.kind===k);
+    if(ud.target==='trash')return true;
+    if(ud.isDropHit){
+      const m=ud.machine;
+      if(m.state!=='empty'&&m.state!=='held'&&m.state!=='idle') return false;
+      return isMachKind(m.kind,k);
+    }
+    return isComplete(k)&&!G.selected.burnt&&ud.customer&&ud.customer.dish===k;
+  });
+  clearHighlights();
+  if(h){
+    const ud=h.object.userData;
+    if(ud.target==='plate')plateBase.material.emissive.setHex(0x2f9e57);
+    else if(ud.target==='trash')trashCan.material.emissive.setHex(0x2f9e57);
+    else if(ud.isDropHit && ud.machine){ ud.machine.bodyMeshes.forEach(b=>{ if(b.material&&b.material.emissive) b.material.emissive.setHex(0x2f9e57); }); }
+    else if(ud.customer){ ud.customer.mesh.userData.body.material.emissive.setHex(0x2f9e57); }
+  }
+}
+function startDrag(o){
+  let kind,from,mesh,m=null;
+  if(o.userData.machine && !o.userData.isDropHit){
+    m=o.userData.machine;
+    if(!m.item || (m.state!=='cooking'&&m.state!=='ready'&&m.state!=='burnt')) return;
+    mesh=m.takeForDrag();
+    if(!mesh) return;
+    kind=m.cfg.item;
+    from='machine';
+    scene.attach(mesh);
+    mesh.scale.setScalar(1.15);
+    if(mesh.material&&mesh.material.emissive) mesh.material.emissive.setHex(0x442200);
+    G.drag={kind,from,mesh,m,burnt:!!mesh.userData.burnt, cookingProgress: mesh.userData.progress||0, grabY:m.cfg.grabY||0};
+    const pickup=dragPosition();
+    if(pickup) mesh.position.set(pickup.x,DRAG_Y-(m.cfg.grabY||0),pickup.z);
+    AudioSys.sfx.pop();
+    refreshPickables();
+    return;
+  }
+  if(o.userData.dragKind==='bun' && o.parent===tray){
+    mesh=o; kind='bun'; from='tray';
+    const home=o.userData.home? o.userData.home.clone(): null;
+    mesh.userData.__home=home;
+    tray.remove(o); scene.add(o);
+    mesh.position.y+=.22;
+    G.drag={kind,from,mesh,m:null,burnt:false, bunHome:home};
+    const pickup=dragPosition();
+    if(pickup) mesh.position.set(pickup.x,DRAG_Y,pickup.z);
+    AudioSys.sfx.pop();
+    refreshPickables();
+    return;
+  }
+  if(o.userData.isFloorItem || G.floorItems.some(f=>f.mesh===o)){
+    const entry=G.floorItems.find(f=>f.mesh===o||f.mesh===findAncestor(o, n=>n&&n.userData&&n.userData.isFloorItem));
+    mesh = entry? entry.mesh : o;
+    kind = entry? entry.kind : (mesh.userData.part||mesh.userData.dragKind||'unknown');
+    from='floor';
+    G.floorItems=G.floorItems.filter(f=>f.mesh!==mesh);
+    scene.attach(mesh);
+    mesh.scale.setScalar(1.15);
+    G.drag={kind,from,mesh,m:null,burnt:!!mesh.userData.burnt, cookingProgress: mesh.userData.progress||0, floorEntry: entry||null};
+    const pickup=dragPosition();
+    if(pickup) mesh.position.set(pickup.x,DRAG_Y,pickup.z);
+    AudioSys.sfx.pop();
+    refreshPickables();
+    return;
+  }
+  if(o.userData.dragKind){
+    kind=o.userData.dragKind;
+    if(kind==='burger' && plate.dishMesh===o){
+      mesh=o; from='plate';
+      plate.dish=null; plate.dishMesh=null;
+      scene.attach(mesh);
+      mesh.position.y+=.22;
+      G.drag={kind,from,mesh,m:null,burnt:false};
+      const pickup=dragPosition();
+      if(pickup) mesh.position.set(pickup.x,DRAG_Y,pickup.z);
+      AudioSys.sfx.pop();
+      refreshPickables();
+      return;
+    }
+    const idx=plate.items.findIndex(i=>i.mesh===o);
+    if(idx!==-1){
+      mesh=o; from='plate';
+      plate.items.splice(idx,1);
+      scene.attach(mesh);
+      mesh.position.y+=.22;
+      G.drag={kind,from,mesh,m:null,burnt:!!mesh.userData.burnt};
+      const pickup=dragPosition();
+      if(pickup) mesh.position.set(pickup.x,DRAG_Y,pickup.z);
+      AudioSys.sfx.pop();
+      refreshPickables();
+      return;
+    }
+  }
+}
 function onMove(e){
   setNDC(e);
-  if(!G.drag)return;
-  ray.setFromCamera(ndc,camera);
-  const p=new THREE.Vector3();
-  if(ray.ray.intersectPlane(dragPlane,p)){
+  // Convert pending tap to drag if movement exceeds threshold
+  if(pendingDragObj && !G.drag && !G.selected){
+    const dx=e.clientX-pendingDragX,dy=e.clientY-pendingDragY;
+    if(Math.hypot(dx,dy)>TAP_THRESHOLD){
+      const obj=pendingDragObj;pendingDragObj=null;
+      startDrag(obj);
+    }
+    return;
+  }
+  if(!G.drag) return;
+  const p=dragPosition();
+  if(p){
     p.x=clamp(p.x,-7.5,7.5);p.z=clamp(p.z,-3,7.2);
-    G.drag.mesh.position.set(p.x,DRAG_Y,p.z);
+    G.drag.mesh.position.set(p.x,DRAG_Y-(G.drag.grabY||0),p.z);
   }
 }
 function onUp(e){
-  if(G.drag){dropItem();return;}
+  if(G.drag){ dropItem(); return; }
+  // If we had a pending tap (no drag started), enter selected mode
+  if(pendingDragObj){
+    const obj=pendingDragObj;pendingDragObj=null;
+    enterSelectedMode(obj);
+    return;
+  }
   if(G.pending){
     const d=Math.hypot(e.clientX-G.pending.x,e.clientY-G.pending.y);
-    if(d<8){
-      if(G.pending.type==='start')G.pending.m.start();
-      else if(G.pending.type==='pile')collectPile(G.pending.pile);
+    if(d<TAP_THRESHOLD){
+      if(G.pending.type==='pile') collectPile(G.pending.pile);
     }
     G.pending=null;
   }
@@ -995,33 +1492,42 @@ function onUp(e){
 function computeDragTarget(){
   if(!G.drag){G.dragTarget=null;clearHighlights();return;}
   ray.setFromCamera(ndc,camera);
-  const targets=[plateBase,trashHit];
+  const targets=[plateBase,plateHit,trashHit];
+  for(const m of machineList){ if(m.dropHit) targets.push(m.dropHit); }
   for(const c of G.customers)if(c.state==='waiting')targets.push(c.hit);
   const hits=ray.intersectObjects(targets,false);
   if(!hits.length){G.dragTarget=null;clearHighlights();return;}
   const k=G.drag.kind;
-  // pick the first VALID hit (skips occluding customer boxes when dragging parts, etc.)
+  const isMachKind=(mk,kk)=> (mk==='stove'&&kk==='patty')||(mk==='grill'&&kk==='cheese')||(mk==='fryer'&&kk==='fries')||(mk==='drinker'&&kk==='soda');
   const h=hits.find(h=>{
     const ud=h.object.userData;
     if(ud.target==='plate')return isPart(k)&&!G.drag.burnt&&!plate.dish&&plate.items.length<3&&!plate.items.some(i=>i.kind===k);
     if(ud.target==='trash')return true;
-    return isComplete(k)&&!G.drag.burnt&&ud.customer.dish===k;
+    if(ud.isDropHit){
+      const m=ud.machine;
+      if(m.state!=='empty'&&m.state!=='held'&&m.state!=='idle') return false;
+      return isMachKind(m.kind,k);
+    }
+    return isComplete(k)&&!G.drag.burnt&&ud.customer&&ud.customer.dish===k;
   });
   if(!h){G.dragTarget=null;clearHighlights();return;}
   const ud=h.object.userData;
   if(ud.target==='plate')G.dragTarget='plate';
   else if(ud.target==='trash')G.dragTarget='trash';
+  else if(ud.isDropHit) G.dragTarget={machine:ud.machine};
   else G.dragTarget={customer:ud.customer};
   clearHighlights();
   if(G.dragTarget){
     if(G.dragTarget==='plate')plateBase.material.emissive.setHex(0x2f9e57);
     else if(G.dragTarget==='trash')trashCan.material.emissive.setHex(0x2f9e57);
+    else if(G.dragTarget.machine){ G.dragTarget.machine.bodyMeshes.forEach(b=>{ if(b.material&&b.material.emissive) b.material.emissive.setHex(0x2f9e57); }); }
     else G.dragTarget.customer.mesh.userData.body.material.emissive.setHex(0x2f9e57);
   }
 }
 function clearHighlights(){
   plateBase.material.emissive.setHex(0);
   trashCan.material.emissive.setHex(0);
+  for(const m of machineList) m.bodyMeshes.forEach(b=>{ if(b.material&&b.material.emissive) b.material.emissive.setHex(0); });
   for(const c of G.customers)c.mesh.userData.body.material.emissive.setHex(0);
 }
 function updateDrag(dt){
@@ -1029,95 +1535,111 @@ function updateDrag(dt){
   G.drag.mesh.rotation.y+=dt*2.5;
   computeDragTarget();
 }
-function reject(d,msg){
-  toast(msg);AudioSys.sfx.error();returnItem(d);
-}
 function clearHeldGlow(d){if(d.mesh.material&&d.mesh.material.emissive)d.mesh.material.emissive.setHex(0);}
-function returnItem(d){
-  if(d.from==='machine'){
-    const m=d.m;
-    m.group.attach(d.mesh);
-    d.mesh.position.copy(m.itemPos);
-    d.mesh.rotation.set(0,0,0);d.mesh.scale.setScalar(1);
-    m.state=d.prevState;
-    clearHeldGlow(d);
+function dropToFloor(d){
+  const m=d.mesh;
+  clearHeldGlow(d);
+  m.rotation.set(0,0,0);
+  m.scale.setScalar(1);
+  const pos=safeFloorPosition(m.position);
+  pos.y=FLOOR_Y - 0.02;
+  m.position.copy(pos);
+  scene.add(m);
+  m.userData.isFloorItem=true;
+  if(d.burnt) m.userData.burnt=true;
+  if(d.cookingProgress!=null) m.userData.progress=d.cookingProgress;
+  if(d.m) m.userData.machineKind=d.m.kind;
+  // add invisible hit box for easy picking
+  if(!m.userData._floorHit){
+    const fh=new THREE.Mesh(new THREE.BoxGeometry(1.0,0.8,1.0),new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false}));
+    fh.position.y=0.3;
+    if(m.children) m.add(fh); else { const wrap=new THREE.Group(); wrap.add(m); scene.add(wrap); m.userData._wrapped=wrap; m.add(fh); }
+    m.userData._floorHit=fh;
   }
-  else if(d.from==='tray'){
-    scene.remove(d.mesh);
-    tray.add(d.mesh);
-    d.mesh.position.copy(d.mesh.userData.home||new THREE.Vector3(0,.9,0));
-    d.mesh.rotation.set(0,0,0);d.mesh.scale.setScalar(1);
+  G.floorItems.push({mesh:m, kind:d.kind, burnt:!!d.burnt});
+  if(d.from==='machine' && d.m){
+    d.m.state='empty';
   }
-  else if(d.from==='plate'){
-    plateGroup.attach(d.mesh);
-    if(d.kind==='burger'){
-      d.mesh.position.set(0,0,0);
-      plate.dish='burger';plate.dishMesh=d.mesh;
-    }
-    else{
-      const slot=SLOTS[plate.items.length];
-      d.mesh.position.copy(slot);d.mesh.rotation.set(0,0,0);d.mesh.scale.setScalar(1);
-      plate.items.push({kind:d.kind,mesh:d.mesh});
-    }
+  if(d.from==='tray' && d.bunHome){
+    replenishBun(d.bunHome);
   }
+}
+function rejectToFloor(d,msg){
+  toast(msg); AudioSys.sfx.error();
+  dropToFloor(d);
 }
 function placeOnPlate(d){
   const kind=d.kind;
-  if(!isPart(kind)){reject(d,'Only burger parts go on the plate!');return;}
-  if(G.drag.burnt){reject(d,'Burnt food can only go in the trash!');return;}
-  if(plate.dish){reject(d,'The plate already has a finished burger!');return;}
-  if(plate.items.length>=3){reject(d,'The plate is full!');return;}
-  if(plate.items.some(i=>i.kind===kind)){reject(d,'Already on the plate!');return;}
+  if(!isPart(kind)){rejectToFloor(d,'Only burger parts go on the plate!');return;}
+  if(d.burnt){rejectToFloor(d,'Burnt food can only go in the trash!');return;}
+  if(plate.dish){rejectToFloor(d,'The plate already has a finished burger!');return;}
+  if(plate.items.length>=3){rejectToFloor(d,'The plate is full!');return;}
+  if(plate.items.some(i=>i.kind===kind)){rejectToFloor(d,'Already on the plate!');return;}
   plateGroup.attach(d.mesh);
   const slot=SLOTS[plate.items.length];
   d.mesh.position.copy(slot);d.mesh.rotation.set(0,0,0);d.mesh.scale.setScalar(1);
+  d.mesh.userData.isFloorItem=false;
   clearHeldGlow(d);
   plate.items.push({kind,mesh:d.mesh});
-  if(d.from==='machine'&&d.m)machineRefill(d.m); // machine mints fresh food
+  if(d.from==='machine'&&d.m) machineRefill(d.m);
+  else if(d.from==='tray' && d.bunHome) replenishBun(d.bunHome);
   AudioSys.sfx.place();
-  if(plate.items.length===3)assembleBurger();
+  if(plate.items.length===3) assembleBurger();
 }
 function discard(d){
   AudioSys.sfx.place();
-  if(d.from==='machine')d.m.resetToIdle();
-  else if(d.from==='tray')scene.remove(d.mesh);
-  else if(d.from==='plate'&&d.kind!=='burger')scene.remove(d.mesh);
-  else if(d.from==='plate'&&d.kind==='burger'){scene.remove(d.mesh);plate.dish=null;plate.dishMesh=null;}
+  if(d.mesh.parent) d.mesh.parent.remove(d.mesh);
+  if(d.from==='machine' && d.m){
+    d.m.resetToIdle();
+  } else if(d.from==='tray' && d.bunHome){
+    replenishBun(d.bunHome);
+  }
 }
 function dropItem(){
   const d=G.drag,t=G.dragTarget;
-  if(t==='trash')discard(d);
-  else if(t==='plate')placeOnPlate(d);
-  else if(t&&t.customer)serve(t.customer,d.kind,d.mesh,d);
-  else returnItem(d);
+  if(t==='trash') discard(d);
+  else if(t==='plate') placeOnPlate(d);
+  else if(t&&t.customer) serve(t.customer,d.kind,d.mesh,d);
+  else if(t&&t.machine){
+    clearHeldGlow(d);
+    t.machine.putBack(d.mesh);
+    if(d.from==='tray' && d.bunHome) replenishBun(d.bunHome);
+    AudioSys.sfx.place();
+  }
+  else {
+    dropToFloor(d);
+  }
   G.drag=null;G.dragTarget=null;
   clearHighlights();
   refreshPickables();
 }
 function cancelDrag(){
+  pendingDragObj=null;
+  if(G.selected) cancelSelection();
   if(!G.drag)return;
   const d=G.drag;
-  if(d.from==='machine')d.m.resetToIdle();
-  else if(d.from==='tray')scene.remove(d.mesh);
-  else if(d.from==='plate'&&d.kind!=='burger')scene.remove(d.mesh);
-  else if(d.from==='plate'&&d.kind==='burger'){scene.remove(d.mesh);plate.dish=null;plate.dishMesh=null;}
+  if(d.mesh.parent) scene.remove(d.mesh);
+  if(d.from==='machine' && d.m) d.m.resetToIdle();
+  else if(d.from==='tray' && d.bunHome) replenishBun(d.bunHome);
   G.drag=null;G.dragTarget=null;
   clearHighlights();
   refreshPickables();
 }
-window.addEventListener('pointerdown',onDown);
-window.addEventListener('pointermove',onMove);
-window.addEventListener('pointerup',onUp);
+window.addEventListener('pointerdown',onDown,{passive:false,capture:true});
+window.addEventListener('pointermove',onMove,{passive:false});
+window.addEventListener('pointerup',onUp,{passive:false});
+window.addEventListener('pointercancel',onUp,{passive:false});
 window.addEventListener('contextmenu',e=>e.preventDefault());
 
 /* ============================== bubbles / hud ============================== */
 function updateBubbles(){
+  const r=canvasRect();
   for(const c of G.customers){
     const v=new THREE.Vector3(c.mesh.position.x,3.15,c.mesh.position.z).project(camera);
     if(v.z>1){c.bubEl.style.display='none';continue;}
     c.bubEl.style.display='';
-    c.bubEl.style.left=((v.x*.5+.5)*innerWidth)+'px';
-    c.bubEl.style.top=((-v.y*.5+.5)*innerHeight)+'px';
+    c.bubEl.style.left=(r.left+(v.x*.5+.5)*r.width)+'px';
+    c.bubEl.style.top=(r.top+(-v.y*.5+.5)*r.height)+'px';
     if(c.state==='waiting'){
       const p=clamp(c.patience,0,1);
       c.fillEl.style.width=Math.round(p*100)+'%';
@@ -1182,6 +1704,8 @@ function startLevel(n){
   G.customers.length=0;
   for(const p of G.piles)scene.remove(p.mesh);
   G.piles.length=0;
+  for(const f of G.floorItems) scene.remove(f.mesh);
+  G.floorItems.length=0;
   clearPlate();
   for(const m of machineList)m.resetToIdle();
   G.served=0;G.coins=0;G.score=0;G.lost=0;
@@ -1239,10 +1763,19 @@ function showMenu(){
 }
 
 /* ============================== ui buttons ============================== */
-function toggleMute(){
-  AudioSys.muted=!AudioSys.muted;
-  $('muteBtn').textContent=AudioSys.muted?'🔇':'🔊';
+let soundMode=parseInt(localStorage.getItem('cookfever3d.sound'))||0;
+function applySoundMode(){
+  if(AudioSys.ctx&&AudioSys.musicGain) AudioSys.musicGain.gain.value=(soundMode===0)?0.4:0;
+  AudioSys.muted=(soundMode===2);
+  $('muteBtn').textContent=['🔊','🔉','🔇'][soundMode];
+  $('muteBtn').title=['Music + SFX','SFX only','Muted'][soundMode];
 }
+function toggleMute(){
+  soundMode=(soundMode+1)%3;
+  localStorage.setItem('cookfever3d.sound',soundMode);
+  applySoundMode();
+}
+applySoundMode();
 function togglePause(){
   if(G.state==='playing'){
     G.state='paused';
@@ -1254,25 +1787,30 @@ function togglePause(){
     clock.getDelta();
   }
 }
-$('playBtn').addEventListener('click',()=>{AudioSys.ensure();AudioSys.sfx.click();startLevel(SAVE.level);});
+function playFrom(n){ AudioSys.ensure(); AudioSys.sfx.click(); startLevel(n); }
+$('playBtn').addEventListener('click',()=>playFrom(SAVE.level));
 $('resetBtn').addEventListener('click',()=>{SAVE={level:1,best:{},coins:0};save();AudioSys.sfx.click();showMenu();});
-$('nextBtn').addEventListener('click',()=>{AudioSys.sfx.click();startLevel(G.level+1);});
-$('replayBtn').addEventListener('click',()=>{AudioSys.sfx.click();startLevel(G.level);});
+$('nextBtn').addEventListener('click',()=>playFrom(G.level+1));
+$('replayBtn').addEventListener('click',()=>playFrom(G.level));
 $('menuBtn').addEventListener('click',()=>{AudioSys.sfx.click();showMenu();});
 $('resumeBtn').addEventListener('click',()=>{AudioSys.sfx.click();togglePause();});
-$('restartBtn').addEventListener('click',()=>{AudioSys.sfx.click();startLevel(G.level);});
+$('restartBtn').addEventListener('click',()=>playFrom(G.level));
 $('pMenuBtn').addEventListener('click',()=>{AudioSys.sfx.click();showMenu();});
 $('muteBtn').addEventListener('click',toggleMute);
+$('fsBtn').addEventListener('click',onFsButton);
 $('pauseBtn').addEventListener('click',()=>{if(G.state==='playing'||G.state==='paused')togglePause();});
 window.addEventListener('keydown',e=>{
   if(e.key==='p'||e.key==='P')togglePause();
   if(e.key==='m'||e.key==='M')toggleMute();
 });
-window.addEventListener('resize',()=>{
-  camera.aspect=innerWidth/innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth,innerHeight);
-});
+window.addEventListener('resize',applySize);
+window.addEventListener('orientationchange',()=>setTimeout(applySize,300));
+document.addEventListener('fullscreenchange',()=>{applySize();syncFsButton();});
+document.addEventListener('webkitfullscreenchange',()=>{applySize();syncFsButton();});
+if(window.visualViewport){
+  visualViewport.addEventListener('resize',applySize);
+  visualViewport.addEventListener('scroll',applySize);
+}
 
 /* ============================== main loop ============================== */
 const clock=new THREE.Clock();
@@ -1286,7 +1824,7 @@ function frame(dt){
 }
 function render(){
   camera.position.x=Math.sin(T*.25)*.25;
-  camera.lookAt(0,.7,.4);
+  camera.lookAt(0,.8,-.5);
   updateBubbles();
   updateHUD();
   renderer.render(scene,camera);
@@ -1302,10 +1840,14 @@ function loop(){
   }
   // input-driven drag follow stays live even while the sim is frozen
   if(G.state!=='paused'&&G.drag)updateDrag(dt);
+  if(G.state!=='paused'&&G.selected)updateSelected(dt);
   render();
 }
 refreshPickables();
 showMenu();
+if(isIPhone&&!isStandalone) $('iosHint').classList.remove('hidden');
+syncFsButton();
+if(new URLSearchParams(location.search).has('debug')){$('dbgToggle').classList.remove('hidden');}
 
 /* ============================== time-travel debug control ============================== */
 const DBG_DT=1/60; // one discrete step = 1/60 s of simulation
@@ -1332,6 +1874,8 @@ function loopAll(){
   loop();
   dbgInfoUpdate();
 }
+window._dbg=()=>({state:G.state,served:G.served,plateItems:plate.items.map(i=>({kind:i.kind,visible:i.mesh.visible,pos:i.mesh.position.toArray().map(v=>+v.toFixed(2)),parent:i.mesh.parent===plateGroup?'plate':(i.mesh.parent?i.mesh.parent.type:'null')})),dish:plate.dish,floor:G.floorItems.map(f=>({kind:f.kind,visible:f.mesh.visible,pos:f.mesh.position.toArray().map(v=>+v.toFixed(2))})),machines:machineList.map(m=>({kind:m.kind,state:m.state}))});
+window._mach=machineList;window._G=G;window._plateObj=plate;window._plateGroup=plateGroup;window._scene=scene;
 renderer.setAnimationLoop(loopAll);
 </script>
 </body>

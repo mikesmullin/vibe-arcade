@@ -1,0 +1,10 @@
+{
+  "name": "Cook Fever 3D",
+  "short_name": "Cook Fever",
+  "start_url": "./cook.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#8fd8e8",
+  "theme_color": "#8fd8e8",
+  "icons": []
+}

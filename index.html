@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vibe Arcade</title>
+<style>
+  :root {
+    --bg: #12110f;
+    --panel: #1c1a16;
+    --ink: #f3ead7;
+    --muted: #a89880;
+    --line: #3a342c;
+    --accent: #e8a23a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    font-family: ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+    background:
+      radial-gradient(1200px 500px at 10% -10%, #2a2218 0%, transparent 55%),
+      var(--bg);
+    color: var(--ink);
+    padding: 48px 24px 72px;
+  }
+  main { max-width: 920px; margin: 0 auto; }
+  header { margin-bottom: 36px; }
+  h1 { font-size: 2.1rem; letter-spacing: .04em; margin: 0 0 8px; }
+  .sub { color: var(--muted); margin: 0; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 16px;
+  }
+  .card {
+    display: block;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 20px 20px 18px;
+    text-decoration: none;
+    color: inherit;
+    min-height: 148px;
+    transition: transform .12s ease, border-color .12s ease;
+  }
+  .card:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .card h2 { margin: 10px 0 10px; font-size: 1.15rem; line-height: 1.3; }
+  .play {
+    display: inline-block;
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: #1a1208;
+    background: var(--accent);
+    border-radius: 999px;
+    padding: 3px 9px;
+  }
+  .meta { color: var(--muted); font-size: .85rem; margin: 0; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+</style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Vibe Arcade</h1>
+      <p class="sub">Browser games · tap a card to play</p>
+    </header>
+    <div class="grid">
+      <a class="card" href="./cook.html">
+        <div class="play">Play</div>
+        <h2>Cook Fever 3D — Fast Food Court</h2>
+        <p class="meta"><code>cook.html</code></p>
+      </a>
+      <a class="card" href="./mars.html">
+        <div class="play">Play</div>
+        <h2>MARS RAID — Colony Skirmish</h2>
+        <p class="meta"><code>mars.html</code></p>
+      </a>
+      <a class="card" href="./boss.html">
+        <div class="play">Play</div>
+        <h2>MARS RAID — Scorpion Boss</h2>
+        <p class="meta"><code>boss.html</code></p>
+      </a>
+      <a class="card" href="./boss2.html">
+        <div class="play">Play</div>
+        <h2>MARS RAID — Scorpion Boss</h2>
+        <p class="meta"><code>boss2.html</code></p>
+      </a>
+      <a class="card" href="./rts.html">
+        <div class="play">Play</div>
+        <h2>The Swarm Awakens — Zerg RTS Slice</h2>
+        <p class="meta"><code>rts.html</code></p>
+      </a>
+    </div>
+  </main>
+</body>
+</html>
