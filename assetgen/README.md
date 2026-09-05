@@ -24,8 +24,8 @@ Assets of interest:
 - Patty state chain: [raw](out/patty/patty_raw.png) → [cooking](out/patty/patty_cooking.png) → [cooked](out/patty/patty_cooked.png) → [burnt](out/patty/patty_burnt.png)
 - Sausage state chain: [raw](out/sausage/sausage_raw.png) → [cooked](out/sausage/sausage_cooked.png) → [burnt](out/sausage/sausage_burnt.png)
 - Bun as three props: [whole](out/bun_whole/bun_whole.png), [top](out/bun_top/bun_top.png), [bottom](out/bun_bottom/bun_bottom.png)
-- Stations and props: [grill](out/grill/grill.png), [soda machine](out/soda_machine/soda_machine.png), [trash bin](out/trash_bin/trash_bin.png), [frying pan](out/frying_pan/frying_pan.png), [prep tray](out/prep_tray/prep_tray.png), [napkin dispenser](out/napkin_dispenser/napkin_dispenser.png), [plate](out/plate/plate.png)
-- Food and drink: [cup empty](out/cup/cup_empty.png) / [full](out/cup/cup_full.png), [coffee mug empty](out/coffee_mug/coffee_mug_empty.png) / [full](out/coffee_mug/coffee_mug_full.png), [cheese slice](out/cheese_slice/cheese_slice.png), [fries](out/fries/fries.png), [ketchup bottle](out/ketchup_bottle/ketchup_bottle.png)
+- Stations and props: [grill](out/grill/grill.png), [soda machine](out/soda_machine/soda_machine.png), [trash bin](out/trash_bin/trash_bin.png), [frying pan](out/frying_pan/frying_pan.png), [deep fryer](out/fryer/fryer.png), [prep tray](out/prep_tray/prep_tray.png), [napkin dispenser](out/napkin_dispenser/napkin_dispenser.png), [plate](out/plate/plate.png)
+- Food and drink: [cup empty](out/cup/cup_empty.png) / [full](out/cup/cup_full.png), [coffee mug empty](out/coffee_mug/coffee_mug_empty.png) / [full](out/coffee_mug/coffee_mug_full.png), [cheese slice](out/cheese_slice/cheese_slice.png), [fries raw](out/fries/fries_raw.png) / [cooked](out/fries/fries_cooked.png) (stateful pair, same carton via `chain: edit`, magenta key so the pale raw sticks survive), [ketchup bottle](out/ketchup_bottle/ketchup_bottle.png)
 
 ## How we made it
 

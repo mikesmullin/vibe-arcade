@@ -148,6 +148,7 @@ assets:
     seed: 42901
     states:
       raw:    raw pale pink uncooked sausage, smooth and glossy
+      cooking: half-cooked sausage, the outside turning light reddish-brown while parts are still pale pink, faint grill marks, tiny steam
       cooked: cooked sausage, evenly reddish-brown with dark grill lines, glossy and juicy
       burnt:  burnt sausage, blackened charred skin, cracked, a wisp of grey smoke
 
@@ -187,10 +188,30 @@ assets:
       on a plain flat {bg} background. No ground shadow, no scene, no table, no kitchen, no text, no UI.
 
   - id: fries
-    type: prop
-    prompt: a red and white striped paper carton full of golden french fries, seen from a 3/4 elevated angle, cartoon game food
+    type: stateful
+    chain: edit
+    # pale raw fries are close to white: rembg would eat them, so magenta key (yellow vs magenta contrasts on G).
+    # keeper carton is red-BLACK stripes (klein ignored "white"), so describe that to keep the identity.
+    bg: solid bright magenta
+    cutout: key
+    prompt: a red and black striped paper carton full of french fries, seen from a 3/4 elevated angle, cartoon game food
     size: 1024
     seed: 43301
+    states:
+      raw: pale uncooked frozen fries, very light creamy yellow-white sticks, matte and frosty with no browning and no crisp edges
+      cooked: golden crispy cooked fries, deep golden-yellow sticks with lightly browned crisp edges, appetizing
+
+  - id: fryer
+    type: prop
+    bg: solid bright green
+    cutout: key
+    prompt: >-
+      a stainless steel countertop deep fryer for a cartoon diner kitchen, seen from a 3/4 front angle:
+      a heavy low rectangular brushed steel unit with a black oil basin on top holding an empty wire fry basket
+      with a black handle, a row of round black control knobs across the steel front face, chrome trim edges,
+      the unit spanning most of the frame. Empty, no fries, no food, no oil splashes outside the basin
+    size: [1280, 1024]
+    seed: 43601
 
   - id: ketchup_bottle
     type: prop
