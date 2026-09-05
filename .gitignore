@@ -6,4 +6,5 @@ assetgen/out/*/raw/
 assetgen/out_explore*/
 assetgen/out_ab/
 assetgen/out_norefs/
+assetgen/out_practice/
 assetgen/__pycache__/
