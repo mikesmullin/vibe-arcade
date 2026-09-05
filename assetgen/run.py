@@ -94,12 +94,37 @@ def build_graph(cfg, prompt, seed, w, h, refs=(), init=None, denoise=1.0, prefix
 
 # ------------------------------------------------------------ post-process
 _session = None
-def cutout(im: Image.Image, pad=24, export=None, fmt="png") -> Image.Image:
+def chroma_key(im: Image.Image, key=None, tol=70, soft=50) -> Image.Image:
+    """Flat-colour background removal with despill: alpha from distance to the key colour.
+    key defaults to the median colour of the image corners (the model rarely paints the exact colour asked for)."""
+    import numpy as np
+    a = np.asarray(im.convert("RGB")).astype(np.float32)
+    if key is None:
+        h, w = a.shape[:2]; m = max(4, min(h, w) // 25)
+        corners = np.concatenate([a[:m, :m].reshape(-1, 3), a[:m, -m:].reshape(-1, 3), a[-m:, :m].reshape(-1, 3), a[-m:, -m:].reshape(-1, 3)])
+        key = tuple(np.median(corners, axis=0))
+    d = np.sqrt(((a - np.array(key, dtype=np.float32)) ** 2).sum(-1))
+    alpha = np.clip((d - tol) / soft, 0, 1)
+    # despill: pull the key channel down to the max of the other two where it dominates
+    k = int(np.argmax(key))
+    others = [i for i in range(3) if i != k]
+    lim = np.maximum(a[..., others[0]], a[..., others[1]])
+    a[..., k] = np.minimum(a[..., k], lim + (a[..., k] - lim) * alpha)
+    out = np.dstack([a, alpha * 255]).astype(np.uint8)
+    return Image.fromarray(out, "RGBA")
+
+
+def cutout(im: Image.Image, pad=24, export=None, mode="rembg") -> Image.Image:
     global _session
-    from rembg import new_session, remove
-    if _session is None:
-        _session = new_session("isnet-general-use")
-    rgba = remove(im, session=_session, post_process_mask=True)
+    if mode == "none":
+        return im.convert("RGBA")
+    if mode == "key":
+        rgba = chroma_key(im)
+    else:
+        from rembg import new_session, remove
+        if _session is None:
+            _session = new_session("isnet-general-use")
+        rgba = remove(im, session=_session, post_process_mask=True)
     a = rgba.getchannel("A").point(lambda v: 255 if v > 8 else 0)
     box = a.getbbox()
     if box:
@@ -147,29 +172,36 @@ def main():
         chain = asset.get("chain", "edit")
         size = asset.get("size", 1024)
         w, h = (size, size) if isinstance(size, int) else size
-        seed = asset.get("seed", 0) + a.seed_offset
+        seed0 = asset.get("seed", 0) + a.seed_offset
         adir = out_root / aid
         (adir / "raw").mkdir(parents=True, exist_ok=True)
         asset_refs = [] if a.no_refs else [upload(HERE / p) for p in asset.get("refs", [])]
         prev_raw = None
-        for i, (state, state_text) in enumerate(states.items()):
+        for i, (state, state_val) in enumerate(states.items()):
+            sdict = state_val if isinstance(state_val, dict) else {"text": state_val}
+            state_text = sdict.get("text", "")
             name = f"{aid}_{state}" if state else aid
             final = adir / f"{name}.png"
             raw_path = adir / "raw" / f"{name}.png"
             if final.exists() and not a.force:
                 print(f"skip {name} (exists)"); prev_raw = raw_path; continue
 
+            seed = sdict.get("seed", seed0)
             obj = asset["prompt"] + (", " + state_text if state_text else "")
             refs, init, denoise = style_refs + asset_refs, None, 1.0
+            if sdict.get("refs") and not a.no_refs:
+                refs = refs + [upload(HERE / p) for p in sdict["refs"]]
+            bg = asset.get("bg", style.get("bg", "pure white"))
+            tmpl = asset.get("template", style["template"])
+            stmpl = asset.get("state_template", style["state_template"])
             if i > 0 and prev_raw and chain != "none":
                 refs.append(upload(prev_raw))
-                prompt = style["state_template"].format(object=obj, state=state_text,
-                                                         ref_clause=ref_clause)
+                prompt = stmpl.format(object=obj, state=state_text, ref_clause=ref_clause, bg=bg)
                 if chain == "img2img":
                     init = refs[-1]
                     denoise = asset.get("denoise", 0.6)
             else:
-                prompt = style["template"].format(object=obj, ref_clause=ref_clause)
+                prompt = tmpl.format(object=obj, ref_clause=ref_clause, bg=bg)
             if asset.get("suffix"):
                 prompt += " " + asset["suffix"]
             if trigger:
@@ -180,7 +212,7 @@ def main():
             imgs = run_graph(build_graph(cfg, prompt, seed, w, h, refs, init, denoise,
                                          prefix=f"assetgen/{aid}/{name}", lora=lora))
             imgs[0].save(raw_path)
-            sprite = cutout(imgs[0], export=asset.get("export"))
+            sprite = cutout(imgs[0], export=asset.get("export"), mode=asset.get("cutout", "rembg"))
             sprite.save(final)
             (adir / "raw" / f"{name}.txt").write_text(prompt + f"\nseed={seed}\n")
             print(f"   -> {final.relative_to(HERE)}  {sprite.size}  {time.time()-t:.1f}s")

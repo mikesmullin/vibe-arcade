@@ -108,6 +108,28 @@ The dataset is every keeper in `out/` (its raw white-background render, padded t
 the manifest prompt plus a trigger word. 1024² training OOMs on the 5090 (the trainer wants ~25 GB plus whatever else
 is on the GPU); 768² with checkpoint depth 2 trains 500 steps in 9 minutes.
 
+## Round two: a whole game's worth of assets (cook2.html)
+
+[`../cook2.html`](../cook2.html) is a from-scratch three.js remake of the diner that uses only sprites from this
+folder. The second batch added, all in one evening:
+
+- **Scene plate** ([`out/scene_diner/`](out/scene_diner/)): the reference screenshot itself, edited by klein with
+  "remove everything that is not the room and the counter" (`cutout: none`, the screenshot as the reference latent).
+  The game draws it once as the background and once more, cropped below the counter edge, above the customers.
+- **HUD icons** ([sheet](docs/hud_icons.png)): coins, stars on/off, XP badge, clock, customer, lock, heart, anger mark,
+  plus a coin, a coin stack for tips and an empty speech bubble.
+- **Puppet customers** ([sheet](docs/customer_parts.png)): per character a floating head (front + 3/4 side), a headless
+  torso (front + side), an ear and a nose; shared eye (open/closed), eyebrow and four mouths
+  ([sheet](docs/face_parts.png)). The game rigs these as a paper puppet and tweens between the two poses.
+  - "Head only" / "body only" prompts leaked (heads came with shoulders, bodies with faces). The fix was a second
+    edit pass: `draft_*` renders first, then a `template` that says "using the reference, erase the body / erase the
+    head" with per-state `refs` pointing at the draft's raw render.
+  - Face parts contain white, so they are generated on a green background with `cutout: key`. The key colour is
+    sampled from the image corners because klein paints a muted green rather than the exact colour asked for.
+
+New manifest features from this round: per-asset `template` / `state_template`, `bg`, `cutout: rembg|key|none`,
+per-asset `refs`, and state values may be objects `{text, refs, seed}`.
+
 ## Usage
 
 ```sh

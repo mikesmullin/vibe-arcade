@@ -20,17 +20,18 @@ style:
     Match the art style of the reference image exactly: the same glossy cel-shaded cartoon rendering,
     saturated diner palette, clean outlines and soft lighting from the upper left. Do not copy any object
     from the reference; draw a completely new image containing only the object described.
+  # Per-asset overrides: template, state_template, bg ("pure white" default), cutout (rembg|key|none)
   # First state / plain props
   template: >-
     {ref_clause} A single isolated 2D game asset for a casual mobile cooking game: {object}.
     Bright saturated cel-shaded cartoon illustration with clean outlines and soft glossy highlights,
     seen from a 3/4 elevated angle, centered and filling most of the frame,
-    on a plain flat pure white background. No ground shadow, no scene, no table, no kitchen, no text, no UI.
+    on a plain flat {bg} background. No ground shadow, no scene, no table, no kitchen, no text, no UI.
   # Later states: the previous state image is appended as the last reference
   state_template: >-
     {ref_clause} Using the last reference image of the game asset, redraw the exact same object with the
     same shape, size, position, camera angle and art style, but change it to this state: {state}.
-    Keep the plain flat pure white background. No ground shadow, no scene, no text, no UI.
+    Keep the plain flat {bg} background. No ground shadow, no scene, no text, no UI.
 
 assets:
   - id: patty
@@ -167,3 +168,292 @@ assets:
     states:
       empty: empty mug seen from a 3/4 elevated angle so the inside is visible
       full:  the same mug filled with dark coffee and a little steam
+
+  # ---------------------------------------------------------------- scene plate (edited from the screenshot)
+  - id: scene_diner
+    type: prop
+    cutout: none
+    refs: [refs/screenshot_diner.png]
+    size: [1584, 1088]
+    template: >-
+      Redraw the reference image exactly: the same diner interior, same camera, same layout, same colors and same
+      art style, but remove everything that is not part of the room and the counter. The buttons, bars, badges and
+      icons along the top edge are a game user interface overlay: remove them completely and paint the ceiling, the
+      chrome trim and the wall that would be behind them. No watermark, no caption, no text anywhere. {object}
+    prompt: >-
+      No user interface overlay, no top bar, no icons, no people, no coins, no food, no plates, no locks, no trays,
+      no cooking equipment, no drink machine, no trash bin, no menu cards, no napkins. Leave only the empty diner
+      interior: checkered floor, windows, wall screens, the long empty red counter with its chrome rail and the
+      wooden cabinet below it, all shelves empty.
+    seed: 50003
+
+  # ---------------------------------------------------------------- coins
+  - id: coin_stack
+    type: prop
+    refs: [refs/screenshot_customers_side.png]
+    prompt: a small stack of shiny gold coins with a couple of copper coins beside it, the tip left on a diner counter, like the coins in the reference, seen from a 3/4 elevated angle, cartoon game prop
+    size: 1024
+    seed: 50101
+  - id: coin
+    type: prop
+    prompt: a single shiny gold coin with a star emblem, seen from the front, glossy cartoon game icon
+    size: 1024
+    seed: 50201
+
+  # ---------------------------------------------------------------- HUD icons (game UI style)
+  - id: hud_coins
+    type: prop
+    prompt: a game HUD icon of three stacked shiny gold coins with a glossy highlight, thick outline, mobile game UI icon
+    size: 1024
+    seed: 50301
+  - id: hud_star
+    type: stateful
+    chain: none
+    prompt: a game HUD star icon, five-pointed, thick outline, glossy, mobile game UI icon
+    size: 1024
+    seed: 50401
+    states:
+      'on':  bright shiny gold star with a soft glow
+      'off': dull grey stone star, unlit
+  - id: hud_xp
+    type: prop
+    prompt: a game HUD badge icon, a rounded glossy green and blue shield with the letters "XP" in bold white lettering, mobile game UI icon
+    size: 1024
+    seed: 50501
+  - id: hud_clock
+    type: prop
+    prompt: a game HUD icon of a round silver stopwatch with a blue face, glossy, thick outline, mobile game UI icon
+    size: 1024
+    seed: 50601
+  - id: hud_customer
+    type: prop
+    prompt: a game HUD icon of a smiling cartoon face inside a round glossy blue circle, mobile game UI icon
+    size: 1024
+    seed: 50701
+  - id: hud_lock
+    type: prop
+    prompt: a game HUD icon of a grey-blue padlock, glossy, thick outline, mobile game UI icon
+    size: 1024
+    seed: 50801
+  - id: hud_heart
+    type: prop
+    prompt: a game HUD icon of a glossy red heart, thick outline, mobile game UI icon
+    size: 1024
+    seed: 50901
+  - id: hud_angry
+    type: prop
+    prompt: a game icon of a red cartoon anger mark, the comic style cross-shaped vein popping symbol, glossy, thick outline
+    size: 1024
+    seed: 51001
+  - id: speech_bubble
+    type: prop
+    prompt: an empty white rounded rectangular speech bubble with a small green vertical bar on its right edge and a small pointer tail at the bottom right, flat game UI element, no text
+    size: [1024, 1280]
+    seed: 51101
+
+  # ---------------------------------------------------------------- customer puppet: man
+  - id: draft_cust_man_head
+    type: stateful
+    chain: none
+    refs: [refs/customer_sheet.png]
+    template: >-
+      {ref_clause} A 2D character asset for a casual mobile cooking game, drawn in the same style as the reference
+      customers: {object}. Clean glossy cartoon rendering with soft shading, centered, filling most of the frame,
+      on a plain flat {bg} background. No ground shadow, no scene, no text, no UI.
+    prompt: only the head and neck of a young man with short dark curly hair, warm dark brown skin, wearing a green and white varsity jacket over a white t-shirt, with a completely blank featureless face - no eyes, no eyebrows, no nose, no mouth, no ears, just smooth skin - and no body below the neck
+    size: [1024, 1024]
+    seed: 52001
+    states:
+      front: seen straight from the front, facing the viewer
+      side:  seen from a three-quarter side view, turned to face the left of the image
+  - id: draft_cust_man_body
+    type: stateful
+    chain: none
+    refs: [refs/customer_sheet.png]
+    template: >-
+      {ref_clause} A 2D character asset for a casual mobile cooking game, drawn in the same style as the reference
+      customers: {object}. Clean glossy cartoon rendering with soft shading, centered, filling most of the frame,
+      on a plain flat {bg} background. No ground shadow, no scene, no text, no UI.
+    prompt: only the upper body of a young man with short dark curly hair, warm dark brown skin, wearing a green and white varsity jacket over a white t-shirt, from the base of the neck down to the waist, shoulders and arms at the sides, cut off flat at the waist and with no head and no neck above the collar
+    size: [1024, 1024]
+    seed: 52101
+    states:
+      front: seen straight from the front, facing the viewer
+      side:  seen from a three-quarter side view, turned to face the left of the image
+  - id: cust_man_ear
+    type: prop
+    refs: [refs/customer_sheet.png]
+    template: >-
+      A single isolated 2D character face part for a casual mobile cooking game, same glossy cartoon style as the
+      reference: {object}. Flat, centered, large, filling most of the frame, on a plain flat {bg} background.
+      Nothing else in the image: no face, no head, no skin around it, no scene, no text.
+    prompt: a single cartoon human ear with warm dark brown skin, the left ear seen from the front, isolated
+    size: 1024
+    seed: 52201
+  - id: cust_man_nose
+    type: prop
+    refs: [refs/customer_sheet.png]
+    template: >-
+      A single isolated 2D character face part for a casual mobile cooking game, same glossy cartoon style as the
+      reference: {object}. Flat, centered, large, filling most of the frame, on a plain flat {bg} background.
+      Nothing else in the image: no face, no head, no skin around it, no scene, no text.
+    prompt: a single small rounded cartoon human nose with warm dark brown skin, seen from the front, isolated
+    size: 1024
+    seed: 52301
+
+  # ---------------------------------------------------------------- customer puppet: woman
+  - id: draft_cust_woman_head
+    type: stateful
+    chain: none
+    refs: [refs/customer_sheet.png]
+    template: >-
+      {ref_clause} A 2D character asset for a casual mobile cooking game, drawn in the same style as the reference
+      customers: {object}. Clean glossy cartoon rendering with soft shading, centered, filling most of the frame,
+      on a plain flat {bg} background. No ground shadow, no scene, no text, no UI.
+    prompt: only the head and neck of a woman with a short auburn bob haircut with bangs, light peach skin, wearing a red dress and a white pearl necklace, with a completely blank featureless face - no eyes, no eyebrows, no nose, no mouth, no ears, just smooth skin - and no body below the neck
+    size: [1024, 1024]
+    seed: 52001
+    states:
+      front: seen straight from the front, facing the viewer
+      side:  seen from a three-quarter side view, turned to face the left of the image
+  - id: draft_cust_woman_body
+    type: stateful
+    chain: none
+    refs: [refs/customer_sheet.png]
+    template: >-
+      {ref_clause} A 2D character asset for a casual mobile cooking game, drawn in the same style as the reference
+      customers: {object}. Clean glossy cartoon rendering with soft shading, centered, filling most of the frame,
+      on a plain flat {bg} background. No ground shadow, no scene, no text, no UI.
+    prompt: only the upper body of a woman with a short auburn bob haircut with bangs, light peach skin, wearing a red dress and a white pearl necklace, from the base of the neck down to the waist, shoulders and arms at the sides, cut off flat at the waist and with no head and no neck above the collar
+    size: [1024, 1024]
+    seed: 52101
+    states:
+      front: seen straight from the front, facing the viewer
+      side:  seen from a three-quarter side view, turned to face the left of the image
+  - id: cust_woman_ear
+    type: prop
+    refs: [refs/customer_sheet.png]
+    template: >-
+      A single isolated 2D character face part for a casual mobile cooking game, same glossy cartoon style as the
+      reference: {object}. Flat, centered, large, filling most of the frame, on a plain flat {bg} background.
+      Nothing else in the image: no face, no head, no skin around it, no scene, no text.
+    prompt: a single cartoon human ear with light peach skin, the left ear seen from the front, isolated
+    size: 1024
+    seed: 52201
+  - id: cust_woman_nose
+    type: prop
+    refs: [refs/customer_sheet.png]
+    template: >-
+      A single isolated 2D character face part for a casual mobile cooking game, same glossy cartoon style as the
+      reference: {object}. Flat, centered, large, filling most of the frame, on a plain flat {bg} background.
+      Nothing else in the image: no face, no head, no skin around it, no scene, no text.
+    prompt: a single small rounded cartoon human nose with light peach skin, seen from the front, isolated
+    size: 1024
+    seed: 52301
+
+
+  - id: cust_man_head
+    type: stateful
+    chain: none
+    template: >-
+      Using the reference image of the character, redraw it with only the head and the neck: erase the shoulders,
+      the clothing, the collar and everything below the neck so the head floats on its own, cut off cleanly at the
+      base of the neck. Keep the face, hair, skin tone, camera angle and art style exactly the same. {object}
+      Plain flat {bg} background, nothing else.
+    prompt: ""
+    size: 1024
+    seed: 52011
+    states:
+      front: {text: "", refs: [out/draft_cust_man_head/raw/cust_man_head_front.png]}
+      side:  {text: "", refs: [out/draft_cust_man_head/raw/cust_man_head_side.png]}
+  - id: cust_man_body
+    type: stateful
+    chain: none
+    template: >-
+      Using the reference image of the character, redraw it without the head: erase the entire head, hair and neck
+      above the collar so the clothing and shoulders stand alone like a headless mannequin with an empty collar.
+      Keep the clothing, pose, camera angle and art style exactly the same. {object}
+      Plain flat {bg} background, nothing else.
+    prompt: ""
+    size: 1024
+    seed: 52111
+    states:
+      front: {text: "", refs: [out/draft_cust_man_body/raw/cust_man_body_front.png]}
+      side:  {text: "", refs: [out/draft_cust_man_body/raw/cust_man_body_side.png]}
+
+  - id: cust_woman_head
+    type: stateful
+    chain: none
+    template: >-
+      Using the reference image of the character, redraw it with only the head and the neck: erase the shoulders,
+      the clothing, the collar and everything below the neck so the head floats on its own, cut off cleanly at the
+      base of the neck. Keep the face, hair, skin tone, camera angle and art style exactly the same. {object}
+      Plain flat {bg} background, nothing else.
+    prompt: ""
+    size: 1024
+    seed: 52011
+    states:
+      front: {text: "", refs: [out/draft_cust_woman_head/raw/cust_woman_head_front.png]}
+      side:  {text: "", refs: [out/draft_cust_woman_head/raw/cust_woman_head_side.png]}
+  - id: cust_woman_body
+    type: stateful
+    chain: none
+    template: >-
+      Using the reference image of the character, redraw it without the head: erase the entire head, hair and neck
+      above the collar so the clothing and shoulders stand alone like a headless mannequin with an empty collar.
+      Keep the clothing, pose, camera angle and art style exactly the same. {object}
+      Plain flat {bg} background, nothing else.
+    prompt: ""
+    size: 1024
+    seed: 52111
+    states:
+      front: {text: "", refs: [out/draft_cust_woman_body/raw/cust_woman_body_front.png]}
+      side:  {text: "", refs: [out/draft_cust_woman_body/raw/cust_woman_body_side.png]}
+
+  # ---------------------------------------------------------------- shared face parts (chroma keyed: they contain white)
+  - id: face_eye
+    type: stateful
+    chain: none
+    refs: [refs/customer_sheet.png]
+    template: >-
+      A single isolated 2D character face part for a casual mobile cooking game, same glossy cartoon style as the
+      reference: {object}. Flat, centered, large, filling most of the frame, on a plain flat {bg} background.
+      Nothing else in the image: no face, no head, no skin around it, no scene, no text.
+    bg: solid bright green
+    cutout: key
+    prompt: a single large cartoon eye seen from the front, the left eye
+    size: 1024
+    seed: 53001
+    states:
+      open:   wide open, white eyeball, large brown iris with a black pupil and a white highlight, thick dark upper lash line
+      closed: {text: "closed eye drawn as one thick curved dark line (a shut eyelid) with three short lashes below it, no eyeball, no white circle, no skin, just the line", seed: 53007}
+  - id: face_brow
+    type: prop
+    refs: [refs/customer_sheet.png]
+    template: >-
+      A single isolated 2D character face part for a casual mobile cooking game, same glossy cartoon style as the
+      reference: {object}. Flat, centered, large, filling most of the frame, on a plain flat {bg} background.
+      Nothing else in the image: no face, no head, no skin around it, no scene, no text.
+    bg: solid bright green
+    cutout: key
+    prompt: a single dark brown cartoon eyebrow, the left eyebrow, a smooth thick arched stroke, horizontal
+    size: 1024
+    seed: 53101
+  - id: face_mouth
+    type: stateful
+    chain: none
+    refs: [refs/customer_sheet.png]
+    template: >-
+      A single isolated 2D character face part for a casual mobile cooking game, same glossy cartoon style as the
+      reference: {object}. Flat, centered, large, filling most of the frame, on a plain flat {bg} background.
+      Nothing else in the image: no face, no head, no skin around it, no scene, no text.
+    bg: solid bright green
+    cutout: key
+    prompt: a single cartoon mouth seen from the front, with soft pink lips
+    size: 1024
+    seed: 53201
+    states:
+      neutral: closed mouth, a gentle relaxed line, lips together
+      smile:   big happy open smile showing a row of white teeth
+      frown:   {text: "only the lips, an unhappy sad frown, lips together with the corners turned down, no face around them, no skin, no eyes", seed: 53213}
+      open:    surprised round open mouth showing the tongue, an O shape
