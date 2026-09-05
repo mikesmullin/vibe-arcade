@@ -347,14 +347,14 @@ const CHAR={
 // part transforms as fractions of head width (x,y) ; sx/sy scale ; rot ; a alpha
 const POSE={
   front:{
-    earL:{x:-.45,y:-.01,sx:1,sy:1,rot:0,a:1}, earR:{x:.45,y:-.01,sx:-1,sy:1,rot:0,a:1},
+    earL:{x:-.45,y:-.01,sx:-1,sy:1,rot:0,a:1}, earR:{x:.45,y:-.01,sx:1,sy:1,rot:0,a:1},
     eyeL:{x:-.16,y:.03,sx:1,sy:1,rot:0,a:1},  eyeR:{x:.16,y:.03,sx:-1,sy:1,rot:0,a:1},
     browL:{x:-.17,y:.16,sx:1,sy:1,rot:.05,a:1},browR:{x:.17,y:.16,sx:-1,sy:1,rot:-.05,a:1},
     nose:{x:0,y:-.09,sx:1,sy:1,rot:0,a:1},     mouth:{x:0,y:-.25,sx:1,sy:1,rot:0,a:1},
     head:{x:0,y:0,sx:1,sy:1,rot:0,a:1},
   },
   side:{ // facing left (−x)
-    earL:{x:-.2,y:-.04,sx:.4,sy:1,rot:0,a:0}, earR:{x:.30,y:0,sx:-1,sy:1,rot:0,a:1},
+    earL:{x:-.2,y:-.04,sx:-.4,sy:1,rot:0,a:0}, earR:{x:.30,y:0,sx:1,sy:1,rot:0,a:1},
     eyeL:{x:-.33,y:.03,sx:.55,sy:1,rot:0,a:1}, eyeR:{x:-.09,y:.03,sx:-.9,sy:1,rot:0,a:1},
     browL:{x:-.34,y:.16,sx:.55,sy:1,rot:.1,a:1},browR:{x:-.1,y:.16,sx:-.9,sy:1,rot:-.02,a:1},
     nose:{x:-.36,y:-.09,sx:.8,sy:1,rot:.1,a:1}, mouth:{x:-.25,y:-.25,sx:.7,sy:1,rot:.05,a:1},
