@@ -293,6 +293,10 @@ function applySize(){
 addEventListener('resize',()=>{applySize();if(typeof Pose!=='undefined'&&Pose.active)Pose.frame();});
 visualViewport&&visualViewport.addEventListener('resize',()=>{applySize();if(typeof Pose!=='undefined'&&Pose.active)Pose.frame();});
 const geoCache={};
+function planeGeoClip(cut){ // bottom-anchored plane showing only the lower `cut` fraction of the texture
+  const k='clip'+cut;if(!geoCache[k]){const g=new THREE.PlaneGeometry(1,cut);g.translate(0,cut/2,0);const uv=g.attributes.uv;for(let i=0;i<uv.count;i++)uv.setY(i,uv.getY(i)*cut);geoCache[k]=g;}return geoCache[k];}
+function planeGeoKeepTop(keep){ // centre-anchored plane showing only the upper `keep` fraction (drops a neck flare etc.)
+  const k='top'+keep;if(!geoCache[k]){const g=new THREE.PlaneGeometry(1,keep);g.translate(0,.5-keep/2,0);const uv=g.attributes.uv;for(let i=0;i<uv.count;i++)uv.setY(i,1-keep+uv.getY(i)*keep);geoCache[k]=g;}return geoCache[k];}
 function planeGeo(ax=.5,ay=.5){const k=ax+','+ay;if(!geoCache[k]){const g=new THREE.PlaneGeometry(1,1);g.translate(.5-ax,.5-ay,0);geoCache[k]=g;}return geoCache[k];}
 /** Sprite: textured plane. w in design px, height from image aspect. anchor (ax,ay) in [0..1], (0.5,0)=bottom-center. */
 function sprite(key,{w=100,h=null,ax=.5,ay=.5,layer=L.ITEM,x=0,y=0,alpha=1}={}){
@@ -341,8 +345,9 @@ function makeBar(w=90,h=14){
    ====================================================================== */
 const CHAR={
   // ear: front-pose placement/size per character, chosen to cover whatever ear remnant klein baked into the head
-  man:  {bodyW:250,headW:150,headY:238,skin:0x6b3f24,ear:{x:.45,y:-.01,w:.2}},
-  woman:{bodyW:240,headW:150,headY:236,skin:0xf2c9a8,ear:{x:.37,y:.06,w:.17}},
+  // collarCut: fraction of the body height (from the bottom) drawn IN FRONT of the neck; above it the body is behind the head
+  man:  {bodyW:250,headW:150,headY:226,skin:0x6b3f24,ear:{x:.45,y:-.01,w:.2},collarCut:.70,neckKeep:.84},
+  woman:{bodyW:240,headW:150,headY:222,skin:0xf2c9a8,ear:{x:.37,y:.06,w:.17},collarCut:.75,neckKeep:1},
 };
 // part transforms as fractions of head width (x,y) ; sx/sy scale ; rot ; a alpha
 const POSE={
@@ -379,11 +384,15 @@ class Puppet{
     const bw=this.c.bodyW,hw=this.c.headW;
     this.bodyF=sprite(charId+'_body_front',{w:bw,ax:.5,ay:0});this.bodyS=sprite(charId+'_body_side',{w:bw*.96,ax:.5,ay:0});
     this.bodyG.add(this.bodyF,this.bodyS);
+    // front copies clipped to below the collar line: clothing overlaps the neck, but the back of the collar stays behind it
+    const clip=b=>{const m=new THREE.Mesh(planeGeoClip(this.c.collarCut),b.material.clone());m.scale.copy(b.scale);m.userData={key:b.userData.key,w:b.userData.w,h:b.userData.h,sub:1.2};m.renderOrder=b.renderOrder+1.2;this.bodyG.add(m);return m;};
+    this.bodyF2=clip(this.bodyF);this.bodyS2=clip(this.bodyS);
     this.headG.position.y=this.c.headY;
     this.parts={};
     const add=(name,key,w,sub)=>{const s=sprite(key,{w:hw*w});s.userData.sub=sub;this.headG.add(s);this.parts[name]=s;return s;};
     this.parts.earL=add('earL',charId+'_ear',this.c.ear.w,1.5);this.parts.earR=add('earR',charId+'_ear',this.c.ear.w,1.5);
     this.headF=add('headF',charId+'_head_front',1,1);this.headS=add('headS',charId+'_head_side',1,1);
+    if(this.c.neckKeep<1){this.headF.geometry=planeGeoKeepTop(this.c.neckKeep);this.headS.geometry=planeGeoKeepTop(this.c.neckKeep);}   // trim the neck flare baked into the head render
     this.parts.head=this.headF;
     add('eyeL','eye_open',PART_W.eye,2);add('eyeR','eye_open',PART_W.eye,2);
     add('browL','brow',PART_W.brow,3);add('browR','brow',PART_W.brow,3);
@@ -440,6 +449,7 @@ class Puppet{
     this.headF.material.opacity=1-t;this.headS.material.opacity=t;this.headS.position.copy(this.headF.position);this.headS.scale.copy(this.headF.scale);this.headS.rotation.copy(this.headF.rotation);
     this.headS.visible=t>.01&&!this._hideHead;this.headF.visible=t<.99&&!this._hideHead;
     this.bodyF.material.opacity=1-t;this.bodyS.material.opacity=t;this.bodyS.visible=t>.01&&!this._hideBody;this.bodyF.visible=t<.99&&!this._hideBody;
+    this.bodyF2.material.opacity=1-t;this.bodyS2.material.opacity=t;this.bodyF2.visible=this.bodyF.visible;this.bodyS2.visible=this.bodyS.visible;
     if(this._hideEars){this.parts.earL.visible=this.parts.earR.visible=false;}
     // eye sprite: closed texture during blink
     const eyeKey=this.blink>0?'eye_closed':'eye_open';
