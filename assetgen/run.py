@@ -95,26 +95,91 @@ def build_graph(cfg, prompt, seed, w, h, refs=(), init=None, denoise=1.0, prefix
 # ------------------------------------------------------------ post-process
 _session = None
 def chroma_key(im: Image.Image, key=None, tol=70, soft=50) -> Image.Image:
-    """Flat-colour background removal with despill: alpha from distance to the key colour.
-    key defaults to the median colour of the image corners (the model rarely paints the exact colour asked for)."""
+    """Flat-colour background removal with despill. key defaults to the median colour of the image corners (the
+    model rarely paints the exact colour asked for). Works for green or magenta backdrops: pick the backdrop colour
+    that is NOT in the object (green jacket -> magenta backdrop)."""
     import numpy as np
     a = np.asarray(im.convert("RGB")).astype(np.float32)
     if key is None:
         h, w = a.shape[:2]; m = max(4, min(h, w) // 25)
         corners = np.concatenate([a[:m, :m].reshape(-1, 3), a[:m, -m:].reshape(-1, 3), a[-m:, :m].reshape(-1, 3), a[-m:, -m:].reshape(-1, 3)])
         key = tuple(np.median(corners, axis=0))
-    d = np.sqrt(((a - np.array(key, dtype=np.float32)) ** 2).sum(-1))
+    key = np.array(key, dtype=np.float32)
+    d = np.sqrt(((a - key) ** 2).sum(-1))
     alpha = np.clip((d - tol) / soft, 0, 1)
-    # despill: pull the key channel down to the max of the other two where it dominates
-    k = int(np.argmax(key))
-    others = [i for i in range(3) if i != k]
-    lim = np.maximum(a[..., others[0]], a[..., others[1]])
-    a[..., k] = np.minimum(a[..., k], lim + (a[..., k] - lim) * alpha)
+    # channels that are "high" in the key colour (G for green, R+B for magenta) vs the rest
+    hi = [i for i in range(3) if key[i] > 128] or [int(np.argmax(key))]
+    lo = [i for i in range(3) if i not in hi] or [int(np.argmin(key))]
+    dominance = a[..., hi].min(-1) - a[..., lo].max(-1)
+    # drop pixels where the key hue dominates (darker shadows painted on the backdrop)
+    alpha = np.minimum(alpha, np.clip((38 - dominance) / 16, 0, 1))
+    # a pixel that does not lean toward the key hue at all is never background, however close it is in RGB
+    # distance (dark brown skin vs a muted green backdrop was coming out 80% opaque)
+    alpha = np.where(dominance <= 0, 1.0, alpha)
+    # despill: pull the key channels down to the max of the other channels where they dominate, on soft edges only
+    lim = a[..., lo].max(-1)
+    for i in hi:
+        a[..., i] = np.minimum(a[..., i], lim + (a[..., i] - lim) * alpha)
     out = np.dstack([a, alpha * 255]).astype(np.uint8)
     return Image.fromarray(out, "RGBA")
 
 
-def cutout(im: Image.Image, pad=24, export=None, mode="rembg") -> Image.Image:
+def trim_neck(rgba: Image.Image, max_neck=0.62, zone=0.4, jaw=1.12, below=0.06) -> Image.Image:
+    """Erase a neck under a head. The neck's waist is a local minimum of the row widths in the bottom `zone` of the
+    silhouette with at least `below` of the image height still below it (a chin tip has nothing below). If that
+    waist is narrower than `max_neck` of the widest row, everything from the jaw line (first row above the waist
+    that is `jaw` times wider) downwards is erased."""
+    import numpy as np
+    a = np.asarray(rgba).copy()
+    alpha = a[..., 3] > 40
+    rows = np.where(alpha.any(1))[0]
+    if len(rows) == 0:
+        return rgba
+    H = a.shape[0]
+    w = alpha.sum(1).astype(np.float32)
+    k = max(2, H // 200); ws = np.convolve(w, np.ones(2 * k + 1) / (2 * k + 1), mode="same")   # smoothed
+    top, bot = rows.min(), rows.max()
+    maxw = w[top:bot + 1].max()
+    z0 = int(bot - (bot - top) * zone)
+    win = max(3, int(H * 0.03))
+    waist = None
+    for y in range(z0, bot - int(below * H)):
+        seg = ws[max(top, y - win):y + win + 1]
+        if ws[y] <= seg.min() + 0.5 and ws[y] < max_neck * maxw:
+            waist = y; break                     # topmost qualifying waist = closest to the jaw
+    if waist is None:
+        return rgba
+    y = waist
+    while y > top and ws[y] < ws[waist] * jaw:
+        y -= 1
+    a[y + 1:, :, 3] = 0
+    print(f"   trim_neck: cut {bot - y} rows below the jaw (neck waist {ws[waist]:.0f}px of {maxw:.0f}px)")
+    return Image.fromarray(a, "RGBA")
+
+
+def skin_match(rgba: Image.Image, ref_path, tol=48, soft=30) -> Image.Image:
+    """Recolour skin-coloured pixels of a body sprite so they match the face tone of a head sprite.
+    The body's own skin tone is sampled from the top of its silhouette (the neck), the target from the head's
+    centre; a per-channel gain is applied to pixels near the body's skin colour, with a soft falloff."""
+    import numpy as np
+    a = np.asarray(rgba.convert("RGBA")).astype(np.float32)
+    h = np.asarray(Image.open(ref_path).convert("RGBA")).astype(np.float32)
+    # head: median of opaque pixels in the central third
+    H, W = h.shape[:2]; c = h[H // 3:2 * H // 3, W // 3:2 * W // 3]; c = c[c[..., 3] > 200][..., :3]
+    target = np.median(c, axis=0)
+    # body: median of opaque pixels in the top 8% of rows that carry any alpha (the neck stub), central half
+    alpha = a[..., 3] > 200; rows = np.where(alpha.any(1))[0]; y0 = rows.min(); y1 = y0 + max(4, int(0.08 * (rows.max() - y0)))
+    Wb = a.shape[1]; n = a[y0:y1, Wb // 4:3 * Wb // 4]; n = n[n[..., 3] > 200][..., :3]
+    src = np.median(n, axis=0)
+    gain = target / np.maximum(src, 1)
+    d = np.sqrt(((a[..., :3] - src) ** 2).sum(-1))
+    wgt = np.clip((tol + soft - d) / soft, 0, 1)[..., None]
+    a[..., :3] = np.clip(a[..., :3] * (1 + (gain - 1) * wgt), 0, 255)
+    print(f"   skin_match: body {src.astype(int)} -> face {target.astype(int)}")
+    return Image.fromarray(a.astype(np.uint8), "RGBA")
+
+
+def cutout(im: Image.Image, pad=24, export=None, mode="rembg", trim=False) -> Image.Image:
     global _session
     if mode == "none":
         return im.convert("RGBA")
@@ -125,6 +190,8 @@ def cutout(im: Image.Image, pad=24, export=None, mode="rembg") -> Image.Image:
         if _session is None:
             _session = new_session("isnet-general-use")
         rgba = remove(im, session=_session, post_process_mask=True)
+    if trim:
+        rgba = trim_neck(rgba)
     a = rgba.getchannel("A").point(lambda v: 255 if v > 8 else 0)
     box = a.getbbox()
     if box:
@@ -212,7 +279,9 @@ def main():
             imgs = run_graph(build_graph(cfg, prompt, seed, w, h, refs, init, denoise,
                                          prefix=f"assetgen/{aid}/{name}", lora=lora))
             imgs[0].save(raw_path)
-            sprite = cutout(imgs[0], export=asset.get("export"), mode=asset.get("cutout", "rembg"))
+            sprite = cutout(imgs[0], export=asset.get("export"), mode=asset.get("cutout", "rembg"), trim=asset.get("trim_neck", False))
+            if asset.get("skin_match"):
+                sprite = skin_match(sprite, HERE / asset["skin_match"])
             sprite.save(final)
             (adir / "raw" / f"{name}.txt").write_text(prompt + f"\nseed={seed}\n")
             print(f"   -> {final.relative_to(HERE)}  {sprite.size}  {time.time()-t:.1f}s")

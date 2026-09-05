@@ -131,6 +131,10 @@ folder. The second batch added, all in one evening:
 time-travel panel (freeze, +1, +N frames of 1/60 s, reset T; keys `f` / `.` / `>`) and the poser. From the console,
 `__cook.help()` lists everything: `__cook.dbg.step(n)`, `__cook.pose.enter('puppet:man',{bg:'grid',zoom:3})`,
 `pose.show({ears:false})`, `pose.center(dx,dy)`, `pose.parts()`. Backdrops: any CSS colour, `'gradient'` or `'grid'`.
+The left-docked toolbar (visible with `?debug` or `?pose=`) has move / scale / rotate tools: hovering outlines the
+smallest sprite under the cursor, including parts inside composites, and each drag logs a `[edit]` line with before
+and after values (`__cook.edit.dump()` prints them all). Puppet face parts log offsets in head-width units that paste
+straight into `POSE` / `CHAR`; everything else logs design pixels.
 This is how the double-ear bug was found: klein bakes ears (or an erased-ear skin patch) into every head it draws,
 so the rigged ears are drawn in front of the head with per-character placement that covers the remnant.
 
