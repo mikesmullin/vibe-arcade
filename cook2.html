@@ -11,7 +11,7 @@
 <meta name="theme-color" content="#1c5c6e">
 <script>
 (function(){
-  function isUi(e){var t=e.target;return !!(t&&t.closest&&t.closest('button,input,select,textarea,a,.overlay,.panel,#story,#hud .r'));}
+  function isUi(e){var t=e.target;return !!(t&&t.closest&&t.closest('button,input,select,textarea,a,.overlay,.panel,#story,#hud .r,#dbgPanel,#dbgToggle'));}
   function block(e){if(e.touches&&e.touches.length>1)e.preventDefault();else if(!isUi(e))e.preventDefault();}
   var o={passive:false,capture:true};
   ['touchstart','touchmove','touchend','touchcancel','gesturestart','gesturechange','gestureend'].forEach(function(t){document.addEventListener(t,block,o);});
@@ -80,6 +80,15 @@ button:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.15)}
 #story input[type=range]{flex:1}
 #story input[type=number]{width:56px;background:#0e1620;color:#fff;border:1px solid #2f4a68;border-radius:6px;padding:3px 5px}
 #story .kv{font-family:ui-monospace,monospace;font-size:11.5px;color:#8fd3ff;white-space:pre-wrap}
+/* ---------- debug harness (?debug) ---------- */
+#dbgToggle{position:fixed;right:calc(10px + env(safe-area-inset-right,0px));bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:30;background:#1d2436;color:#cfe3ff;border:1px solid #3a4a75;border-radius:10px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer}
+#dbgPanel{position:fixed;right:10px;bottom:48px;z-index:30;background:#1d2436ee;color:#cfe3ff;border:1px solid #3a4a75;border-radius:14px;padding:12px 14px;font-size:13px;width:270px;display:none}
+#dbgPanel.open{display:block}
+#dbgPanel .row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center}
+#dbgPanel button{background:#2c3a5e;color:#fff;border:1px solid #46598f;border-radius:8px;padding:5px 9px;font-size:12.5px;cursor:pointer;box-shadow:none}
+#dbgPanel .lbl{color:#8fa5d6;font-size:11.5px;margin-top:8px;line-height:1.5;font-family:ui-monospace,monospace;white-space:pre-wrap}
+#dbgPanel input,#dbgPanel select{background:#10162a;color:#fff;border:1px solid #46598f;border-radius:7px;padding:4px 6px;font-size:12.5px}
+#dbgPanel input[type=number]{width:56px}#dbgPanel input[type=text]{width:150px}
 </style>
 </head>
 <body>
@@ -132,6 +141,16 @@ button:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.15)}
   <div class="panel"><h1>Paused</h1><div class="row"><button class="big" id="resumeBtn">Resume</button><button class="ghost" id="quitBtn">Quit to menu</button></div></div>
 </div>
 <div id="toast"></div>
+<button id="dbgToggle" class="hidden">⏱ Debug</button>
+<div id="dbgPanel">
+  <b style="font-size:14px">Time-Travel Control</b>
+  <div class="row"><button id="dbgFreeze">⏸ Freeze</button><span>steps:</span><input type="number" id="dbgSteps" value="1" min="1" max="6000"></div>
+  <div class="row"><button id="dbgStep1">▶ +1</button><button id="dbgStepN">▶ +N</button><button id="dbgResetT">↺ Reset T</button></div>
+  <b style="font-size:14px;display:block;margin-top:10px">Poser (studio)</b>
+  <div class="row"><input type="text" id="poseSpec" value="puppet:man" placeholder="puppet:man | item:patty:cooked | key:grill"><button id="poseGo">Pose</button><button id="poseExit">Exit</button></div>
+  <div class="row"><select id="poseBg"><option value="white">white</option><option value="#333">dark</option><option value="gradient">gradient</option><option value="grid">grid</option><option value="#0f0">green</option></select><span>zoom</span><input type="number" id="poseZoom" value="1" min="0.1" max="20" step="0.1"></div>
+  <div class="lbl" id="dbgInfo">frozen: false · T=0.00s</div>
+</div>
 
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
@@ -271,8 +290,8 @@ function applySize(){
   view={w,h,fw,fh};
   if(bgSprite){const s=Math.max(fw/W,fh/H);bgSprite.scale.set(W*s,H*s,1);counterSprite.scale.set(W*s,counterH*s,1);counterSprite.position.y=(-H/2)*s+counterH*s/2;}
 }
-addEventListener('resize',applySize);
-visualViewport&&visualViewport.addEventListener('resize',applySize);
+addEventListener('resize',()=>{applySize();if(typeof Pose!=='undefined'&&Pose.active)Pose.frame();});
+visualViewport&&visualViewport.addEventListener('resize',()=>{applySize();if(typeof Pose!=='undefined'&&Pose.active)Pose.frame();});
 const geoCache={};
 function planeGeo(ax=.5,ay=.5){const k=ax+','+ay;if(!geoCache[k]){const g=new THREE.PlaneGeometry(1,1);g.translate(.5-ax,.5-ay,0);geoCache[k]=g;}return geoCache[k];}
 /** Sprite: textured plane. w in design px, height from image aspect. anchor (ax,ay) in [0..1], (0.5,0)=bottom-center. */
@@ -321,27 +340,28 @@ function makeBar(w=90,h=14){
    puppet rig: paper-doll customer, tweened between FRONT and SIDE poses
    ====================================================================== */
 const CHAR={
-  man:  {bodyW:250,headW:150,headY:238,headTilt:0,skin:0x6b3f24},
-  woman:{bodyW:240,headW:150,headY:236,headTilt:0,skin:0xf2c9a8},
+  // ear: front-pose placement/size per character, chosen to cover whatever ear remnant klein baked into the head
+  man:  {bodyW:250,headW:150,headY:238,skin:0x6b3f24,ear:{x:.45,y:-.01,w:.2}},
+  woman:{bodyW:240,headW:150,headY:236,skin:0xf2c9a8,ear:{x:.37,y:.06,w:.17}},
 };
 // part transforms as fractions of head width (x,y) ; sx/sy scale ; rot ; a alpha
 const POSE={
   front:{
-    earL:{x:-.47,y:-.05,sx:1,sy:1,rot:0,a:1}, earR:{x:.47,y:-.05,sx:-1,sy:1,rot:0,a:1},
+    earL:{x:-.45,y:-.01,sx:1,sy:1,rot:0,a:1}, earR:{x:.45,y:-.01,sx:-1,sy:1,rot:0,a:1},
     eyeL:{x:-.16,y:.03,sx:1,sy:1,rot:0,a:1},  eyeR:{x:.16,y:.03,sx:-1,sy:1,rot:0,a:1},
     browL:{x:-.17,y:.16,sx:1,sy:1,rot:.05,a:1},browR:{x:.17,y:.16,sx:-1,sy:1,rot:-.05,a:1},
     nose:{x:0,y:-.09,sx:1,sy:1,rot:0,a:1},     mouth:{x:0,y:-.25,sx:1,sy:1,rot:0,a:1},
     head:{x:0,y:0,sx:1,sy:1,rot:0,a:1},
   },
   side:{ // facing left (−x)
-    earL:{x:-.2,y:-.04,sx:.4,sy:1,rot:0,a:0}, earR:{x:.27,y:-.05,sx:-1,sy:1,rot:0,a:1},
+    earL:{x:-.2,y:-.04,sx:.4,sy:1,rot:0,a:0}, earR:{x:.30,y:0,sx:-1,sy:1,rot:0,a:1},
     eyeL:{x:-.33,y:.03,sx:.55,sy:1,rot:0,a:1}, eyeR:{x:-.09,y:.03,sx:-.9,sy:1,rot:0,a:1},
     browL:{x:-.34,y:.16,sx:.55,sy:1,rot:.1,a:1},browR:{x:-.1,y:.16,sx:-.9,sy:1,rot:-.02,a:1},
-    nose:{x:-.42,y:-.09,sx:.8,sy:1,rot:.1,a:1}, mouth:{x:-.25,y:-.25,sx:.7,sy:1,rot:.05,a:1},
+    nose:{x:-.36,y:-.09,sx:.8,sy:1,rot:.1,a:1}, mouth:{x:-.25,y:-.25,sx:.7,sy:1,rot:.05,a:1},
     head:{x:0,y:0,sx:1,sy:1,rot:0,a:1},
   },
 };
-const PART_W={ear:.17,eye:.17,brow:.2,nose:.11,mouth:.17};
+const PART_W={ear:.2,eye:.17,brow:.2,nose:.11,mouth:.17};
 const EXPR={ // brow offsets (dy in head-w units, rot inner-up positive), mouth key, eye sy
   neutral:{browDy:0,browRot:0,mouth:'mouth_neutral',eyeSy:1},
   happy:  {browDy:.04,browRot:.05,mouth:'mouth_smile',eyeSy:1},
@@ -362,7 +382,7 @@ class Puppet{
     this.headG.position.y=this.c.headY;
     this.parts={};
     const add=(name,key,w,sub)=>{const s=sprite(key,{w:hw*w});s.userData.sub=sub;this.headG.add(s);this.parts[name]=s;return s;};
-    this.parts.earL=add('earL',charId+'_ear',PART_W.ear,0);this.parts.earR=add('earR',charId+'_ear',PART_W.ear,0);
+    this.parts.earL=add('earL',charId+'_ear',this.c.ear.w,1.5);this.parts.earR=add('earR',charId+'_ear',this.c.ear.w,1.5);
     this.headF=add('headF',charId+'_head_front',1,1);this.headS=add('headS',charId+'_head_side',1,1);
     this.parts.head=this.headF;
     add('eyeL','eye_open',PART_W.eye,2);add('eyeR','eye_open',PART_W.eye,2);
@@ -374,6 +394,7 @@ class Puppet{
     this.gaze={x:0,y:0};this.blink=0;this.blinkNext=1.5+Math.random()*3;
     this.walk=0;this.walkPhase=Math.random()*6;this.bob=0;this.time=0;this.facing=1; // facing: 1 = left, -1 = right
     this.layer=L.CUST;
+    this.setLayer(L.CUST);
     this.apply();
   }
   setLayer(l){this.layer=l;setLayer(this.g,l);}
@@ -406,6 +427,7 @@ class Puppet{
       const a=A[name],b=B[name],p=this.parts[name];if(!p)continue;
       let x=lerp(a.x,b.x,t),y=lerp(a.y,b.y,t),sx=lerp(a.sx,b.sx,t),sy=lerp(a.sy,b.sy,t),rot=lerp(a.rot,b.rot,t),al=lerp(a.a,b.a,t);
       const isL=name.endsWith('L');
+      if(name.startsWith('ear')){const e=this.c.ear;x=lerp(isL?-e.x:e.x,b.x,t);y=lerp(e.y,b.y,t);}
       if(name.startsWith('eye')){x+=gx;y+=gy;sy*=eyeSy;if(this.blink>0)sy*=.12;}
       if(name.startsWith('brow')){y+=browDy+gy*.5;x+=gx*.7;rot+=isL?browRot:-browRot;}
       if(name==='mouth'||name==='nose'){x+=gx*.5;y+=gy*.5;}
@@ -416,8 +438,9 @@ class Puppet{
     }
     // head / body crossfade between front and side textures
     this.headF.material.opacity=1-t;this.headS.material.opacity=t;this.headS.position.copy(this.headF.position);this.headS.scale.copy(this.headF.scale);this.headS.rotation.copy(this.headF.rotation);
-    this.headS.visible=t>.01;this.headF.visible=t<.99;
-    this.bodyF.material.opacity=1-t;this.bodyS.material.opacity=t;this.bodyS.visible=t>.01;this.bodyF.visible=t<.99;
+    this.headS.visible=t>.01&&!this._hideHead;this.headF.visible=t<.99&&!this._hideHead;
+    this.bodyF.material.opacity=1-t;this.bodyS.material.opacity=t;this.bodyS.visible=t>.01&&!this._hideBody;this.bodyF.visible=t<.99&&!this._hideBody;
+    if(this._hideEars){this.parts.earL.visible=this.parts.earR.visible=false;}
     // eye sprite: closed texture during blink
     const eyeKey=this.blink>0?'eye_closed':'eye_open';
     if(this.parts.eyeL.userData.key!==eyeKey){setTex(this.parts.eyeL,eyeKey);setTex(this.parts.eyeR,eyeKey);}
@@ -754,7 +777,7 @@ function serveCustomer(c,it){
 const ndcTmp={x:0,y:0};
 let pDown=null;
 function onDown(e){
-  if(e.target.closest&&e.target.closest('button,.overlay,.panel,#story,#hud .r'))return;
+  if(e.target.closest&&e.target.closest('button,.overlay,.panel,#story,#hud .r,#dbgPanel,#dbgToggle'))return;
   if(e.cancelable)e.preventDefault();
   if(!G.inputEnabled())return;
   Audio.ensure();
@@ -854,7 +877,7 @@ try{const s=localStorage.getItem(SAVE_KEY);if(s)SAVE=Object.assign(SAVE,JSON.par
 const save=()=>{try{localStorage.setItem(SAVE_KEY,JSON.stringify(SAVE));}catch(e){}};
 const G={
   mode:'menu',level:1,cfg:null,coins:0,score:0,served:0,lost:0,time:0,elapsed:0,queue:[],spawnIdx:0,nextSpawnAt:0,
-  inputEnabled(){return this.mode==='playing'||this.mode==='story';},
+  inputEnabled(){return this.mode==='playing'||this.mode==='story'||this.mode==='pose';},
   addCoins(n,x,y,{fly=false}={}){this.coins+=n;this.score+=n;floatText(x,y,'+'+n,'coin');if(fly)flyCoins(x,y,Math.min(8,2+Math.round(n/6)));else bumpHud();updateHUD();},
   onServed:null,
 };
@@ -1004,7 +1027,7 @@ page('Customers rig','Paper-puppet customers: ear/eye/brow mirrored across the v
   slider(body,'gaze x',-1,1,0,.01,v=>P.forEach(p=>{killTweens(p.gaze);p.gaze.x=v;}));
   slider(body,'gaze y',-1,1,0,.01,v=>P.forEach(p=>{killTweens(p.gaze);p.gaze.y=v;}));
   slider(body,'head Y',150,320,CHAR.man.headY,1,v=>P.forEach(p=>{p.c.headY=v;}));
-  slider(body,'head W',90,220,CHAR.man.headW,1,v=>P.forEach(p=>{p.c.headW=v;for(const n in p.parts){const s=p.parts[n];const fw=n.startsWith('ear')?PART_W.ear:n.startsWith('eye')?PART_W.eye:n.startsWith('brow')?PART_W.brow:n==='nose'?PART_W.nose:n==='mouth'?PART_W.mouth:1;setSize(s,v*fw);}setSize(p.headS,v);}));
+  slider(body,'head W',90,220,CHAR.man.headW,1,v=>P.forEach(p=>{p.c.headW=v;for(const n in p.parts){const s=p.parts[n];const fw=n.startsWith('ear')?p.c.ear.w:n.startsWith('eye')?PART_W.eye:n.startsWith('brow')?PART_W.brow:n==='nose'?PART_W.nose:n==='mouth'?PART_W.mouth:1;setSize(s,v*fw);}setSize(p.headS,v);}));
   ctl(body,[['Turn to side',()=>P.forEach(p=>p.turn(1))],['Turn to front',()=>P.forEach(p=>p.turn(0))],['Face right ⟲',()=>P.forEach(p=>p.face(-p.facing))]]);
   ctl(body,[['Blink',()=>P.forEach(p=>p.doBlink())],['Smile',()=>P.forEach(p=>p.setExpr('happy'))],['Frown',()=>P.forEach(p=>p.setExpr('sad'))],['Angry',()=>P.forEach(p=>p.setExpr('angry'))],['Surprised',()=>P.forEach(p=>p.setExpr('surprised'))],['Talk',()=>P.forEach(p=>p.setExpr('talk'))],['Neutral',()=>P.forEach(p=>p.setExpr('neutral'))]]);
   ctl(body,[['Look left',()=>P.forEach(p=>p.look(-1,0))],['Look right',()=>P.forEach(p=>p.look(1,0))],['Look up',()=>P.forEach(p=>p.look(0,1))],['Look down',()=>P.forEach(p=>p.look(0,-1))],['Center',()=>P.forEach(p=>p.look(0,0))]]);
@@ -1038,18 +1061,118 @@ window.__cook={hit(x,y){const h=hitTest(x,y);return h&&(h.owner.constructor.name
   state(){return {mode:G.mode,sel:selected&&selected.kind+':'+selected.state,items:scene.children.length,customers:customers.map(c=>c.state+':'+c.dish+':'+c.patience.toFixed(2)),stations:stations.map(s=>s.constructor.name+(s.slots?':'+s.slots.map(x=>x.item?x.item.kind+'/'+x.item.state:(x.item===null&&x.pan?'-':'plate['+(x.item&&x.item.stack||[]).join('+')+']')).join(','):'')),coins:G.coins,served:G.served};},
   G,scene,customers,stations};
 /* ======================================================================
-   main loop
+   main loop + time-travel debug harness (ported from cook.html / museum harness.js)
    ====================================================================== */
-let last=performance.now();
-function frame(){
-  const now=performance.now();const dt=Math.min(.05,(now-last)/1000);last=now;
+const Time={T:0,frozen:false,frames:0,dt:1/60,last:performance.now(),
+  advance(){const now=performance.now();const wall=Math.min(.1,(now-this.last)/1000);this.last=now;if(this.frozen)return 0;this.T+=wall;this.frames++;return wall;},
+  info(){return {frozen:this.frozen,T:+this.T.toFixed(4),frames:this.frames,dt:this.dt,mode:G.mode};},
+  freeze(v=true){this.frozen=!!v;this.last=performance.now();render();dbgInfoUpdate();return this.info();},
+  unfreeze(){return this.freeze(false);},toggle(){return this.freeze(!this.frozen);},
+  step(n=1){this.frozen=true;n=Math.max(1,Math.min(6000,n|0));for(let i=0;i<n;i++){this.T+=this.dt;this.frames++;tick(this.dt);}render();dbgInfoUpdate();return this.info();},
+  stepMs(ms){return this.step(Math.max(1,Math.round(ms/(this.dt*1000))));},
+  resetT(){this.T=0;this.frames=0;render();dbgInfoUpdate();return this.info();},
+};
+const poseTicks=[];   // objects with update(dt) that live only in the poser studio
+function tick(dt){
   updateTweens(dt);
   if(G.mode==='playing')updateGame(dt);
   else if(G.mode==='story'){updateWorld(dt);storyTick&&storyTick(dt);}
   else if(G.mode==='menu')updateWorld(dt);
-  renderer.render(scene,camera);
-  requestAnimationFrame(frame);
+  else if(G.mode==='pose'){updateWorld(dt);for(const o of poseTicks)o.update(dt);}
 }
+function render(){renderer.render(scene,camera);}
+function frame(){const dt=Time.advance();if(dt>0)tick(dt);render();requestAnimationFrame(frame);}
+
+/* ---------- poser: isolate one object on a studio backdrop ---------- */
+function backdropTexture(kind,opts={}){
+  const cv=document.createElement('canvas');cv.width=cv.height=512;const g=cv.getContext('2d');
+  if(kind==='gradient'){const [a,b]=opts.colors||['#e8f4ff','#7fb2d8'];const gr=g.createLinearGradient(0,0,0,512);gr.addColorStop(0,a);gr.addColorStop(1,b);g.fillStyle=gr;g.fillRect(0,0,512,512);}
+  else if(kind==='grid'){const [a,b]=opts.colors||['#ffffff','#d8dde3'];const n=opts.cells||16,c=512/n;g.fillStyle=a;g.fillRect(0,0,512,512);g.fillStyle=b;for(let y=0;y<n;y++)for(let x=0;x<n;x++)if((x+y)%2)g.fillRect(x*c,y*c,c,c);g.strokeStyle='rgba(0,0,0,.18)';g.lineWidth=1;for(let i=0;i<=n;i++){g.beginPath();g.moveTo(i*c,0);g.lineTo(i*c,512);g.stroke();g.beginPath();g.moveTo(0,i*c);g.lineTo(512,i*c);g.stroke();}}
+  else{g.fillStyle=kind||'#ffffff';g.fillRect(0,0,512,512);}
+  const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;return t;
+}
+const Pose={
+  active:false,obj:null,spec:null,plane:null,saved:null,zoom:1,
+  /** spec: 'puppet:man' | 'customer:woman:burger' | 'item:patty:cooked' | 'plate:bun_bottom+patty+bun_top' | 'station:grill' | 'key:hud_star_on' | any asset key */
+  enter(spec,{bg='white',zoom=1,colors,cells}={}){
+    if(this.active)this.exit();
+    this.saved={mode:G.mode,hud:$('hud').className,story:$('story').className,menu:$('menu').className,children:scene.children.slice(),vis:scene.children.map(c=>c.visible)};
+    for(const c of scene.children)c.visible=false;
+    $('hud').classList.add('hidden');$('story').classList.add('hidden');$('menu').classList.add('hidden');$('end').classList.add('hidden');
+    G.mode='pose';this.active=true;this.spec=spec;poseTicks.length=0;
+    this.plane=new THREE.Mesh(planeGeo(),new THREE.MeshBasicMaterial({map:backdropTexture(bg,{colors,cells}),depthTest:false}));this.plane.renderOrder=-10;this.plane.scale.set(W*20,H*20,1);scene.add(this.plane);
+    const [type,a,b]=spec.split(':');
+    let o;
+    if(type==='puppet'){const p=new Puppet(a||'man');scene.add(p.g);poseTicks.push(p);o=p;o.root=p.g;}
+    else if(type==='customer'){const c=new Customer(a||'man',b||'burger',60,1);killTweens(c.p.g.position);c.p.g.position.set(0,-120,0);c.p.walk=0;c.p.pose=0;c.state='waiting';c.bub.visible=true;c.bub.scale.setScalar(1);c.bub.position.set(-150,150,0);o=c;o.root=c.p.g;}
+    else if(type==='item'){const it=new Item(a,b||'raw',0,0);o=it;o.root=it.g;}
+    else if(type==='plate'){const it=new Item('plate','empty',0,0);it.stack=(a||'').split('+').filter(Boolean);it.refresh();o=it;o.root=it.g;}
+    else if(type==='station'){buildKitchen({grillSlots:3});const st=stations.find(x=>x.constructor.name.toLowerCase()===(a||'grill').toLowerCase()||(x.spr&&x.spr.userData.key===a));for(const x of stations)if(x!==st&&x.spr)x.spr.visible=false;o=st||stations[0];o.root=o.spr;}
+    else{const key=type==='key'?a:spec;const sp=sprite(key,{w:400,layer:L.ITEM});scene.add(sp);o={root:sp};}
+    this.obj=o;this.zoom=zoom;this.pan={x:0,y:0};this.frame();render();
+    return this.info();
+  },
+  frame(){ // center on the object's bounds, scale the view so it fills ~70% of the height
+    if(!this.obj||!this.obj.root)return;scene.updateMatrixWorld();
+    const b=new THREE.Box3().setFromObject(this.obj.root);const c=b.getCenter(new THREE.Vector3()),sz=b.getSize(new THREE.Vector3());
+    const fit=Math.max(sz.x/(view.fw*.7),sz.y/(view.fh*.7),1e-3)/this.zoom;
+    const px=(this.pan&&this.pan.x)||0,py=(this.pan&&this.pan.y)||0;
+    camera.left=-view.fw/2*fit;camera.right=view.fw/2*fit;camera.top=view.fh/2*fit;camera.bottom=-view.fh/2*fit;camera.position.x=c.x+px;camera.position.y=c.y+py;camera.updateProjectionMatrix();
+    this.plane.position.set(c.x,c.y,0);
+  },
+  setZoom(z){this.zoom=z;this.frame();render();},
+  center(x,y){ // pan the studio camera (design units, relative to the object's bounds center)
+    this.pan={x,y};this.frame();render();},
+  setBg(bg,opts={}){if(this.plane){this.plane.material.map=backdropTexture(bg,opts);this.plane.material.needsUpdate=true;render();}},
+  info(){const b=this.obj&&this.obj.root?new THREE.Box3().setFromObject(this.obj.root):null;return {active:this.active,spec:this.spec,zoom:this.zoom,bounds:b?{x:[+b.min.x.toFixed(1),+b.max.x.toFixed(1)],y:[+b.min.y.toFixed(1),+b.max.y.toFixed(1)]}:null};},
+  show(v={}){const p=this.obj;if(!p||!p.parts)return;if('ears' in v)p._hideEars=!v.ears;if('head' in v)p._hideHead=!v.head;if('body' in v)p._hideBody=!v.body;p.apply();render();},
+  /** per-part dump for puppets: world rect of each part */
+  parts(){const p=this.obj;if(!p||!p.parts)return null;scene.updateMatrixWorld();const out={};for(const n in p.parts){const m=p.parts[n];const r=worldRect(m);out[n]={key:m.userData.key,vis:m.visible,alpha:+m.material.opacity.toFixed(2),rect:[+r.x0.toFixed(0),+r.y0.toFixed(0),+r.x1.toFixed(0),+r.y1.toFixed(0)],order:m.renderOrder};}
+    for(const n of ['headF','headS','bodyF','bodyS']){const m=p[n];const r=worldRect(m);out[n]={key:m.userData.key,vis:m.visible,alpha:+m.material.opacity.toFixed(2),rect:[+r.x0.toFixed(0),+r.y0.toFixed(0),+r.x1.toFixed(0),+r.y1.toFixed(0)],order:m.renderOrder};}return out;},
+  exit(){
+    if(!this.active)return;
+    removeObj(this.plane);this.plane=null;
+    if(this.obj){if(this.obj.dispose)this.obj.dispose();else if(this.obj.root)removeObj(this.obj.root);}
+    if(this.spec&&this.spec.startsWith('station'))clearWorld();
+    for(const c of scene.children.slice())if(!this.saved.children.includes(c))scene.remove(c);
+    this.saved.children.forEach((c,i)=>c.visible=this.saved.vis[i]);
+    $('hud').className=this.saved.hud;$('story').className=this.saved.story;$('menu').className=this.saved.menu;
+    G.mode=this.saved.mode;this.active=false;this.obj=null;poseTicks.length=0;
+    camera.position.x=0;camera.position.y=0;applySize();render();
+  },
+};
+const DBG_HELP=`__cook.dbg — time travel
+  dbg.freeze() / dbg.unfreeze() / dbg.toggle()   stop the sim (render keeps going)
+  dbg.step(n=1)        advance n frames of 1/60 s, then render
+  dbg.stepMs(ms)       advance ~ms of sim time
+  dbg.resetT()         T=0 (does not rewind world state)
+  dbg.info()           {frozen,T,frames,mode}
+  dbg.state()          world snapshot (customers, stations, coins)
+  dbg.panel(bool)      show the on-screen panel
+__cook.pose — studio
+  pose.enter(spec,{bg,zoom,colors,cells})  spec: puppet:man | customer:woman:burger | item:patty:cooked
+                                            plate:bun_bottom+patty+bun_top | station:grill | key:hud_star_on
+                                            bg: '#hex' | 'white' | 'gradient' | 'grid'  (colors:[a,b], cells:n)
+  pose.obj             the live object (e.g. pose.obj.turn(1); dbg.step(30))
+  pose.parts()         puppet part rects / textures / render order
+  pose.setBg(bg,opts)  pose.setZoom(z)  pose.center(dx,dy)  pose.frame()  pose.exit()
+  pose.show({ears:false,head:false,body:false})  hide/show puppet layers
+__cook.tapAt(x,y) / dragTo(x0,y0,x1,y1)  design-space input (0,0 = screen center, y up)`;
+function dbgInfoUpdate(){const i=Time.info();$('dbgInfo').textContent=`frozen: ${i.frozen} · T=${i.T.toFixed(2)}s · frames=${i.frames} · mode=${i.mode}`+(Pose.active?` · pose=${Pose.spec}`:'');$('dbgFreeze').textContent=i.frozen?'▶ Resume':'⏸ Freeze';}
+$('dbgToggle').onclick=()=>$('dbgPanel').classList.toggle('open');
+$('dbgFreeze').onclick=()=>Time.toggle();
+$('dbgStep1').onclick=()=>Time.step(1);
+$('dbgStepN').onclick=()=>Time.step(parseInt($('dbgSteps').value)||1);
+$('dbgResetT').onclick=()=>Time.resetT();
+$('poseGo').onclick=()=>Pose.enter($('poseSpec').value.trim(),{bg:$('poseBg').value,zoom:parseFloat($('poseZoom').value)||1});
+$('poseExit').onclick=()=>Pose.exit();
+$('poseBg').onchange=()=>Pose.active&&Pose.setBg($('poseBg').value);
+$('poseZoom').onchange=()=>Pose.active&&Pose.setZoom(parseFloat($('poseZoom').value)||1);
+addEventListener('keydown',e=>{if(e.target.matches('input,textarea,select'))return;if(e.key==='f')Time.toggle();if(e.key==='.')Time.step(1);if(e.key==='>')Time.step(10);});
+if(new URLSearchParams(location.search).has('debug')){$('dbgToggle').classList.remove('hidden');$('dbgPanel').classList.add('open');}
+window.__cook.dbg=Object.assign(Time,{state:()=>window.__cook.state(),panel(v=true){$('dbgPanel').classList.toggle('open',v);},help(){console.log(DBG_HELP);return DBG_HELP;}});
+window.__cook.pose=Pose;window.__cook.help=()=>DBG_HELP;
+
 (async()=>{
   const el=$('menuLevel');el.textContent='Loading assets…';
   await loadAll(p=>{el.textContent='Loading '+Math.round(p*100)+'%';});
@@ -1058,6 +1181,7 @@ function frame(){
   buildBackground();applySize();syncFsButton();
   showMenu();
   if(location.hash.startsWith('#story')){const n=parseInt(location.hash.slice(6))||0;openStory(n);}
+  Time.last=performance.now();dbgInfoUpdate();
   frame();
 })();
 </script>

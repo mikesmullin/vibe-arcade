@@ -127,6 +127,13 @@ folder. The second batch added, all in one evening:
   - Face parts contain white, so they are generated on a green background with `cutout: key`. The key colour is
     sampled from the image corners because klein paints a muted green rather than the exact colour asked for.
 
+**Debug harness in cook2.html** (ported from cook.html and the museum harness): open `cook2.html?debug` for the
+time-travel panel (freeze, +1, +N frames of 1/60 s, reset T; keys `f` / `.` / `>`) and the poser. From the console,
+`__cook.help()` lists everything: `__cook.dbg.step(n)`, `__cook.pose.enter('puppet:man',{bg:'grid',zoom:3})`,
+`pose.show({ears:false})`, `pose.center(dx,dy)`, `pose.parts()`. Backdrops: any CSS colour, `'gradient'` or `'grid'`.
+This is how the double-ear bug was found: klein bakes ears (or an erased-ear skin patch) into every head it draws,
+so the rigged ears are drawn in front of the head with per-character placement that covers the remnant.
+
 New manifest features from this round: per-asset `template` / `state_template`, `bg`, `cutout: rembg|key|none`,
 per-asset `refs`, and state values may be objects `{text, refs, seed}`.
 

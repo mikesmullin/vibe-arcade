@@ -358,11 +358,13 @@ assets:
     template: >-
       Using the reference image of the character, redraw it with only the head and the neck: erase the shoulders,
       the clothing, the collar and everything below the neck so the head floats on its own, cut off cleanly at the
-      base of the neck. Keep the face, hair, skin tone, camera angle and art style exactly the same. {object}
+      base of the neck. Also erase both ears completely, so the sides of the head are smooth skin and hair with no
+      ears at all. The face must stay completely blank and featureless: no eyes, no closed-eye lines, no eyebrows,
+      no nose, no mouth, only smooth skin. Keep the hair, skin tone, camera angle and art style exactly the same. {object}
       Plain flat {bg} background, nothing else.
     prompt: ""
     size: 1024
-    seed: 52011
+    seed: 52018
     states:
       front: {text: "", refs: [out/draft_cust_man_head/raw/cust_man_head_front.png]}
       side:  {text: "", refs: [out/draft_cust_man_head/raw/cust_man_head_side.png]}
@@ -387,11 +389,13 @@ assets:
     template: >-
       Using the reference image of the character, redraw it with only the head and the neck: erase the shoulders,
       the clothing, the collar and everything below the neck so the head floats on its own, cut off cleanly at the
-      base of the neck. Keep the face, hair, skin tone, camera angle and art style exactly the same. {object}
+      base of the neck. Also erase both ears completely, so the sides of the head are smooth skin and hair with no
+      ears at all. The face must stay completely blank and featureless: no eyes, no closed-eye lines, no eyebrows,
+      no nose, no mouth, only smooth skin. Keep the hair, skin tone, camera angle and art style exactly the same. {object}
       Plain flat {bg} background, nothing else.
     prompt: ""
     size: 1024
-    seed: 52011
+    seed: 52018
     states:
       front: {text: "", refs: [out/draft_cust_woman_head/raw/cust_woman_head_front.png]}
       side:  {text: "", refs: [out/draft_cust_woman_head/raw/cust_woman_head_side.png]}
@@ -457,3 +461,4 @@ assets:
       smile:   big happy open smile showing a row of white teeth
       frown:   {text: "only the lips, an unhappy sad frown, lips together with the corners turned down, no face around them, no skin, no eyes", seed: 53213}
       open:    surprised round open mouth showing the tongue, an O shape
+
