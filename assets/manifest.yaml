@@ -170,12 +170,30 @@ fries:
   - fries_cooked
   - fries_raw
   taken: '2026-09-05'
-fryer:
+fries_pile:
   files:
-    fryer: art/fryer/fryer.png
-  from: out/fryer/ (art outbox)
+    fries_pile_cooked: art/fries_pile/fries_pile_cooked.png
+    fries_pile_raw: art/fries_pile/fries_pile_raw.png
+  from: out/fries_pile/ (art outbox)
   keys:
-  - fryer
+  - fries_pile_cooked
+  - fries_pile_raw
+  taken: '2026-09-05'
+fry_carton_empty:
+  files:
+    carton_empty: art/fry_carton_empty/fry_carton_empty.png
+  from: out/fry_carton_empty/ (art outbox)
+  keys:
+  - carton_empty
+  taken: '2026-09-05'
+fry_station:
+  files:
+    fry_station_lowered: art/fry_station/fry_station_lowered.png
+    fry_station_raised: art/fry_station/fry_station_raised.png
+  from: out/fry_station/ (art outbox)
+  keys:
+  - fry_station_lowered
+  - fry_station_raised
   taken: '2026-09-05'
 frying_pan:
   files:
