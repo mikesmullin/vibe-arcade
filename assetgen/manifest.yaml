@@ -1,0 +1,169 @@
+# assetgen manifest: list in, sprites out.  Run: .venv/bin/python run.py [asset ids]
+project: diner_kitchen
+out: out
+
+comfy:
+  model: flux-2-klein-4b.safetensors
+  text_encoder: qwen_3_4b.safetensors
+  vae: flux2-vae.safetensors
+  steps: 4
+  cfg: 1.0
+  # Optional style LoRA trained with train.py. Off by default: with FLUX.2 klein the screenshot refs alone
+  # give the cleanest results; v2 @ <=0.5 is stable but adds little, >=0.8 washes out / tints backgrounds.
+  # lora: {name: dinerart_v2.safetensors, strength: 0.5, trigger: dnrart style}
+
+style:
+  # Reference images passed to every generation (style lock).  Comment out or use --no-refs to test without.
+  refs:
+    - refs/style_sheet.png
+  ref_clause: >-
+    Match the art style of the reference image exactly: the same glossy cel-shaded cartoon rendering,
+    saturated diner palette, clean outlines and soft lighting from the upper left. Do not copy any object
+    from the reference; draw a completely new image containing only the object described.
+  # First state / plain props
+  template: >-
+    {ref_clause} A single isolated 2D game asset for a casual mobile cooking game: {object}.
+    Bright saturated cel-shaded cartoon illustration with clean outlines and soft glossy highlights,
+    seen from a 3/4 elevated angle, centered and filling most of the frame,
+    on a plain flat pure white background. No ground shadow, no scene, no table, no kitchen, no text, no UI.
+  # Later states: the previous state image is appended as the last reference
+  state_template: >-
+    {ref_clause} Using the last reference image of the game asset, redraw the exact same object with the
+    same shape, size, position, camera angle and art style, but change it to this state: {state}.
+    Keep the plain flat pure white background. No ground shadow, no scene, no text, no UI.
+
+assets:
+  - id: patty
+    type: stateful
+    prompt: a single thick round ground-beef burger patty by itself (only the meat, no bun, no bread, no plate, no lettuce), cartoon game food
+    size: 1024
+    seed: 42101
+    chain: edit          # edit | img2img | none
+    states:
+      raw:     raw uncooked patty, red-pink minced meat with visible ground texture and small marbling flecks
+      cooking: half-cooked patty, the outside turning light brown while the middle is still pink, faint grill marks, tiny steam
+      cooked:  fully cooked patty, evenly deep golden-brown seared crust with dark charred grill lines, juicy
+      burnt:   badly burnt patty, almost black charcoal crust, cracked and dry, with a wisp of grey smoke rising
+
+  - id: bun_whole
+    type: prop
+    prompt: cartoon game food, a whole plain empty sesame hamburger bun (top and bottom halves stacked together, nothing in between, no patty, no cheese, no filling)
+    size: 1024
+    seed: 42204
+
+  - id: bun_top
+    type: prop
+    prompt: >-
+      cartoon game food, one single golden-brown dome-shaped dinner roll with sesame seeds on top, sitting alone with its flat
+      base on the ground. It is one solid piece of bread with no layers, no second piece underneath, nothing stacked, no cut
+    size: 1024
+    seed: 42211
+
+  - id: bun_bottom
+    type: prop
+    prompt: >-
+      cartoon game food, one single thick round flat slice of golden bread, like a short cylinder or hockey puck of bread:
+      golden crust around the side, soft pale cream-colored crumb on the flat top face. One solid piece, no layers, no dome,
+      nothing stacked on top, no seeds
+    size: 1024
+    seed: 42223
+
+  - id: grill
+    type: prop
+    refs: [refs/crop_grill.png]
+    prompt: >-
+      the diner griddle station from the reference, redrawn cleanly on white: a long wide rectangular brushed stainless steel
+      flat-top counter unit seen from the front at a slightly elevated angle, with eight round black burner rings in two rows
+      of four on the steel top, a red rectangular drip tray along the right side, chrome trim, the unit spanning the whole width of the frame
+    size: [1536, 1024]
+    seed: 42304
+
+  - id: icecream_machine
+    type: prop
+    refs: [refs/crop_icecream_machine.png]
+    prompt: >-
+      the red and cream retro soft-serve ice cream dispenser machine from the reference, redrawn cleanly: a tall boxy
+      countertop machine with a rounded red top, a black lid, a chrome nozzle and a small drip grate at the bottom, seen from a 3/4 front angle
+    size: [1024, 1280]
+    seed: 42501
+
+  - id: trash_bin
+    type: prop
+    refs: [refs/crop_trash_bin.png]
+    prompt: >-
+      the green diner trash bin from the reference, redrawn cleanly: a tall green plastic bin with a black flap lid and a white
+      trash icon, seen from a 3/4 front angle
+    size: [1024, 1280]
+    seed: 42601
+
+  - id: plate
+    type: prop
+    prompt: an empty round white ceramic diner plate with a silver rim, seen from a 3/4 elevated angle, cartoon game prop
+    size: 1024
+    seed: 42701
+
+  - id: cup
+    type: stateful
+    chain: edit
+    prompt: a single small white paper cup with a red stripe, cartoon game prop
+    size: 1024
+    seed: 42801
+    states:
+      empty: empty cup, seen from a 3/4 elevated angle so the inside is visible
+      full:  the same cup filled to the brim with orange soda and a few bubbles
+
+  - id: sausage
+    type: stateful
+    chain: edit
+    prompt: a single plump hot dog sausage by itself (only the sausage, no bun, no plate), cartoon game food
+    size: 1024
+    seed: 42901
+    states:
+      raw:    raw pale pink uncooked sausage, smooth and glossy
+      cooked: cooked sausage, evenly reddish-brown with dark grill lines, glossy and juicy
+      burnt:  burnt sausage, blackened charred skin, cracked, a wisp of grey smoke
+
+  - id: frying_pan
+    type: prop
+    prompt: a small black cast iron frying pan with a dark handle, empty, cartoon game prop
+    size: 1024
+    seed: 42401
+  - id: prep_tray
+    type: prop
+    prompt: an empty rectangular stainless steel hotel pan prep tray with rounded corners, seen from a 3/4 elevated angle, cartoon game prop
+    size: [1280, 1024]
+    seed: 43001
+
+  - id: napkin_dispenser
+    type: prop
+    prompt: a chrome diner napkin dispenser with a few white napkins sticking out of the top and a silver fork leaning against it, seen from a 3/4 angle, cartoon game prop
+    size: 1024
+    seed: 43101
+
+  - id: cheese_slice
+    type: prop
+    prompt: a single square slice of yellow-orange american cheese with softly melting drooping corners, seen from a 3/4 elevated angle, cartoon game food
+    size: 1024
+    seed: 43201
+
+  - id: fries
+    type: prop
+    prompt: a red and white striped paper carton full of golden french fries, seen from a 3/4 elevated angle, cartoon game food
+    size: 1024
+    seed: 43301
+
+  - id: ketchup_bottle
+    type: prop
+    prompt: a red squeeze ketchup bottle with a white cap and a small label, seen from a 3/4 elevated angle, cartoon game prop
+    size: [1024, 1280]
+    seed: 43401
+
+  - id: coffee_mug
+    type: stateful
+    chain: edit
+    prompt: a single white ceramic diner coffee mug with a teal stripe, cartoon game prop
+    size: 1024
+    seed: 43501
+    states:
+      empty: empty mug seen from a 3/4 elevated angle so the inside is visible
+      full:  the same mug filled with dark coffee and a little steam

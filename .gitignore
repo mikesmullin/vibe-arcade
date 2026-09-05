@@ -1,4 +1,8 @@
 node_modules/
 server.lock
-CHALLENGE.md
-SCRATCH.md
+/tmp/
+assetgen/.venv/
+assetgen/out/*/raw/
+assetgen/out_explore*/
+assetgen/out_ab/
+assetgen/out_norefs/
