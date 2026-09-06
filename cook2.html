@@ -816,7 +816,9 @@ class SodaMachine extends Station{
     if(this.cup){this.cup.dispose();this.cup=null;this.bar.visible=false;}
     if(st==='none'||!st)return;
     this.onTap();if(st==='filling'){this.t=this.fillT*.5;this.update(0);}else if(st==='full'){this.cup.set('full');this.bar.visible=false;}}
-  take(item){if(item===this.cup){this.cup=null;this.bar.visible=false;}item.station=null;if(this.stream)this.stream.visible=false;}
+  accepts(item){return !this.cup&&item.kind==='cup'&&item.state==='empty';}   // partial cup back on the grate resumes filling (t is kept); full cups never come back
+  drop(item){if(!this.accepts(item))return false;this.cup=item;item.station=this;item.home=null;item.g.position.set(this.cupPos.x,this.cupPos.y,0);item.refresh();item.setLayer(L.ITEM);SFX.place();return true;}   // t untouched: fill resumes; next update() Loops.set('soda') starts a fresh pour voice from the top
+  take(item){if(item===this.cup){this.cup=null;this.bar.visible=false;if(item.state==='full')this.t=0;}item.station=null;if(this.stream)this.stream.visible=false;Loops.stop('soda');}   // cup lifted mid-pour: voice stops with its release tail; putting it back starts a new one from the top
   update(dt){if(this.cup&&this.cup.state==='empty'){this.t+=dt;this.buildStream();if(this.stream){this.stream.visible=true;this.streamTx.offset.y=(this.streamTx.offset.y+dt*1.1)%1;}this.bar.visible=true;this.bar.set(this.t/this.fillT,0x60a5fa);
     Loops.set('soda',SND.pour,true);Loops.param('soda','fill',this.t/this.fillT);   // pour loop while filling; `fill` 0..1 drives the card's rising-resonance / closing-lowpass cue live
     if(this.t>=this.fillT){this.cup.set('full');this.bar.visible=false;if(this.stream)this.stream.visible=false;Loops.stop('soda');SFX.ding();}}}
@@ -1058,7 +1060,7 @@ function findTarget(x,y,it){
 }
 function canPick(o){
   if(o.kind==='plate')return !!(o.stack&&o.stack.length);
-  if(o.state==='cooking'||(o.kind==='cup'&&o.state==='empty'))return false;
+  if(o.state==='cooking')return false;   // filling cups (cup/empty on the soda machine) ARE pickable: lifting one pauses the pour, putting it back resumes
   return true;
 }
 /* lone container on a plate (empty carton / hotdog bun / hamburger bun): dragging or tapping
