@@ -238,9 +238,11 @@ document.addEventListener('fullscreenchange',()=>{applySize();syncFsButton();});
 /* ======================================================================
    audio (tiny synth)
    ====================================================================== */
+/* 3-mode sound, copied from cook.html: 0 = Music + SFX, 1 = SFX only, 2 = Muted */
+let soundMode=parseInt(localStorage.getItem('cookfever2.sound'))||0;
 const Sfx=new SfxEngine({base:'assets/'});   // keepers + automation cards from assets/sfx.json (bank loaded at boot); literal path: A is declared later
-const Audio={ctx:null,master:null,muted:false,
-  ensure(){if(!this.ctx){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;this.ctx=new AC();this.master=this.ctx.createGain();this.master.gain.value=.8;this.master.connect(this.ctx.destination);Sfx.setContext(this.ctx,this.ctx.destination);/* keepers bypass the synth master (.8) so a card's gain sounds exactly as on the desk */}if(this.ctx.state==='suspended')this.ctx.resume();},
+const Audio={ctx:null,master:null,musicGain:null,muted:false,
+  ensure(){if(!this.ctx){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;this.ctx=new AC();this.master=this.ctx.createGain();this.master.gain.value=.8;this.master.connect(this.ctx.destination);this.musicGain=this.ctx.createGain();this.musicGain.gain.value=(soundMode===0)?.4:0;this.musicGain.connect(this.master);Sfx.setContext(this.ctx,this.ctx.destination);/* keepers bypass the synth master (.8) so a card's gain sounds exactly as on the desk */}if(this.ctx.state==='suspended')this.ctx.resume();},
   tone({f=440,f2=null,t=.15,type='sine',v=.2,when=0}){if(!this.ctx||this.muted)return;const c=this.ctx,o=c.createOscillator(),g=c.createGain(),t0=c.currentTime+when;o.type=type;o.frequency.setValueAtTime(f,t0);if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(1,f2),t0+t);g.gain.setValueAtTime(v,t0);g.gain.exponentialRampToValueAtTime(.0001,t0+t);o.connect(g);g.connect(this.master);o.start(t0);o.stop(t0+t+.03);},
   noise({t=.2,v=.15,freq=1000}){if(!this.ctx||this.muted)return;const c=this.ctx,len=Math.floor(c.sampleRate*t),buf=c.createBuffer(1,len,c.sampleRate),d=buf.getChannelData(0);for(let i=0;i<len;i++)d[i]=Math.random()*2-1;const n=c.createBufferSource();n.buffer=buf;const f=c.createBiquadFilter();f.type='lowpass';f.frequency.value=freq;const g=c.createGain();g.gain.setValueAtTime(v,c.currentTime);g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+t);n.connect(f);f.connect(g);g.connect(this.master);n.start();},
 };
@@ -257,6 +259,39 @@ const SFX={
   sad:()=>{Audio.tone({f:392,t:.18,v:.14});Audio.tone({f:311,t:.3,v:.14,when:.16});},
   star:i=>Audio.tone({f:[784,988,1318][i]||1568,t:.22,type:'triangle',v:.2}),
 };
+/* Chiptune loop, copied from cook.html (132 BPM bass + lead + hats through Audio.musicGain) */
+const Music={
+  step:0,nextT:0,on:false,
+  start(){Audio.ensure();if(!Audio.ctx)return;this.nextT=Audio.ctx.currentTime+.15;this.step=0;this.on=true;},
+  stop(){this.on=false;},
+  tick(){
+    if(!this.on||!Audio.ctx||Audio.muted)return;
+    const c=Audio.ctx,stepDur=60/132/2;
+    while(this.nextT<c.currentTime+.18){
+      this.schedule(this.step%32,this.nextT);this.step++;this.nextT+=stepDur;
+    }
+  },
+  schedule(s,t){
+    const c=Audio.ctx,when=t-c.currentTime;if(when<0||Audio.muted)return;
+    const bass=[130.81,0,0,0,98,0,0,0,110,0,0,0,87.31,0,98,0,130.81,0,0,0,98,0,0,0,174.61,0,146.83,0,164.81,0,130.81,0];
+    const lead=[523.25,0,659.25,783.99,880,0,783.99,659.25,587.33,0,659.25,783.99,880,0,1046.5,0,523.25,0,659.25,783.99,880,0,1046.5,0,1174.66,0,1046.5,880,783.99,0,659.25,0];
+    if(bass[s])this.toneAt(bass[s],when,.2,'triangle',.16);
+    if(lead[s])this.toneAt(lead[s],when,.16,'sine',.07);
+    if(s%4===2)this.hat(when);
+  },
+  toneAt(f,when,dur,type,v){
+    const c=Audio.ctx,o=c.createOscillator(),g=c.createGain(),t0=c.currentTime+when;
+    o.type=type;o.frequency.value=f;
+    g.gain.setValueAtTime(v,t0);g.gain.exponentialRampToValueAtTime(.0001,t0+dur);
+    o.connect(g);g.connect(Audio.musicGain);o.start(t0);o.stop(t0+dur+.03);
+  },
+  hat(when){
+    const c=Audio.ctx,o=c.createOscillator(),g=c.createGain(),t0=c.currentTime+when;
+    o.type='square';o.frequency.value=5200;
+    g.gain.setValueAtTime(.012,t0);g.gain.exponentialRampToValueAtTime(.0001,t0+.03);
+    o.connect(g);g.connect(Audio.musicGain);o.start(t0);o.stop(t0+.05);
+  }
+};
 /* Looping keepers with runtime automation (SfxEngine). A station "wants" a loop every
    update it is active (Loops.set); frame() sweeps loops nobody wanted for 250 ms — so
    pause/end/menu/dispose/mute all stop it with its release tail, no per-path plumbing. */
@@ -269,6 +304,18 @@ const Loops={v:{},want:{},warned:{},
   stop(name,opts){const v=this.v[name];if(v){v.stop(opts);delete this.v[name];}this.want[name]=0;},
   stopAll(){for(const n in this.v)this.stop(n);},
 };
+function applySoundMode(){
+  if(Audio.ctx&&Audio.musicGain)Audio.musicGain.gain.value=(soundMode===0)?.4:0;
+  Audio.muted=(soundMode===2);
+  $('muteBtn').textContent=['🔊','🔉','🔇'][soundMode];
+  $('muteBtn').title=['Music + SFX','SFX only','Muted'][soundMode];
+}
+function toggleMute(){
+  soundMode=(soundMode+1)%3;
+  try{localStorage.setItem('cookfever2.sound',soundMode);}catch(e){}
+  applySoundMode();
+}
+applySoundMode();
 
 /* ======================================================================
    assets (game sprites in assets/ — copies of the art outbox; code manifest:
@@ -1143,7 +1190,7 @@ function startLevel(n){
   for(let i=0;i<G.cfg.total;i++){const dish=i===0?'soda':G.cfg.pool[Math.floor(rng()*G.cfg.pool.length)];G.queue.push({dish,dur:G.cfg.patience*(.85+rng()*.5),delay:i===0?1:2.5+rng()*3,ch:rng()<.5?'man':'woman'});}
   buildKitchen(G.cfg);
   G.served=0;G.coins=0;G.score=0;G.lost=0;G.elapsed=0;G.time=G.cfg.timer;G.spawnIdx=0;G.nextSpawnAt=1;
-  G.mode='playing';Time.unfreeze();syncPauseBtn();G.onServed=()=>{G.served++;updateHUD();if(G.served>=G.cfg.goal)setTimeout(()=>endLevel(true),900);};
+  G.mode='playing';Time.unfreeze();syncPauseBtn();Music.start();G.onServed=()=>{G.served++;updateHUD();if(G.served>=G.cfg.goal)setTimeout(()=>endLevel(true),900);};
   $('menu').classList.add('hidden');$('end').classList.add('hidden');$('paused').classList.add('hidden');$('story').classList.add('hidden');$('hud').classList.remove('hidden');
   updateHUD();
   if(n===1)setTimeout(()=>toast('Tap the patty tray, then a pan. Tap buns, then a plate. Drag dishes to customers!',4500),600);
@@ -1165,7 +1212,7 @@ function updateWorld(dt){
   updateFx(dt);
 }
 function endLevel(win){
-  if(G.mode!=='playing')return;G.mode='end';Time.unfreeze();syncPauseBtn();
+  if(G.mode!=='playing')return;G.mode='end';Music.stop();Time.unfreeze();syncPauseBtn();
   for(const p of piles.slice())collectPile(p);
   let stars=0;if(win){const [s1,s2,s3]=starThresholds(G.cfg);stars=G.score>=s3?3:G.score>=s2?2:1;SAVE.level=Math.max(SAVE.level,G.level+1);}
   SAVE.best[G.level]=Math.max(SAVE.best[G.level]||0,stars);SAVE.coins+=G.coins;save();
@@ -1174,7 +1221,7 @@ function endLevel(win){
     $('endServed').textContent='Served '+G.served+'/'+G.cfg.goal;$('endCoins').textContent='+'+G.coins+' 🪙';$('nextBtn').classList.toggle('hidden',!win);$('end').classList.remove('hidden');},600);
 }
 function showMenu(){
-  G.mode='menu';Time.unfreeze();syncPauseBtn();clearWorld();
+  G.mode='menu';Music.stop();Time.unfreeze();syncPauseBtn();clearWorld();
   $('end').classList.add('hidden');$('paused').classList.add('hidden');$('hud').classList.add('hidden');$('story').classList.add('hidden');$('storyRestore').classList.add('hidden');
   const sp=$('menuStars').children,best=SAVE.best[SAVE.level]||0;for(let i=0;i<3;i++)sp[i].classList.toggle('on',i<best);
   $('menuLevel').textContent='Level '+SAVE.level;$('menuCoins').textContent='🪙 '+SAVE.coins;$('menu').classList.remove('hidden');
@@ -1185,12 +1232,12 @@ $('playBtn').onclick=()=>{Audio.ensure();requestShell();startLevel(SAVE.level);}
 $('resetBtn').onclick=()=>{SAVE={level:1,best:{},coins:0};save();showMenu();toast('Save reset');};
 $('nextBtn').onclick=()=>startLevel(G.level+1);$('retryBtn').onclick=()=>startLevel(G.level);$('endMenuBtn').onclick=showMenu;
 function syncPauseBtn(){$('pauseBtn').textContent=G.mode==='paused'?'▶':'⏸';}
-function pauseGame(){if(G.mode!=='playing')return;G.mode='paused';Time.freeze(true);syncPauseBtn();}
-function resumeGame(){if(G.mode!=='paused')return;G.mode='playing';Time.unfreeze();$('paused').classList.add('hidden');syncPauseBtn();}
+function pauseGame(){if(G.mode!=='playing')return;G.mode='paused';Music.stop();Time.freeze(true);syncPauseBtn();}
+function resumeGame(){if(G.mode!=='paused')return;G.mode='playing';Time.unfreeze();Music.start();$('paused').classList.add('hidden');syncPauseBtn();}
 $('pauseBtn').onclick=()=>{Audio.ensure();G.mode==='paused'?resumeGame():pauseGame();};
-$('menuBtn').onclick=()=>{if(G.mode==='playing'){G.mode='paused';Time.freeze(true);syncPauseBtn();$('paused').classList.remove('hidden');}else if(G.mode==='story')showMenu();};
+$('menuBtn').onclick=()=>{if(G.mode==='playing'){G.mode='paused';Music.stop();Time.freeze(true);syncPauseBtn();$('paused').classList.remove('hidden');}else if(G.mode==='story')showMenu();};
 $('resumeBtn').onclick=()=>resumeGame();$('quitBtn').onclick=showMenu;
-$('muteBtn').onclick=()=>{Audio.muted=!Audio.muted;$('muteBtn').textContent=Audio.muted?'🔇':'🔊';};
+$('muteBtn').onclick=()=>{Audio.ensure();toggleMute();};
 $('storyHide').onclick=()=>setStorySidebar(true);$('storyRestore').onclick=()=>setStorySidebar(false);
 $('labelToggle').onclick=()=>{setLabelVisibility(!labelVisible);$('labelToggle').classList.toggle('on',labelVisible);};
 
@@ -1321,7 +1368,7 @@ function tick(dt){
   else if(G.mode==='pose'){updateWorld(dt);for(const o of poseTicks)o.update(dt);}
 }
 function render(){renderer.render(scene,camera);}
-function frame(){const dt=Time.advance();if(dt>0)tick(dt);Loops.sweep();render();requestAnimationFrame(frame);}
+function frame(){const dt=Time.advance();if(dt>0){tick(dt);if(G.mode==='playing')Music.tick();}Loops.sweep();render();requestAnimationFrame(frame);}
 
 /* ---------- poser: isolate one object on a studio backdrop ---------- */
 function backdropTexture(kind,opts={}){
