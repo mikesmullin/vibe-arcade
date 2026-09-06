@@ -675,6 +675,25 @@ assets:
     size: 1024
     seed: 43911
 
+  - id: cheese_slices
+    type: stateful
+    chain: edit
+    # melt pair (2026-09-05): same slice twice — firm/square vs wavy-melted all around.
+    # Same wide canvas + headroom template as cheese_slice so klein keeps it a thin slab, not a cube.
+    prompt: a single thin flat slice of yellow-orange american cheese, a wide flat slab much wider than it is thick, cartoon game food
+    size: [1024, 640]
+    seed: 44001
+    template: >-
+      {ref_clause} A single isolated 2D game asset for a casual mobile cooking game: {object}.
+      Bright saturated cel-shaded cartoon illustration with clean outlines and soft glossy highlights,
+      seen from a 3/4 elevated angle. The slice must look thin and flat: it occupies only the middle band of
+      the frame and leaves a large amount of empty background space above and below it.
+      on a plain flat {bg} background. No ground shadow, no scene, no table, no kitchen, no text, no UI.
+    states:
+      fresh: perfectly firm and unmelted, a clean flat square with straight sharp edges and square corners, no drooping, no drips, no waviness anywhere
+      melted: half-melted and soft, all four edges wavy and sagging with a few small drips running over the sides, glossy melty sheen, still recognizably one slice
+      burnt: burnt to a crisp, blackened charred edges curled and crisped, dark burnt blotches across the top, dry and crackled, with a wisp of grey smoke rising
+
   - id: tool_log
     type: stateful
     chain: none

@@ -16,6 +16,16 @@ bun_whole:
   - bun_whole.png
   keys:
   - bun_whole
+cheese_slices:
+  date: '2026-09-05'
+  files:
+  - cheese_slices_fresh.png
+  - cheese_slices_melted.png
+  - cheese_slices_burnt.png
+  keys:
+  - cheese_fresh
+  - cheese_melted
+  - cheese_burnt
 cheese_slice:
   date: '2026-09-05'
   files:

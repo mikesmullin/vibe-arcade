@@ -29,12 +29,16 @@ bun_whole:
   keys:
   - bun_whole
   taken: '2026-09-05'
-cheese_slice:
+cheese_slices:
   files:
-    cheese: art/cheese_slice/cheese_slice.png
-  from: out/cheese_slice/ (art outbox)
+    cheese_fresh: art/cheese_slices/cheese_slices_fresh.png
+    cheese_melted: art/cheese_slices/cheese_slices_melted.png
+    cheese_burnt: art/cheese_slices/cheese_slices_burnt.png
+  from: out/cheese_slices/ (art outbox)
   keys:
-  - cheese
+  - cheese_fresh
+  - cheese_melted
+  - cheese_burnt
   taken: '2026-09-05'
 coffee_mug:
   files:
