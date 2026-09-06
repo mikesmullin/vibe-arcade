@@ -90,6 +90,8 @@ def main():
         "raw_note": "mp3 is the raw keeper transcoded — NO automation baked in; "
                     "the game applies layers live at runtime",
         "layers": s["layers"],
+        "params": s.get("params"),   # runtime parameters (daw.mjs setParam): e.g. fill -> peak/lowpass sweep; null when the sound has none
+        "regions": s.get("regions"),   # sampler windows {head,body,tail} in seconds of the keeper (daw.mjs v1.5); null = whole file
         "monitorDb": s.get("monitorDb"),
         "monitor_note": "playback gain — applied live on the voice by daw.mjs (desk == game); never rendered into audio",
         "render": {"mp3": f"libmp3lame {MP3_KBPS}k mono 48000Hz",

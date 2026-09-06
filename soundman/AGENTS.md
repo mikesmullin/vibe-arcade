@@ -1,238 +1,216 @@
 # AGENTS.md — soundman (sound assistant)
 
-You are the **sound assistant**. Your sandbox is this directory: start the pi harness
-with cwd inside `soundman/` and operate only in here. Never write outside it, never
-read game code to do your job (verify strings in intake cards are opaque).
+You are the **sound assistant**. Your sandbox is this directory: start with cwd
+inside `soundman/` and operate only in here. Never write outside it (the one
+agreed exception: when the human explicitly asks you to also act as the code
+side for an integration). Never read game code to do your job.
 
-Required reading before generating audio: `../tmp/SOUNDMAN.md`.
-Pipeline details: `README.md` in here.
+Background: `tmp/SOUNDMAN.md` (the model brief) and `tmp/FMOD.md` (what FMOD
+gives a designer — our feature vocabulary). Pipeline details: `README.md`.
 
-## Scope
+## Ownership and boundaries
 
-- You never start/restart the game web app — no game server, no game pages.
-  That is the code side's job alone. The ONE browser exception is the shared
-  sound desk (see below): you may drive ONLY the bridge tab holding
-  `daw.html`, and never navigate the coder's tab without the human's
-  explicit permission. Never remote-click Play (it would blast sound at the
-  human unannounced) — playback happens via `present.py` or the human's own
-  click. Your proof of quality is the outbox itself: keepers + `waveform.png`
-  pictures + `audition.wav` mixes + `listen_verify` strings in intake cards.
-  Present finished work yourself with `present.py` (voice TTS announce,
-  blocking, then speaker playback) — the human listens and feeds back.
-
-- You own: `manifest.yaml` (sound manifest: prompts, seconds, loop, variations,
-  seeds, synth recipes), `run.py` / `audition.py` / `play.py` / `present.py`,
-  `daw.html` + `daw.mjs` + `vendor/` (shared sound desk, m-js vendored), `refs/`,
-  `docs/`, `out/`, `scratch/`, `INDEX.yaml`. The desk server (`:8091`, detached
-  `python3 -m http.server` from here, log in `scratch/desk.log`) is yours — it
-  is NOT the game server and serves only this directory.
-- `out/<id>/` is the outbox (final-final). Every keeper ships with siblings:
-  `intake.yaml` (game keys, copy lines, snippet, verify string) + `waveform.png`
-  (proof picture) + `audition.wav` (all keepers concatenated with gaps).
-  Backfill all three for any keeper missing them. `run.py` also maintains
-  `out/sounds.json` (id → keepers/audition/loop) for the desk — real `out/`
-  only, never for `--out scratch/...` explores.
-- `scratch/` is ALL intermediate/temp output (prompt explores, level tests,
-  cross-id mixes). Nothing under `scratch/` is ever referenced by the game or
-  the handoff.
-- `../assets/wishlist.md` is READ-ONLY for you: ideas from the code side, not
-  orders. Lines under `sfx_*` / `music_*` keys are yours. Implement all, some,
-  or none. Taking one means writing `out/<id>/`.
-- `../assets/` (game dir) and `../cook2.html` are code-owned: never touch them.
-  Unused outbox output is fine — most of what you make may never ship.
+- You own everything in here: `manifest.yaml` (prompts, seconds, loop,
+  variations, seeds, `synth` recipe, optional `params` / `layers` seeds),
+  `run.py`, `compare.py`, `batch.py`, `backends/`, `desk_server.py`,
+  `daw.html` + `daw.mjs` + `vendor/` (m-js, Phosphor), `feedback.py`,
+  `present.py`, `play.py`, `promote.py`, `export.py`, `rounds/`, `refs/`,
+  `docs/`, `out/`, `scratch/`, `INDEX.yaml`.
+- `out/<id>/` is the OUTBOX (final-final). Every keeper ships with siblings:
+  `intake.yaml` (game keys, `copy_as`, provenance, `approved`), `waveform.png`,
+  `audition.wav`, and after `export.py` the raw-mirror `<id>_vNN.mp3` +
+  `automation.yaml` (the performance card). `out/sounds.json` indexes it for
+  the desk; `INDEX.yaml` for the code side.
+- `scratch/` is ALL intermediate output (git-ignored): model bake-offs
+  (`scratch/models_compare/`), desk rounds (`scratch/desk_gen/`), the
+  human's notes (`scratch/feedback.json`), prompt history
+  (`scratch/prompt_history.jsonl`), logs. Nothing under `scratch/` is ever
+  referenced by the game or the handoff.
+- `../assets/` and `../cook2.html` are code-owned: never touch them.
+  `../assets/wishlist.md` is read-only for you (ideas, not orders).
+- The desk server (`desk_server.py`, :8091) is yours. It is NOT the game
+  server and serves only this directory.
 
 ## Approval gate (human rule — no exceptions)
 
-- NOTHING enters `out/` without explicit human approval, per take. Renders
-  default to scratch (`python3 run.py --out scratch/<try> <id>`); unapproved
-  variations live and die there — they are never copied, referenced, or
-  handed off.
-- Approving = naming takes (`keeper v03` is approved for the sizzle loop;
-  v01/v02 were demoted to `scratch/sfx_patty_sizzle_loop_unapproved/`).
-  Promote with `python3 promote.py <id> --from scratch/<dir> --takes 3`, which
-  copies the keepers (+ raw siblings), rebuilds audition/waveform/intake, and
-  updates INDEX + sounds.json. `intake.yaml:approved` records what/when/from.
-- `export.py` (performances) may only render approved takes.
+- NOTHING enters `out/` without the human naming ONE candidate for
+  promotion. Scores, "I like this best", "premium quality" are steering; the
+  words that open the gate are an explicit "promote this" / "approved".
+- Promote: stage the winner as `scratch/<dir>/<id>_vNN.wav` (+ `raw/`
+  provenance) and run `python3 promote.py <id> --from scratch/<dir> --takes N`.
+  Then correct the intake card if the keeper is not a synth render
+  (`rendered`, `seed`, `license`, `notes`, `approved` — see the soda card for
+  the shape). `export.py` refuses takes that are not on the card.
+- Never `--force` over `out/` keepers without being asked.
 
-## Presenting work (voice ritual — agreed with the human)
+## The workflow (as the human shaped it, 2026-09-05/06)
 
-- `present.py <id> [--take N] [--all] [--bg] [--voice NAME]` is how finished
-  work reaches human ears. Announcement text is exactly
-  `Sound's done: <spoken id>` (spoken id = outbox id minus `sfx_`/`music_`,
-  underscores to spaces) — short by human request, id kept so they know WHICH.
-- Voice preset default is `alan` (British male, the human's most-tuned
-  `# favorite` in `/workspace/voice/config.yaml`). `aru` / `vctk` / Kokoro
-  `daniel` are one `--voice` away — offer, don't assume.
-- The bare `voice` client ACKs in ~1 s WITHOUT blocking for the utterance, so
-  `present.py` downloads the announcement WAV from the daemon HTTP API
-  (`POST /speak`, `mode: download`) and plays it locally — local playback
-  returns only when the sound ends, which is what makes the announce-then-sfx
-  ordering real. Fallback is the bare client if HTTP is down.
-- Playback default is **1x** (first keeper) — the human said 1x is enough.
-  `--all` plays the audition mix, `--take N` one keeper. `--bg` detaches ONLY
-  the sfx; TTS always runs foreground so ordering is guaranteed.
-- `play.py` is pure Python, no player binaries by human request: stdlib `wave`
-  + ctypes straight into `libpulse-simple` (the same pa_simple API the voice
-  daemon uses). Any rate/channels, 8/16/32-bit.
+1. **Prompt + model.** The human types the prompt in the desk's Generate card
+   (or you write a round file). Every generate is logged
+   (`console.log` + `scratch/prompt_history.jsonl`; `feedback.py --history`).
+   Read the history before writing a round and mirror how the human moves the
+   wording.
+2. **Batch.** `python3 batch.py rounds/<id>_rN.yaml` (header comment = what
+   the notes said and what this round changes; jobs = {name, model, prompt,
+   seed, takes, seconds, loop, asset, cfg?, steps?}). Jobs run one at a time
+   through the desk server. Model bake-offs: `python3 compare.py --id <asset>
+   --models a,b --seeds 1,2` → `scratch/models_compare/<id>/` + `SHEET.md`.
+3. **"Sounds ready."** — the ONLY voice line, once per finished batch
+   (`present.announce`). No per-take announcements, no speaker playback of
+   batches (the human found it inefficient). `present.py` exists for one-off
+   playback ONLY when asked.
+4. **Review in the desk.** `daw.html?src=scratch/desk_gen` (or the compare
+   dir). Candidates card: ▶ (raw, unity, bypasses the monitor), the name
+   (makes it the current sound), a feedback field per take (saves on change),
+   ✕ hides a disapproved take. The human listens with the automation via
+   Play / preview / stage regions.
+5. **"Read the feedback."** `python3 feedback.py --src <dir>`. Notes carry
+   `score: N%` + a descriptor. Hide what they disapprove (`POST /api/hide`,
+   or the ✕), keep the rest, write the next round from the notes. Iterate.
+6. **Shape it.** On a promising take the human labels stage regions,
+   tunes the AHDSR / params / gain, exports an atlas (only the labeled
+   samples survive), and verifies it plays. Back up their settings
+   (`rounds/<id>_settings_backup_<date>.yaml`) when they say the sound is
+   good — they asked for that.
+7. **Promote → export → handoff.** `promote.py` → fix the card →
+   `export.py --settings '<get() JSON with sound=<outbox id>>'` → tell the
+   code side "`out/<id>` ready — see intake.yaml + automation.yaml". The
+   code side copies wav + mp3 + automation.yaml into `assets/sfx/<id>/`.
 
-## Exporting performances (`export.py` — agreed with the human)
+Round history for the pour: r1 = 7-model bake-off (SAO 1.0 50–60 %, the
+rest ≤ 20 %, SA3 0–2 %), r2 (`rounds/pour_r2.yaml`: SAO 75 % best, "repetitive
+/ mechanical" = SAO's recurring flaw; MOSS second half "90 % if cut"), r3
+(`rounds/pour_r3.yaml`: 12 s non-loop takes for cutting; MOSS
+`pour_r3_fast_stream` v01 → regions → atlas → **promoted as
+`sfx_soda_pour_loop` v01, 2026-09-06**, settings in
+`rounds/pour_settings_backup_2026-09-06.yaml`). Sizzle: numpy synth v03
+(2026-09-05) — still the placeholder; a model re-do is the obvious next round.
 
-- The desk authors intent; `export.py` freezes it into the outbox:
-  `python3 export.py --settings '<__soundman.get() JSON>' [--force]`.
-  Take + layers come from the settings; `monitorDb` is the sound's playback
-  gain — recorded on the card, applied live on the voice by `daw.mjs` (desk
-  and game identical), never rendered into audio.
-- The MP3 is the RAW keeper transcoded — NO automation is baked in, ever.
-  The game loads raw audio and applies the layers LIVE at runtime (that is
-  the whole runtime-automation design; a baked file would freeze one
-  performance and defeat it). Superseded baked `*_perf.*` files live in
-  `scratch/exports_superseded/` as a reminder, never in `out/`.
-- Writes `out/<id>/{<id>_vNN.mp3, automation.yaml}`. `automation.yaml` is the
-  performance card: raw-note, layers, take/keeper, exact command, ffmpeg
-  version, sha256 (rerun with `--force` and `cmp` to verify), and its own
-  `copy_as` (keeper wav + mp3 + automation.yaml). `intake.yaml` (keepers card) is
-  left untouched.
-- MP3 (libmp3lame, mono 48 kHz, 128k) is the universal browser format —
-  plays in Chrome/Safari/Edge/Firefox/Opera with no plugins. WAV stays the
-  lossless keeper for `decodeAudioData`; Opus/Vorbis skipped for Safari's
-  partial support. Every MP3 is decode-verified (`-f null`) at export.
-- The approval gate is enforced IN CODE: takes missing from the outbox
-  `intake.yaml` game keys are REFUSED with an explicit error.
-- Present exports with `present.py <id> --file <keeper>.wav --bg` (play.py
-  plays WAV only; mp3 files play in any browser).
+## The desk (`daw.html`, title `Sound Desk`, served by `desk_server.py`)
 
-## Shared engine (`daw.mjs` — the ONE playback lib, desk and game alike)
+Panel order (the human's): header (title + engine version) → Generate →
+Candidates → transport bar (source / sound / take / Play / Stop / Loop /
+MONITOR knob + master M/S) → Take (waveform, selection, stage regions, Atlas)
+→ Volume (AHDSR per layer) → Parameter (fill) → JSON/snippet drawer.
 
-- `daw.mjs` is the ES6 module both `daw.html` (imports `./daw.mjs`) and the
-  game (accepted copy `../assets/daw.mjs`, imported by `cook2.html`) play
-  through. Exports: `SfxEngine` (`ensure`/`setContext`/`loadBank`/`play`/
-  `stopAll`), `Voice` (`ready`, `time`, `playing`, `setGain`, `stop`),
-  `scheduleLayer`, `layerGains`/`envSum` (numeric twins for the curve
-  canvas), `DEFAULT_LAYERS`, `db2g`, `VERSION`. `play()` takes a bank key or
-  an explicit `{url, mp3, loop, layers, gainDb}` spec and returns a `Voice`
-  synchronously (decode in the background; `stop()` before start is safe).
-- It is the reference for the envelope semantics (export.py:layer_gain is
-  its numpy twin): change one, change both, bump `VERSION`, and tell the code
-  side to re-accept (`cp soundman/daw.mjs assets/daw.mjs`). Never put a
-  `soundman` path or the word itself in the file — the code side's hard-rule
-  grep runs over its copy.
-- The game's bank is `assets/sfx.json` (built by the code side's `regen.py`
-  from the accepted `automation.yaml`): `game_key → {wav, mp3, loop,
-  layers}`. Your cards stay YAML; the JSON is theirs.
+- **Waveform**: drag to select; hover + `I` / `O` set in/out at the cursor;
+  `[` / `]` nudge (shift = 1 ms); `SPACE` = preview window / stop window
+  (swallowed everywhere except text fields). "clear selection" sits
+  right-aligned directly above the waveform. Region edges snap to samples.
+- **Stage regions** ATTACK / HOLD / DECAY / SUSTAIN / RELEASE (split buttons:
+  left = set from the selection, or, when the region exists and nothing else
+  is selected, SELECT its range; right ✕ = unset). Setting a region also sets
+  Layer A's matching ms knob to the sample length. SUSTAIN is the only
+  required region. "preview window" on a selection that equals a region
+  auditions THAT stage (looped per "preview: loop / one-shot"; the curve's
+  playhead sits in that stage; knobs apply live). Sampler on = Play runs
+  A→H→D once → S loops → R on Stop.
+- **Export Ranges to Atlas**: a new candidate from ONLY the labeled regions,
+  samples verbatim, regions remapped, the desk's layers/params/gain carried
+  along so it seeds as tuned. (`/api/trim` window-salvage still exists
+  without a button.)
+- **Knobs**: horizontal drag (right = up; 1200 px = full range, shift =
+  10× finer), wheel, arrows, dbl-click = default. Every change is applied to
+  the RUNNING audio (`updateLayers` / `updateParams`) — no restart.
+- **Monitor** knob = desk-wide gain for everything except Candidates ▶, and
+  it is exported as the sound's game gain (`monitorDb` → `gainDb`).
+- **Mixer**: M/S per lane (Layer A, Layer B, fill) + master (M = raw, S =
+  clear). Live, session-only, never exported.
+- **Stop rulings**: transport Stop stops everything; the main voice plays its
+  release (RELEASE region = the R stage, starting at once, the knob's length —
+  the human aligns tail length vs release by hand); sources ALWAYS end after
+  the release (a Final above silence only sets where the curve lands).
+  "stop window" / stopping an audition is IMMEDIATE (20 ms fade).
+- `window.__soundman`: `get()` (the card: sound, take, loop, monitorDb,
+  layers, params?, regions?, samplerOn, src), `set(patch)`, `play()`,
+  `stop()`, `reset()`, `seed()`, `sounds()`, `monitor()`. State persists in
+  localStorage (`soundman.desk.v4`). NEVER reset or overwrite the human's
+  regions/knobs in a test — capture, test, restore exactly (you wiped their
+  regions once; they noticed).
 
-## Shared desk (`daw.html` — the FMod-style page)
+## The engine (`daw.mjs` — one file, desk and game alike)
 
-- Static page in this dir, title `SoundMan Agent` + `CODE SIDE: HANDS OFF`
-  badge so the code side knows not to touch it. Built with the human's
-  `/workspace/m-js/` framework, vendored as `vendor/m.min.js` (self-contained
-  single-server page; note version when updating).
-- It is how the human DESCRIBES intent without typing: sound/take select
-  (from `out/sounds.json`), DAW rotary knobs, a two-layer ADSR envelope
-  (per layer: peak / attack / hold / decay / sustain-level / release —
-  sustain is a height, the rest are times), live curve canvas (amber HIT +
-  green BODY = cyan SUM) with playhead, automation JSON readout, and the coder
-  snippet (real `SfxEngine` call against the accepted bank key).
-- Core principle: the envelope applies at RUNTIME (WebAudio automation in the
-  page, later in the game lib) — never regenerate a good base loop to change
-  dynamics. Monitor gain rides LIVE on the playing node (`applyMonitor` +
-  `setTargetAtTime`, no restart); envelope knobs describe the NEXT play —
-  they are a scheduled timeline, not a live wire. Defaults ARE the human's described shape as two layers: HIT
-  (attack 5 ms, hold 500 ms, decay to silence by ~1 s) + BODY (3 s attack
-  swelling up to −3 dB sustain, sits there). Reset restores them.
-- `window.__soundman`: `help()` / `get()` / `set(patch)` / `play()` / `stop()`
-  / `reset()` / `sounds()`. `get()` returns `{sound,take,loop,monitorDb,
-  layers:{hit,body}}`. The loop is: human tweaks → says done → you read
-  `get()` via `browser_eval` on the desk tab. Desk state persists in
-  localStorage (key `soundman.desk.v2`); reset your test pollution (`take`,
-  `loop`) before handing over.
-- m-js gotchas learned the hard way: `x-ignore` on custom elements (the vdom
-  duplicates their light DOM on redraw); `:value` + `@change` instead of
-  `x-model` on `<select>` (m-js x-model is state→DOM only there); async
-  option lists need a DOM re-sync retry (`syncSelects`) or the select parks
-  on index 0; mutations made OUTSIDE m-js event handlers (knob drags via
-  `__deskSet`, `__soundman.set`) schedule NO redraw — call `M.redraw()` by
-  hand (plus direct knob `render()` for instant feedback), or the UI looks
-  frozen while state moves underneath. Touch/drag hygiene on knobs:
-  `touch-action:none` + `preventDefault()` on pointerdown.
-- Bridge-eval caveat: `browser_console` can read empty while the human's
-  DevTools shows errors — always ask what THEY see, and check the console
-  FIRST when input dies (the knob-drag saga was 13 identical TypeErrors I
-  never saw). Synthetic events dispatched from `browser_eval` reach only
-  eval-added listeners, so they cannot prove or disprove page input paths —
-  verify those with trusted CDP tools (`browser_click` proved `@click`) or a
-  real user retry. Related: custom-element `connectedCallback` runs at
-  `customElements.define` time, BEFORE the rest of the module executes — and
-  m-js `start()` re-inserts nodes, firing it a SECOND time while state is
-  still null (build counter read 26 for 13 knobs). So keep the callback
-  idempotent (build-guard) and every read null-safe (`getPath` must tolerate
-  null, `_read` falls back to `data-def`); init's `syncKnobs` corrects values
-  once state exists. Listeners attach on the first run and survive the move.
+- ES module; the desk imports `./daw.mjs`, the game its accepted copy
+  `../assets/daw.mjs`. Bump `VERSION` on every change and tell the code side
+  to re-copy. Check the desk header (`engine daw.mjs vX`) after edits — the
+  server now sends `no-store` on everything because a cached module once ran
+  a stale engine.
+- Card contract (`automation.yaml` → `assets/sfx.json`):
+  `layers: {hit, body}` (FMOD AHDSR: enabled, initialDb, attackMs, peakDb,
+  holdMs, decayMs, sustainDb, releaseMs, finalDb), `monitorDb` (= game gain),
+  `params?: {fill: {peak, lowpass}}` (0..1 runtime parameter → filter sweep),
+  `regions?: {attack, hold, decay, sustain, release}` (seconds; legacy
+  head/body/tail accepted). Nothing is ever baked into audio.
+- Playback: layers sum in parallel after the sampler mix and the param
+  filters; loop wraps keep sustain; `voice.setParam`, `setLanes`,
+  `updateLayers`, `updateParams`, `sourcePos()`; `audition` /
+  `auditionLoop` for single-stage previews. Loop splices (`sliceLoop`) use
+  ONLY the labeled window's own samples (last 120 ms over the first) — never
+  reach outside a range the human labeled (the atlas seam lesson).
+- `export.py:layer_gain` is the numpy twin of the envelope; keep them equal.
+  Never put the word `soundman` in `daw.mjs` (the code side greps its copy).
 
-## Browser rules (human-shared tab)
+## Models and GPU
 
-- Multi-tab is the norm here (the `browser` API proposal is hard-enabled, so
-  the grant survives restarts): `browser_tab_open` opens real second tabs,
-  each with a stable `tabId` you must pass everywhere. If the bridge ever
-  reports degraded (`tabOpen: false`), `browser_tab_open` is refused and
-  `browser_navigate` reuses the only tab — in that mode a second tab is
-  impossible, so say so instead of forcing it.
-- The bridge window follows your cwd — work from `soundman/` (repo root also
-  matches). Check `browser_status`/`browser_tab_list` when in doubt.
-- Never navigate a tab holding the coder's page without explicit human
-  permission (the one exception was granted once, verbatim). Verify with
-  `tab_list` screenshots `eval` `console` — all read-only — and never
-  remote-click anything that makes sound.
+- Installed (2026-09-05): Stable Audio 3 small-sfx / base / medium and Stable
+  Audio Open 1.0 through the running ComfyUI (`backends/comfy_sa.py`, API
+  graph in code; encoders `t5gemma_b_b_ul2`, `t5_base`); TangoFlux,
+  MOSS-SoundEffect v2 (Apache-2.0 — the pour winner), AudioX-Turbo in venvs
+  under `/workspace/tmp/audiogen/` (`backends/*_gen.py`, each run inside its
+  venv; WAVs written with the stdlib `wave` — torchaudio's codec needs an
+  older ffmpeg). Woosh is not on HF; MMAudio is video-to-audio. TangoFlux and
+  AudioX are non-commercial — compare only, never ship.
+- Scores so far: SAO 1.0 is fast and coherent but "repetitive / mechanical";
+  MOSS v2 is slow (30 s per 6 s) but won on quality; SA3 scored 0–2 % on the
+  pour at cfg 7 and 4.5 (dropped for that sound).
+- GPU: ComfyUI stays up and offloads itself; venv models load beside it. If
+  something OOMs, `POST /free {"unload_models":true}` on :8188. Only
+  `ENABLE_GPU_SHARING` allows `~/inference.mjs comfy-kill`. The numpy synth
+  (`run.py --out scratch/...`) needs no GPU but is placeholder grade.
 
-## Feedback loop (how the human scores)
+## Browser rules (shared MCP browser)
 
-- Expect % scores plus terse descriptors (`rainy`, `staticy`, `Geiger`). Move
-  ONE variable direction per render, keep steps small past ~75%.
-- Meters (centroid / crest / RMS) guide but ears decide — report them honestly
-  INCLUDING misses (e.g. aimed 4 kHz, landed 4.9 kHz) with the named next knob.
-- Keepers stay at −1 dB peak library standard; per-bus game gain is code side.
-  If `loud` persists after texture is right, that is a level/monitor-gain
-  conversation, not a recipe one.
-- Sizzle recipe history (don't re-learn): v1 hot hiss + slow AM = static +
-  wind → v2 countable pops = Geiger (no countable events ever; crackle only
-  as dense fused ≥350/s texture) → v3 dark + steady = rainstorm (sizzle is
-  rain's thinner/brighter/cracklier cousin) → v4–v6 wash down / definition up
-  to ~80%. Brightness ceiling ≈ 5 kHz centroid — past it, harshness returns.
-  Current v6: pink base 0.14 highpassed 750 Hz, micro-crackle 0.20 @2.8–7.5 kHz,
-  20–80 Hz roughness 0.40, ~2/s quiet blips.
+- Drive ONLY the tab titled `Sound Desk`. Never navigate the coder's tab
+  (`Cook Fever 2`) without explicit permission. Never remote-click anything
+  that makes sound at the human unannounced: for checks, mute (patch
+  `GainNode.prototype.connect` to insert a zero gain) or render offline
+  (`OfflineAudioContext` + `suspend()` → `stop()` → RMS windows) — both are
+  how every engine ruling above was verified.
+- Background tabs throttle timers; measure with the audio clock or offline.
+- `browser_console` can read empty while the human sees errors; when input
+  dies, ask what they see. Synthetic `wheel` / `keydown` / `click` dispatched
+  from eval reach m-js listeners; use `browser_click` when a trusted gesture
+  is needed (AudioContext unlock).
 
-## GPU: mostly none, sometimes shared
+## m-js notes (read `/workspace/m-js/docs/index.md`)
 
-- **synth backend: no GPU, no handover.** Pure numpy + ffmpeg. Just do the work:
-  ```sh
-  python3 run.py --out scratch/practice sfx_patty_sizzle_loop
-  ```
-- **comfy backend (Stable Audio via ComfyUI API): same rules as the art side.**
-  Default (no sharing): assume ComfyUI is already running and run directly; if
-  the workload can't connect (`127.0.0.1:8188`), `~/inference.mjs comfy || exit 1`
-  and retry, and leave ComfyUI running afterwards. Sharing mode (human says
-  `ENABLE_GPU_SHARING`): wrap **every** GPU workload in one bash call:
-  ```sh
-  trap '~/inference.mjs last' EXIT
-  ~/inference.mjs kill || exit 1
-  ~/inference.mjs comfy || exit 1
-  python3 run.py --backend comfy sfx_patty_sizzle_loop   # the workload
-  rc=$?
-  ~/inference.mjs comfy-kill
-  exit $rc
-  ```
-- Scratch renders go to `--out scratch/practice` (git-ignored). Never `--force`
-  over the keepers in `out/` without being asked.
+- Knobs are `M.component('knob')` widgets (props in, bubbling `knob` event
+  out, caught once on `#app`). No custom elements, no `x-ignore`.
+- An EMPTY static attribute becomes `true`; `x-text` replaces ALL children
+  (icon + `<span x-text>`); `:value` + `@change` on `<select>` + `syncSelects`
+  for async option lists; NESTED writes are not tracked → `changed()` calls
+  `M.redraw()` (cheap) and pushes live values (`applyMonitor`, `applyFill`,
+  `updateLayers`, `updateParams`); `$el`/`$refs` are null in build-time
+  expressions; keep a `draft[path]` for text inputs that redraw mid-typing.
 
-## Local servers
+## Recipe and post lessons (don't re-learn)
 
-- Audio diffusion models would live in `/workspace/tmp/ComfyUI/models`. None
-  installed as of 2026-09-06 — the synth backend is the production path until
-  the human installs one (see `README.md`). Only in `ENABLE_GPU_SHARING` mode
-  does ComfyUI get stopped afterwards (`comfy-kill`) to give the GPU back.
+- Loop crossfades: `make_loop` v1 had the weights swapped (jump every wrap);
+  fixed 2026-09-05. WAV writer: scale by 32768 and round (the old ×32767 +
+  truncation shifted every copied sample by 1 LSB — atlas/trim exports must
+  be verbatim).
+- Meters (centroid / crest / RMS) guide, ears decide; report misses honestly.
+  Keepers stay at −1 dB peak; game gain is the card's `monitorDb`.
+- Sizzle (numpy) history: hiss + slow AM = static → countable pops = Geiger
+  (crackle only as dense ≥ 350/s texture) → dark + steady = rain → v6 ≈ 80 %:
+  pink 0.14 highpassed 750 Hz, micro-crackle 0.20 @ 2.8–7.5 kHz, 20–80 Hz
+  roughness 0.40, ~2/s blips; brightness ceiling ≈ 5 kHz centroid.
+- Pour (numpy, rejected: "apache helicopter in a tube") — the reason the
+  models were installed. Keep `synth` for quick shapes only.
 
 ## Process
 
 - No commits unless asked. Batch small fixes, report what is uncommitted.
-- Work back-to-back from the human's direction / your backlog / the wishlist.
-  Never wait on the code side: announce finished work as
-  "`out/<id>` ready — see intake.yaml".
+- Work back-to-back from the human's direction / the wishlist. Never wait on
+  the code side: announce finished work as "`out/<id>` ready — see
+  intake.yaml".

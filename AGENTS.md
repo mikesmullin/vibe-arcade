@@ -39,69 +39,64 @@ You need no ComfyUI / klein / rembg knowledge. The interface is files only:
 ## The sound assistant (exists, but its pipeline is not your problem)
 
 A separate sound assistant owns `soundman/` (cwd-rooted sandbox, own guide at
-`soundman/AGENTS.md`, own manifest with prompts/seeds/synth recipes, own desk
-at `soundman/daw.html` titled SoundMan Agent — hands off that tab too). You
-need no audio-ML knowledge. The interface is files only:
+`soundman/AGENTS.md`, its own models/desk/rounds, and the shared **Sound
+Desk** tab at `soundman/daw.html` — hands off that tab). You need no audio-ML
+knowledge. The interface is files only:
 
 - **Discover (read-only outbox):** `ls soundman/out/*/intake.yaml` (keepers
-  cards: game keys, `copy_as`, seed, `approved`) + `*/automation.yaml`
-  (performance cards: ADSR knob settings, take, raw-mirror mp3, sha256,
-  `copy_as`). `soundman/INDEX.yaml` + `out/sounds.json` index them.
-  Accept ONLY takes with `intake.yaml:approved` — the human gates every
-  take; unapproved variations live in `soundman/scratch/` and must never be
-  referenced, previewed, or shipped.
-- **Accept = copy + rebuild:** `cp soundman/out/<id>/{keeper wavs + mp3,
-  automation.yaml} assets/sfx/<id>/` (or `assets/music/<id>/` for `music_*`
-  ids) per the cards' `copy_as`, append one entry to `assets/manifest.yaml`
-  (same shape as art: taken date, `from:` outbox source, files
-  {game_key: path}, keys — plus `automation: sfx/<id>/automation.yaml` and
-  `loop:` for sounds), then regen the maps (`assets/regen.py` writes audio
-  keys into `assets.json` and the automation bank into `assets/sfx.json`).
-  First accepted sound: `sfx_patty_sizzle_loop` v03 (2026-09-05), looped by
-  the `Grill` unbroken while ≥1 pan holds an item (cooking, cooked, burnt);
-  `Grill.take` (tap-select or drag start) of the last item cuts it at once
-  (`Loops.stop(..., {immediate:true})`), a failed drop reattaches and
-  `update()` restarts it from the top. Game keys for takes live under
-  one sound id; unused outbox output is harmless — take 1 of N or 0.
+  card: game keys, `copy_as`, provenance, `approved`) and
+  `soundman/out/*/automation.yaml` (performance card: AHDSR layers,
+  `monitorDb`, `params`, `regions`, raw-mirror mp3, sha256, `copy_as`).
+  `soundman/INDEX.yaml` indexes ids. Accept ONLY takes whose intake card says
+  `approved`; everything under `soundman/scratch/` is unapproved and must
+  never be referenced, previewed, or shipped.
+- **Accept = copy + rebuild:** per the cards' `copy_as`,
+  `cp soundman/out/<id>/{<id>_vNN.wav,<id>_vNN.mp3,automation.yaml}
+  assets/sfx/<id>/` (`assets/music/<id>/` for `music_*`), append one entry to
+  `assets/manifest.yaml` (`taken`, `from:` outbox-relative, `files`
+  {game_key: path}, `keys`, plus `automation: sfx/<id>/automation.yaml` and
+  `loop:`), then `python3 assets/regen.py` → `assets/assets.json` (keys) +
+  `assets/sfx.json` (the bank: `game_key → {wav, mp3, loop, layers, gainDb,
+  params, regions}`). The game never parses YAML.
+- **Re-accept the engine when its version bumps:** `cp soundman/daw.mjs
+  assets/daw.mjs` (the sound side tells you). The desk and the game play
+  through the same file, so desk == game.
 - **Hard rule: `cook2.html` refers only to `assets/`, never to `soundman/`.**
-  No fetch, audio load, `<audio src>`, or automation path may point under the
-  sound dir. Check: `grep -rn "soundman" cook2.html assets/
-  --exclude=automation.yaml` must print nothing. (`from:` provenance in
-  `assets/manifest.yaml` is outbox-relative for this reason; the accepted
-  `automation.yaml` cards are copied verbatim and carry outbox `copy_as`
-  lines, which is why they are excluded — the game reads `sfx.json`, never
-  the card.)
-- **Play RAW keepers with RUNTIME automation — nothing baked, ever.** The game
-  decodes keeper WAVs (primary) or their raw MP3 mirrors (48 kHz mono,
-  universal fallback) and shapes them live
-  with the two-layer ADSR (hit + body) from the accepted `automation.yaml`.
-  No outbox file has automation baked in — that is the design, not an
-  omission. `monitorDb` on the card is the sound's playback gain: `regen.py`
-  carries it into `sfx.json` as `gainDb` and the engine applies it live on the
-  voice, so gameplay is exactly as loud as the desk (the engine is routed
-  straight to `ctx.destination`, bypassing the synth's .8 master for that
-  reason). Never render it into audio.
-- **Playback lib (sound-written, you accept a copy): `assets/daw.mjs`.** The
-  sound side owns `soundman/daw.mjs` (`SfxEngine`, `Voice`, `layerGains`,
-  `VERSION`) and its desk plays through the very same file, so desk == game.
-  Accept = `cp soundman/daw.mjs assets/daw.mjs` whenever `VERSION` bumps.
-  `cook2.html` imports `./assets/daw.mjs`; `Sfx` (engine) shares the game's
-  AudioContext + master gain (`Audio.ensure` → `Sfx.setContext`), loads the
-  bank `assets/sfx.json` at boot, and `Loops.set(name, key, wanted)` runs a
-  looping keeper while a station wants it (`frame()` sweeps loops nobody
-  re-wanted for 250 ms — pause/end/menu/dispose/mute all stop with the
-  release tail). Debug: `__cook.sfx` (engine, `.bank`, `.voices`) and
-  `__cook.loops.v`. Semantics per layer: `setValueAtTime(1e-4)` → linear ramp
-  to peak over attack → hold → exponential ramp to sustain over decay → sit
-  (loop wraps keep sustain, never retrigger); stop = cancel +
-  `setTargetAtTime(0, tau=release/3)`, source stops after the slowest tail.
-  Missing keys = console warn + `null` voice (audio's `fallbackTex()`).
-  `assets/regen.py` builds `assets/sfx.json` (`game_key → {wav, mp3, loop,
-  layers}`) from every manifest entry carrying `automation:` — the game never
-  parses YAML. Game keys for sounds live in the `SND` map in `cook2.html`.
-- **Wishlist (shared file):** `assets/wishlist.md` `sfx_*` / `music_*` lines
-  are yours to write, sound's to read (ideas, not orders). Delete a line as
-  you accept the asset.
+  Check: `grep -rn "soundman" cook2.html assets/ --exclude=automation.yaml`
+  must print nothing (the copied cards carry outbox `copy_as` lines, hence
+  the exclusion; the game reads `sfx.json`, never the card).
+- **Play RAW keepers with RUNTIME automation — nothing baked, ever.** The
+  engine (`assets/daw.mjs`, `SfxEngine`) decodes the keeper WAV (MP3 mirror
+  as fallback) and applies the card live: two FMOD-AHDSR layers (Initial →
+  Attack → Peak → Hold → Decay → Sustain → Release → Final), `gainDb` (the
+  desk's monitor level — the engine is routed straight to `ctx.destination`,
+  bypassing the synth's .8 master, so gameplay is exactly as loud as the
+  desk), optional `params` (0..1 runtime parameter → peaking/lowpass sweep;
+  drive with `Loops.param(name, 'fill', t / T)` every frame), optional
+  `regions` (stage samples: attack→hold→decay once, spliced sustain loop,
+  release on stop — all inside the engine, `Loops` needs no change). Sources
+  always end after the release. Missing bank keys warn once and no-op
+  (audio's `fallbackTex()`), so you can code against future keys.
+- **Wiring in `cook2.html`:** `import { SfxEngine } from './assets/daw.mjs'`;
+  `Sfx` shares the game's AudioContext (`Audio.ensure` → `Sfx.setContext`)
+  and loads `assets/sfx.json` at boot; game keys live in the `SND` map;
+  `Loops.set(name, key, wanted)` runs a looping keeper while a station wants
+  it every update, `Loops.stop(name, {immediate})` cuts one, and `frame()`
+  sweeps loops nobody re-wanted for 250 ms (pause / end / menu / dispose /
+  mute all stop with the release). Debug: `__cook.sfx`, `__cook.loops.v`.
+- **Accepted so far:** `sfx_patty_sizzle_loop` v03 (numpy synth, 2026-09-05)
+  — `Grill` wants it while any pan holds an item; pickup of the last item
+  cuts it, a failed drop restarts it; an item added to a busy grill restarts
+  it (`SIZZLE_RESTART_ON_ADD`, experimental). `sfx_soda_pour_loop` v01
+  (MOSS-SoundEffect v2 atlas, 2026-09-06) — `SodaMachine.update` wants it
+  while a cup fills and drives `fill`; it carries stage regions and a
+  −14.5 dB gain on its card.
+- **Verify an accept:** `cook2.html?debug&nocache`, start a level, trigger
+  the station; `__cook.loops.v` should hold the voice, `__cook.sfx.bank`
+  the key. For a silent check, swap `__cook.sfx.destination` for a muted
+  gain first.
+- **Wishlist (shared file):** `assets/wishlist.md` `sfx_*` / `music_*`
+  lines are yours to write, sound's to read. Delete a line as you accept.
 - You never synthesize audio. Intake is plain `cp`.
 
 ## Web app + browser (yours alone)

@@ -60,6 +60,8 @@
  "scene": "art/scene_diner/scene_diner.png",
  "sfx_patty_sizzle_loop_v03": "sfx/sfx_patty_sizzle_loop/sfx_patty_sizzle_loop_v03.wav",
  "sfx_patty_sizzle_loop_v03_mp3": "sfx/sfx_patty_sizzle_loop/sfx_patty_sizzle_loop_v03.mp3",
+ "sfx_soda_pour_loop_v01": "sfx/sfx_soda_pour_loop/sfx_soda_pour_loop_v01.wav",
+ "sfx_soda_pour_loop_v01_mp3": "sfx/sfx_soda_pour_loop/sfx_soda_pour_loop_v01.mp3",
  "soda_machine": "art/soda_machine/soda_machine.png",
  "soda_stream_long": "art/soda_stream_long/soda_stream_long.png",
  "tool_log_off": "art/tool_log/tool_log_off.png",

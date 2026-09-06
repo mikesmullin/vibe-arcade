@@ -38,7 +38,9 @@ yaml.add_representer(_Literal, _literal_representer, Dumper=yaml.SafeDumper)
 
 # ------------------------------------------------------------------ wav io
 def write_wav(path: Path, x: np.ndarray, sr: int):
-    pcm = (np.clip(x, -1.0, 1.0) * 32767).astype(np.int16)
+    # round-trip exact: read_wav divides by 32768, so scale by 32768 and ROUND (the old *32767 + truncation
+    # shifted copies by 1 LSB, which broke "samples verbatim" for atlas/trim exports)
+    pcm = np.clip(np.round(np.clip(x, -1.0, 1.0) * 32768.0), -32768, 32767).astype(np.int16)
     with wave.open(str(path), "wb") as w:
         w.setnchannels(1)
         w.setsampwidth(2)
@@ -185,7 +187,45 @@ def render_coin(rng, sr, seconds) -> np.ndarray:
     return y.astype(np.float32)
 
 
+def render_pour(rng, sr, seconds) -> np.ndarray:
+    """Soda dispensed into a paper cup of ice: steady stream + carbonation fizz +
+    ice clinks. Deliberately PITCH-NEUTRAL: the 'how full is the cup' cue (the
+    air column above the liquid shortening, so its resonance rises) is NOT in
+    the file — daw.mjs applies it live from the card's `fill` parameter
+    (peaking filter sweeping up + lowpass closing) so any fill duration works."""
+    n = int(sr * seconds)
+    t = np.arange(n) / sr
+    # stream: pink wash, mid-band, with 9-14 Hz turbulence ("glug") carved in
+    stream = _bandpass(_pink(rng, n), sr, 250, 2600, edge_lo=150.0, edge_hi=1500.0)
+    stream = _norm_rms(stream) * 0.22
+    glug_src = band_noise(rng, n, sr, 9, 14, edge=4.0)
+    glug_src /= np.max(np.abs(glug_src)) + 1e-6
+    stream *= (1.0 + 0.45 * glug_src).astype(np.float32)
+    # splash body: low gurgle under the stream, slow 3-5 Hz surge
+    body = _norm_rms(_bandpass(_pink(rng, n), sr, 110, 420, edge_lo=60.0, edge_hi=200.0)) * 0.10
+    surge = band_noise(rng, n, sr, 3, 5, edge=2.0)
+    surge /= np.max(np.abs(surge)) + 1e-6
+    body *= (1.0 + 0.5 * surge).astype(np.float32)
+    # carbonation: dense fused micro-pops, bright (no countable events)
+    fizz = _norm_rms(_bandpass(crackle(rng, n, sr, 900.0, 1.0, decay_ms=1.2),
+                               sr, 3200, 11000, edge_lo=800.0, edge_hi=3000.0)) * 0.16
+    fizz_hiss = _norm_rms(band_noise(rng, n, sr, 5000, 12000, edge=1500.0)) * 0.05
+    # ice clinks: sparse ringing pings, two partials, random pitch, ~1.3/s
+    clinks = np.zeros(n, dtype=np.float32)
+    for _ in range(max(1, int(seconds * 1.3))):
+        i0 = int(rng.uniform(0, n - sr * 0.12))
+        L = int(sr * rng.uniform(0.05, 0.09))
+        tt = np.arange(L) / sr
+        f0 = float(rng.uniform(2200, 4800))
+        ping = (np.sin(2 * np.pi * f0 * tt) * np.exp(-tt * 55.0)
+                + 0.4 * np.sin(2 * np.pi * f0 * 2.41 * tt) * np.exp(-tt * 90.0))
+        clinks[i0:i0 + L] += (ping * float(rng.uniform(0.35, 0.7))).astype(np.float32)
+    x = stream + body + fizz + fizz_hiss + clinks * 0.35
+    return x.astype(np.float32)
+
+
 RECIPES = {
+    "pour": render_pour,
     "sizzle": lambda rng, sr, s: render_sizzle(rng, sr, s),
     "drop": lambda rng, sr, s: render_sizzle(rng, sr, s, slap=True),
     "burn": lambda rng, sr, s: render_sizzle(rng, sr, s, harsh=1.0),
@@ -199,7 +239,11 @@ def make_loop(x: np.ndarray, sr: int, seconds: float, xfade: float) -> np.ndarra
     assert len(x) >= N + X, "loop render too short for crossfade"
     y = x[:N].copy()
     t = np.linspace(0, np.pi / 2, X).astype(np.float32)
-    y[:X] = y[:X] * np.cos(t) ** 2 + x[N:N + X] * np.sin(t) ** 2
+    # the wrap goes y[N-1] -> y[0], i.e. x[N-1] -> must continue as x[N]: so the
+    # head starts as the TAIL continuation (x[N+i], weight 1 at i=0) and fades
+    # into the real head (x[i]) by i=X. (v1 had the weights swapped: a jump at
+    # every wrap — masked by the sizzle's crackle, audible on a smooth pour.)
+    y[:X] = x[N:N + X] * np.cos(t) ** 2 + y[:X] * np.sin(t) ** 2
     return y
 
 
@@ -330,6 +374,8 @@ def main():
             "loop": loop,
             "game_keys": game_keys,
             "seed": seed0,
+            "params": asset.get("params"),   # runtime automation suggestion (daw.mjs `fill` etc.); the desk edits, export.py freezes
+            "layers": asset.get("layers"),   # suggested ADSR seed for the desk (optional)
             "copy_as": _Literal("\n".join(
                 f"cp soundman/out/{aid}/{f.name} assets/sfx/{aid}/{f.name}"
                 for f in keepers) + "\n"),
@@ -344,8 +390,7 @@ def main():
         with open(adir / "intake.yaml", "w") as f:
             yaml.safe_dump(card, f, sort_keys=False)
 
-        idx_path = out_root / "INDEX.yaml" if (out_root / "INDEX.yaml").exists() \
-            else HERE / "INDEX.yaml"
+        idx_path = out_root / "INDEX.yaml" if out_root != HERE / "out" else HERE / "INDEX.yaml"   # scratch roots keep their own index
         idx = yaml.safe_load(open(idx_path)) or {} if idx_path.exists() else {}
         idx[aid] = {"date": today, "files": [f.name for f in keepers],
                     "keys": list(game_keys), "loop": loop,
@@ -357,17 +402,21 @@ def main():
         print(f"   -> {adir.relative_to(HERE)}/ ({vars_} keepers, audition.wav, "
               f"waveform.png, intake.yaml)")
 
-    if out_root == HERE / "out":
-        sounds = {}
-        for card_path in sorted((HERE / "out").glob("*/intake.yaml")):
-            c = yaml.safe_load(open(card_path)) or {}
-            if c.get("game_keys"):
-                sounds[c.get("id", card_path.parent.name)] = {
-                    "keepers": list(c["game_keys"].values()),
-                    "audition": "audition.wav",
-                    "loop": bool(c.get("loop", False))}
-        (HERE / "out" / "sounds.json").write_text(
-            json.dumps(sounds, indent=1, sort_keys=True) + "\n")
+    # sounds.json for the desk (daw.html): out/ is the default listing; a scratch
+    # root gets its own so unapproved takes can be auditioned via ?src=scratch/<dir>
+    # (desk-only — nothing under scratch/ is ever referenced by the game/handoff).
+    sounds = {}
+    for card_path in sorted(out_root.glob("*/intake.yaml")):
+        c = yaml.safe_load(open(card_path)) or {}
+        if c.get("game_keys"):
+            sounds[c.get("id", card_path.parent.name)] = {
+                "keepers": list(c["game_keys"].values()),
+                "audition": "audition.wav",
+                "loop": bool(c.get("loop", False)),
+                "params": c.get("params"),
+                "layers": c.get("layers")}
+    (out_root / "sounds.json").write_text(
+        json.dumps(sounds, indent=1, sort_keys=True) + "\n")
 
     print("done.")
 

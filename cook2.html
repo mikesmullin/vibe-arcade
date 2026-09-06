@@ -260,10 +260,11 @@ const SFX={
 /* Looping keepers with runtime automation (SfxEngine). A station "wants" a loop every
    update it is active (Loops.set); frame() sweeps loops nobody wanted for 250 ms — so
    pause/end/menu/dispose/mute all stop it with its release tail, no per-path plumbing. */
-const SND={sizzle:'sfx_patty_sizzle_loop_v03'};   // game keys from assets/sfx.json
+const SND={sizzle:'sfx_patty_sizzle_loop_v03',pour:'sfx_soda_pour_loop_v01'};   // game keys from assets/sfx.json (both accepted; Loops.set warns once + no-ops for any key not in the bank)
 const SIZZLE_RESTART_ON_ADD=true;   // experimental (2026-09-05): adding an item to a grill that already has one restarts the sizzle from the top; set false to revert
-const Loops={v:{},want:{},
-  set(name,key,on){this.want[name]=on?performance.now():0;if(on&&!this.v[name]&&Audio.ctx&&!Audio.muted){const v=Sfx.play(key,{loop:true});if(v)this.v[name]=v;}},
+const Loops={v:{},want:{},warned:{},
+  set(name,key,on){this.want[name]=on?performance.now():0;if(on&&!this.v[name]&&Audio.ctx&&!Audio.muted){if(!Sfx.bank[key]){if(!this.warned[key]){this.warned[key]=1;console.warn('[Loops] sound key not in bank yet: '+key);}return;}const v=Sfx.play(key,{loop:true});if(v)this.v[name]=v;}},
+  param(name,param,v){const voice=this.v[name];if(voice)voice.setParam(param,v);},   // runtime parameter 0..1 (e.g. cup fullness), every frame is fine
   sweep(){const now=performance.now();for(const n in this.v)if(now-(this.want[n]||0)>250||Audio.muted){this.v[n].stop();delete this.v[n];}},
   stop(name,opts){const v=this.v[name];if(v){v.stop(opts);delete this.v[name];}this.want[name]=0;},
   stopAll(){for(const n in this.v)this.stop(n);},
@@ -816,7 +817,9 @@ class SodaMachine extends Station{
     if(st==='none'||!st)return;
     this.onTap();if(st==='filling'){this.t=this.fillT*.5;this.update(0);}else if(st==='full'){this.cup.set('full');this.bar.visible=false;}}
   take(item){if(item===this.cup){this.cup=null;this.bar.visible=false;}item.station=null;if(this.stream)this.stream.visible=false;}
-  update(dt){if(this.cup&&this.cup.state==='empty'){this.t+=dt;this.buildStream();if(this.stream){this.stream.visible=true;this.streamTx.offset.y=(this.streamTx.offset.y+dt*1.1)%1;}this.bar.visible=true;this.bar.set(this.t/this.fillT,0x60a5fa);if(this.t>=this.fillT){this.cup.set('full');this.bar.visible=false;if(this.stream)this.stream.visible=false;SFX.ding();}}}
+  update(dt){if(this.cup&&this.cup.state==='empty'){this.t+=dt;this.buildStream();if(this.stream){this.stream.visible=true;this.streamTx.offset.y=(this.streamTx.offset.y+dt*1.1)%1;}this.bar.visible=true;this.bar.set(this.t/this.fillT,0x60a5fa);
+    Loops.set('soda',SND.pour,true);Loops.param('soda','fill',this.t/this.fillT);   // pour loop while filling; `fill` 0..1 drives the card's rising-resonance / closing-lowpass cue live
+    if(this.t>=this.fillT){this.cup.set('full');this.bar.visible=false;if(this.stream)this.stream.visible=false;Loops.stop('soda');SFX.ding();}}}
   dispose(){super.dispose();removeObj(this.bar);if(this.stream){removeObj(this.stream);this.stream.material.dispose();this.stream=null;}this.cup&&this.cup.dispose();}
 }
 /** Fryer: raw pile in (basket lowers) → cooked pile out (basket raises); pile must be cartoned before serving (no burn). Tap the fries tray then the fryer, or tap the fryer directly. */

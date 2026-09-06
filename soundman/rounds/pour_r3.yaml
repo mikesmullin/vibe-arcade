@@ -1,0 +1,26 @@
+# Round 3 — soda pour. From the round-2 notes (scratch/feedback.json, 22:30–22:36):
+#   fast_stream sao1 v02 = 75% (best so far, seed 988); fill_cup sao1 50–55% "well isolated
+#   pour but too weak a flow"; fizz_cola v02 45% "good mix, replays too frequently";
+#   fast_stream v01/v03 25–30% "bubbling / ice clanking repetitive, mechanical";
+#   MOSS v02: second half = 90% "if we could cut that part" -> the desk gets a trim/salvage
+#   tool; SA3 at low cfg still 0–1% -> dropped for good; AudioX 5–7% -> dropped.
+# Moves: SAO only (+MOSS for its second-half quality), 12 s NON-loop raw takes so the human
+# can pick the best window with the trim tool (which applies the loop splice), more seeds
+# around the winning prompt, wording against "weak flow" and "repetitive/mechanical":
+# heavy/gushing/thick stream, natural irregular splashing, no rhythmic ice.
+defaults: {seconds: 12, loop: false, takes: 3, asset: sfx_soda_pour_loop}   # asset = manifest id whose params/layers seed the desk
+jobs:
+  - name: pour_r3_fast_stream
+    model: sao1
+    seed: 41
+    takes: 4
+    prompt: "soda fountain machine dispensing carbonated soda into a paper cup full of ice, strong fast stream splashing and gurgling, loud fizzing carbonation bubbles, ice cubes clinking and settling, close mic, no music, no speech"
+  - name: pour_r3_gush
+    model: sao1
+    seed: 51
+    takes: 4
+    prompt: "heavy gushing pour of carbonated soda from a restaurant fountain dispenser into a paper cup of ice, thick fast liquid stream, natural irregular splashing and gurgling as the cup fills, fine fizzing carbonation, no rhythmic clinking, close mic, no music, no speech"
+  - name: pour_r3_fast_stream
+    model: moss_v2
+    seed: 21
+    prompt: "soda fountain machine dispensing carbonated soda into a paper cup full of ice, strong fast stream splashing and gurgling, loud fizzing carbonation bubbles, ice cubes clinking and settling, close mic, no music, no speech"

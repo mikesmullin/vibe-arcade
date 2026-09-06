@@ -1,0 +1,25 @@
+# BACKUP of the human's desk settings for the soda pour — "our hard work has paid off — premium quality"
+# (2026-09-06). Source take: scratch/desk_gen/pour_r3_fast_stream_moss_v2_223758 v01 (MOSS-SoundEffect v2,
+# seed 21, 12 s, prompt pour_r3_fast_stream). Restore: __soundman.set({...}) with the blocks below, or
+# python3 desk_server.py + pick the take + paste. Not approved yet — the human verifies the atlas first.
+sound: pour_r3_fast_stream_moss_v2_223758
+take: 1
+src: scratch/desk_gen
+loop: true
+monitorDb: -14.5          # desk-wide gain = the sound's game gain
+samplerOn: true
+regions:                  # seconds into the 12 s source take (sample-exact in the atlas export)
+  attack:  [0.932, 1.816]
+  hold:    [1.776, 3.19]
+  decay:   [3.19, 5.803]
+  sustain: [5.789, 8.796]
+  release: [10.932, 12.0]
+layers:                   # FMOD AHDSR per layer; Layer A knobs synced to region lengths, then hand-tuned
+  hit:  {enabled: true, initialDb: -80, attackMs: 884,  peakDb: 0,  holdMs: 1414, decayMs: 2613, sustainDb: -10.5, releaseMs: 1068, finalDb: -3}
+  body: {enabled: true, initialDb: -80, attackMs: 250,  peakDb: -4, holdMs: 0,    decayMs: 100,  sustainDb: -13,   releaseMs: 600,  finalDb: 3}
+paramsOn: false           # fill filter NOT used on this sound
+params:                   # (kept for reference; off)
+  fill: {peak: {fromHz: 320, toHz: 1500, q: 7, gainDb: 11}, lowpass: {fromHz: 12000, toHz: 3800}}
+mixer: {masterMute: false, layerA: {mute: false, solo: false}, layerB: {mute: false, solo: false}, fill: {mute: false, solo: false}}   # master S lit = nothing muted/soloed
+previewMode: loop
+sweepS: 3

@@ -2,7 +2,7 @@
 """Regen assets.json (+ sfx.json) from manifest.yaml (code-side). Run after every accept.
 
 assets.json: game_key -> path (art + audio alike; the ASSETS overlay).
-sfx.json:    game_key -> {wav, mp3, loop, layers, gainDb} for every entry carrying an
+sfx.json:    game_key -> {wav, mp3, loop, layers, gainDb, params} for every entry carrying an
              `automation:` card — the bank assets/daw.mjs (SfxEngine) loads so
              the game plays raw keepers with the card's two-layer ADSR live.
 """
@@ -24,6 +24,8 @@ for _id, e in m.items():
             "wav": wav, "mp3": mp3, "loop": bool(e.get("loop", False)),
             "layers": card["layers"], "take": card.get("take"),
             "gainDb": card.get("monitorDb", 0),   # the desk's monitor level = the sound's playback gain
+            "params": card.get("params"),          # runtime parameters (voice.setParam(name, 0..1)) or null
+            "regions": card.get("regions"),        # sampler windows {head, body, tail} (seconds) or null
             "automation": e["automation"],   # provenance only; the game reads this json
         }
 (HERE / "assets.json").write_text(json.dumps(out, indent=1, sort_keys=True) + "\n")

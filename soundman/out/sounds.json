@@ -5,5 +5,12 @@
    "sfx_patty_sizzle_loop_v03.wav"
   ],
   "loop": true
+ },
+ "sfx_soda_pour_loop": {
+  "audition": "audition.wav",
+  "keepers": [
+   "sfx_soda_pour_loop_v01.wav"
+  ],
+  "loop": true
  }
 }

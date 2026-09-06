@@ -7,3 +7,11 @@ sfx_patty_sizzle_loop:
   keys:
   - sfx_patty_sizzle_loop_v03
   loop: true
+sfx_soda_pour_loop:
+  backend: moss_v2/atlas
+  date: '2026-09-06'
+  files:
+  - sfx_soda_pour_loop_v01.wav
+  keys:
+  - sfx_soda_pour_loop_v01
+  loop: true

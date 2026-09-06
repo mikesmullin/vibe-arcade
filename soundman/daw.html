@@ -3,314 +3,842 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SoundMan Agent</title>
+<title>Sound Desk</title>
+<link rel="stylesheet" href="vendor/phosphor/regular.css">
+<link rel="stylesheet" href="vendor/phosphor/fill.css">
 <style>
+  .ph,.ph-fill{font-size:15px;vertical-align:-2px;line-height:1}
+  button .ph,button .ph-fill{margin-right:5px}
+  button.small .ph,button.small .ph-fill{font-size:13px;margin-right:4px}
+  button.icon .ph,button.icon .ph-fill{margin:0}
+  h2 .ph,h2 .ph-fill,h1 .ph{color:var(--dimmer);margin-right:6px;font-size:14px;vertical-align:-2px}
+  .cands .play .ph-fill{margin:0}
   :root{
     --bg:#07090d; --panel:#0d131c; --panel2:#111927; --line:#1e2a3c; --line2:#2a3a52;
     --ink:#e7eef6; --dim:#93a5bd; --dimmer:#5f728c;
-    --cyan:#4ee2f5; --amber:#ffc861; --green:#5ce6a8; --pink:#ff77c8;
+    --cyan:#4ee2f5; --amber:#ffc861; --green:#5ce6a8; --pink:#ff77c8; --red:#ff7a7a;
     --mono:"MonoLisa","JetBrains Mono",Menlo,Consolas,monospace;
     --sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;padding:18px;max-width:1180px;margin:0 auto}
-  header{display:flex;align-items:baseline;gap:12px;margin-bottom:4px}
-  h1{font-size:22px;letter-spacing:.02em}
-  h1 .tag{font-size:11px;font-weight:600;color:var(--amber);border:1px solid var(--amber);border-radius:20px;padding:2px 10px;margin-left:8px;vertical-align:middle;white-space:nowrap}
-  .sub{color:var(--dim);font-size:12.5px;margin-bottom:14px}
-  .sub b{color:var(--pink)}
-  .grid{display:grid;grid-template-columns:250px 1fr;gap:14px}
-  @media(max-width:900px){.grid{grid-template-columns:1fr}}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px}
-  .card h2{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--dimmer);margin-bottom:10px}
-  .layer-h{font-size:12px;font-weight:700;margin:12px 0 8px}
-  .layer-h.hit{color:var(--amber)} .layer-h.body{color:var(--green)}
-  .layer-h:first-of-type{margin-top:0}
-  .layer-h span{font-weight:400;color:var(--dimmer);font-size:11.5px}
-  label.fld{display:block;font-size:12px;color:var(--dim);margin:8px 0 3px}
-  select{width:100%;background:var(--panel2);color:var(--ink);border:1px solid var(--line2);border-radius:8px;padding:7px 9px;font-size:13px;font-family:var(--sans)}
-  .row{display:flex;gap:8px;align-items:center}
-  button{background:var(--panel2);color:var(--ink);border:1px solid var(--line2);border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans)}
+  html{color-scheme:dark}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13px;line-height:1.45;padding:14px 16px 24px;max-width:1280px;margin:0 auto}
+  [x-cloak]{display:none!important}
+  *{scrollbar-width:thin;scrollbar-color:#2a3a52 transparent}
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:#2a3a52;border-radius:8px;border:2px solid transparent;background-clip:padding-box}
+  ::-webkit-scrollbar-thumb:hover{background:#3d5270;background-clip:padding-box}
+  ::-webkit-scrollbar-corner{background:transparent}
+
+  /* ---- bare page header */
+  .pagehead{display:flex;align-items:baseline;justify-content:space-between;padding:0 4px 10px}
+  .pagehead h1{font-size:18px;letter-spacing:.02em}
+  .pagehead .ver{font-family:var(--mono);font-size:11px;color:var(--dimmer)}
+
+  /* ---- top bar: identity + transport in one row */
+  .bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px}
+  .bar h1{font-size:16px;letter-spacing:.02em;white-space:nowrap}
+  .bar .tag{font-size:10px;font-weight:700;color:var(--amber);border:1px solid var(--amber);border-radius:20px;padding:1px 8px;margin-left:6px;vertical-align:middle;white-space:nowrap;letter-spacing:.06em}
+  .bar .fld{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .bar .fld > span{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--dimmer)}   /* labels only — not the text spans inside buttons */
+  .bar .grow{flex:1 1 140px}
+  .bar .status{margin-left:auto;font-size:12px;color:var(--dim);max-width:420px;text-align:right}
+  .bar .status.err{color:var(--red)}
+  select,input[type=text]{background:var(--panel2);color:var(--ink);border:1px solid var(--line2);border-radius:8px;padding:6px 8px;font-size:12.5px;font-family:var(--sans);min-width:0}
+  input[type=text]{font-family:var(--mono);font-size:12px}
+  button{background:var(--panel2);color:var(--ink);border:1px solid var(--line2);border-radius:8px;padding:6px 12px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:var(--sans);white-space:nowrap}
   button:hover{border-color:var(--cyan);color:var(--cyan)}
-  button.primary{background:var(--cyan);border-color:var(--cyan);color:#04262b}
+  button.primary{background:var(--cyan);border-color:var(--cyan);color:#04262b;padding:6px 16px}
   button.primary:hover{filter:brightness(1.1);color:#04262b}
-  button.warn.on{background:var(--amber);border-color:var(--amber);color:#3a2704}
-  .knobs{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:10px}
-  r-knob{display:block;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 6px 8px;text-align:center;cursor:ns-resize;user-select:none;-webkit-user-select:none;touch-action:none}
-  r-knob:focus{outline:2px solid var(--cyan);outline-offset:1px}
-  r-knob .dial{width:58px;height:58px;margin:0 auto}
-  r-knob .val{font-family:var(--mono);font-size:12px;color:var(--cyan);margin-top:4px}
-  r-knob .lab{font-size:11px;color:var(--dim);margin-top:1px}
-  #envcurve{width:100%;height:auto;background:#05070b;border:1px solid var(--line);border-radius:10px;display:block}
-  pre{background:#05070b;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-family:var(--mono);font-size:12px;line-height:1.6;overflow-x:auto;white-space:pre-wrap;color:var(--green)}
+  button.on{background:var(--amber);border-color:var(--amber);color:#3a2704}
+  button.on:hover{color:#3a2704}
+  button.small{padding:3px 9px;font-size:11.5px;font-weight:600}
+
+  /* ---- cards */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px}
+  .card h2{font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--dimmer);display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .card h2 .sub{text-transform:none;letter-spacing:0;font-weight:400;color:var(--dimmer);font-size:11.5px}
+  .card h2 .right{margin-left:auto;display:flex;gap:6px;align-items:center}
+  .cols{display:grid;grid-template-columns:1fr 330px;gap:10px;align-items:start}
+  @media(max-width:980px){.cols{grid-template-columns:1fr}}
+
+  /* ---- knob strips: horizontal, compact */
+  .strip{display:flex;align-items:flex-end;gap:2px;flex-wrap:wrap}
+  .strip .sep{width:1px;align-self:stretch;background:var(--line);margin:4px 6px}
+  .lname{font-size:11px;font-weight:700;letter-spacing:.04em;padding:0 6px 10px 2px;min-width:74px}
+  .lname.a{color:var(--amber)} .lname.b{color:var(--green)} .lname.p{color:var(--pink)} .lname.m{color:var(--cyan)}
+  .lname small{display:block;font-weight:400;color:var(--dimmer);font-size:10.5px}
+  .knob{width:66px;padding:2px 0 4px;text-align:center;cursor:ew-resize;user-select:none;-webkit-user-select:none;touch-action:none;border-radius:8px;outline:none}
+  .knob:hover,.knob:focus-visible{background:var(--panel2)}
+  .knob:focus-visible{box-shadow:0 0 0 1px var(--cyan) inset}
+  .knob .lab{font-size:10.5px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px}
+  .knob svg{width:44px;height:44px;display:block;margin:1px auto 0}
+  .knob .val{font-family:var(--mono);font-size:11px;color:var(--cyan);white-space:nowrap}
+  .knob.off{opacity:.35}
+  .ms{display:flex;gap:3px;padding:0 8px 10px 0;align-self:flex-end}
+  .ms button{width:26px;height:22px;padding:0;font-size:11px;font-weight:800;border-radius:6px;font-family:var(--mono)}
+  .ms button.m.on{background:#ff7a7a;border-color:#ff7a7a;color:#3a0a0a}
+  .ms button.s.on{background:var(--amber);border-color:var(--amber);color:#3a2704}
+  .ms button.m.on:hover{color:#3a0a0a} .ms button.s.on:hover{color:#3a2704}
+  .lane-off .knob{opacity:.4}
+
+  /* ---- trim strip under the take waveform */
+  .trim{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:12px;color:var(--dim)}
+  .trim .rng{font-family:var(--mono);color:var(--cyan);min-width:190px}
+  .trim input[type=text]{width:190px;background:var(--panel2);color:var(--ink);border:1px solid var(--line2);border-radius:6px;padding:4px 8px;font-size:12px;font-family:var(--mono)}
+  #wave{cursor:crosshair}
+  .wavehead{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:4px}
+  .wavehead .rng{font-family:var(--mono);font-size:11px;color:var(--cyan)}
+  .trim .reg{font-family:var(--mono);font-size:11px;padding:2px 6px;border-radius:5px;border:1px solid var(--line2);color:var(--dim)}
+  .trim .reg.attack{border-color:#ffc861;color:#ffc861} .trim .reg.hold{border-color:#ffe08a;color:#ffe08a} .trim .reg.decay{border-color:#ff9f6b;color:#ff9f6b} .trim .reg.sustain{border-color:#5ce6a8;color:#5ce6a8} .trim .reg.release{border-color:#ff77c8;color:#ff77c8}
+  .split{display:inline-flex;align-items:stretch;border-radius:6px;overflow:hidden}
+  .split button{border-radius:0}
+  .split button+button{border-left:0;padding:3px 6px}
+  .split button.x.on{filter:brightness(.92)}
+  .split button.x .ph{margin:0;font-size:12px}
+  .trim button.attack.on{background:#ffc861;border-color:#ffc861;color:#3a2704} .trim button.hold.on{background:#ffe08a;border-color:#ffe08a;color:#3a2704} .trim button.decay.on{background:#ff9f6b;border-color:#ff9f6b;color:#3a1604} .trim button.sustain.on{background:#5ce6a8;border-color:#5ce6a8;color:#03301c} .trim button.release.on{background:#ff77c8;border-color:#ff77c8;color:#3a0a26}
+
+  .salv{display:flex;flex-direction:column;gap:6px;align-items:stretch}
+  .salv input[type=text]{width:100%;background:var(--panel2);color:var(--ink);border:1px solid var(--line2);border-radius:6px;padding:4px 8px;font-size:12px;font-family:var(--mono)}
+  .salv button{justify-content:center}
+  .bar .knob{width:58px;padding:0}
+  .bar .knob svg{width:36px;height:36px}
+
+  /* ---- canvases */
+  canvas.cv{width:100%;height:auto;background:#05070b;border:1px solid var(--line);border-radius:8px;display:block}
+  .legend{display:flex;gap:14px;font-size:11px;color:var(--dim);margin-top:5px}
+  .legend i{display:inline-block;width:16px;height:3px;vertical-align:middle;margin-right:5px}
+
+  /* ---- generate */
+  .gen{display:grid;grid-template-columns:1fr 300px;gap:12px}
+  @media(max-width:980px){.gen{grid-template-columns:1fr}}
+  textarea{width:100%;min-height:64px;background:var(--panel2);color:var(--ink);border:1px solid var(--line2);border-radius:8px;padding:7px 9px;font-size:12.5px;font-family:var(--sans);resize:vertical}
+  .gen .fld{display:flex;flex-direction:column;gap:2px}
+  .gen .fld span{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--dimmer)}
+  .gen .opts{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:8px}
+  .gen input[type=number]{width:70px;background:var(--panel2);color:var(--ink);border:1px solid var(--line2);border-radius:8px;padding:6px 8px;font-size:12.5px;font-family:var(--mono)}
+  .gen .log{font-family:var(--mono);font-size:11px;color:var(--dim);white-space:pre-wrap;margin-top:6px;max-height:80px;overflow:auto}
+  .genlist{list-style:none;max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px;background:#05070b}
+  .genlist li{padding:6px 9px;border-bottom:1px solid var(--line);cursor:pointer;font-size:12px;display:flex;gap:8px;align-items:baseline}
+  .genlist li:hover{background:var(--panel2)} .genlist li.cur{background:#0f2430;border-left:3px solid var(--cyan)}
+  .genlist .mdl{color:var(--amber);font-weight:700;white-space:nowrap} .genlist .tk{color:var(--cyan);font-family:var(--mono);font-size:11px;white-space:nowrap}
+  .genlist .pr{color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+  .genlist .when{color:var(--dimmer);font-family:var(--mono);font-size:10.5px;white-space:nowrap}
+
+  /* ---- candidates (review list) */
+  .cands{list-style:none;border:1px solid var(--line);border-radius:8px;background:#05070b;max-height:70vh;overflow:auto}
+  .cands li{display:flex;gap:8px;align-items:center;padding:5px 8px;border-bottom:1px solid var(--line)}
+  .cands li.cur{background:#0f2430;box-shadow:inset 3px 0 0 var(--cyan)}
+  .cands .play{width:30px;height:26px;padding:0;font-size:12px;flex:0 0 auto}
+  .cands .play.on{background:var(--green);border-color:var(--green);color:#03301c}
+  .cands .lbl{font-family:var(--mono);font-size:11.5px;color:var(--ink);cursor:pointer;white-space:nowrap;flex:0 0 auto}
+  .cands .lbl:hover{color:var(--cyan)}
+  .cands .mdl{font-size:10.5px;color:var(--amber);white-space:nowrap;flex:0 0 auto}
+  .cands input[type=text]{flex:1;min-width:120px;background:var(--panel2);color:var(--ink);border:1px solid var(--line2);border-radius:6px;padding:4px 8px;font-size:12px;font-family:var(--sans)}
+  .cands input[type=text].saved{border-color:#2d6b4f}
+
+  /* ---- readouts */
+  details{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-bottom:10px}
+  details summary{cursor:pointer;padding:9px 12px;font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--dimmer);list-style:none;display:flex;align-items:center;gap:10px}
+  details summary::-webkit-details-marker{display:none}
+  details summary::before{content:'▸';color:var(--dimmer)} details[open] summary::before{content:'▾'}
+  details .body{padding:0 12px 12px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  @media(max-width:980px){details .body{grid-template-columns:1fr}}
+  pre{background:#05070b;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-family:var(--mono);font-size:11.5px;line-height:1.5;overflow:auto;white-space:pre-wrap;color:var(--green);max-height:340px}
   pre.snip{color:var(--dim)}
-  .status{font-size:12.5px;color:var(--dim);margin-top:8px;min-height:20px}
-  .status.err{color:#ff7a7a}
-  .hint{font-size:12px;color:var(--dimmer);margin-top:10px}
-  .hint code{font-family:var(--mono);color:var(--dim);font-size:11.5px}
-  .legend{display:flex;gap:16px;font-size:12px;color:var(--dim);margin-top:8px}
-  .legend i{display:inline-block;width:18px;height:3px;vertical-align:middle;margin-right:5px}
-  footer{margin-top:6px;font-size:12px;color:var(--dimmer)}
+  .hint{font-size:11.5px;color:var(--dimmer)}
+  .hint code{font-family:var(--mono);color:var(--dim);font-size:11px}
+  footer{margin-top:4px;font-size:11.5px;color:var(--dimmer)}
 </style>
 </head>
 <body>
-<div id="app" x-data="desk()" x-init="init()">
-  <header>
-    <h1>SoundMan Agent <span class="tag">CODE SIDE: HANDS OFF</span></h1>
-  </header>
-  <p class="sub">Shared sound-design desk. Human tweaks knobs, agent reads them via
-    <b><code>__soundman.get()</code></b>. Game code lives elsewhere — nothing here ships.</p>
+<div id="app" x-data="desk()" x-init="init()" x-cloak @knob="onKnob($event.detail)">
 
-  <div class="grid">
-    <div>
-      <div class="card">
-        <h2>Sound</h2>
-        <label class="fld">Outbox id</label>
-        <select id="selSound" :value="sound" @change="sound=$event.target.value; onSound()">
-          <template x-for="id in Object.keys(sounds)" :key="id">
-            <option :value="id" x-text="id"></option>
+  <!-- ============================================================ page header (no panel) -->
+  <div class="pagehead">
+    <h1><i class="ph ph-sliders-horizontal"></i>Sound Desk</h1>
+    <span class="ver" x-text="'engine daw.mjs v' + engineVersion"></span>
+  </div>
+
+  <!-- ============================================================ generate -->
+  <div class="card">
+    <h2><i class="ph ph-sparkle"></i>Generate <span class="sub">prompt + model → takes into scratch/desk_gen (unapproved) · pick one to make it the current sound</span>
+      <span class="right hint" x-text="genStatus"></span></h2>
+    <div class="gen">
+      <div>
+        <div class="fld"><span>Prompt (one prompt, any model)</span>
+          <textarea x-ref="prompt" :value="gen.prompt" @input="gen.prompt = $event.target.value" placeholder="sound-report style: what, where, mic, 'no music, no speech'"></textarea></div>
+        <div class="opts">
+          <div class="fld"><span>Model</span>
+            <select :value="gen.model" @change="gen.model = $event.target.value">
+              <template x-for="m in models" :key="m.id"><option :value="m.id" :disabled="!m.available" x-text="m.label + (m.available ? '' : ' — not installed') + ' · ' + m.license"></option></template>
+            </select></div>
+          <div class="fld"><span>Seconds</span><input type="number" min="1" max="30" step="0.5" :value="gen.seconds" @change="gen.seconds = +$event.target.value"></div>
+          <div class="fld"><span>Seed</span><input type="number" min="0" step="1" :value="gen.seed" @change="gen.seed = +$event.target.value"></div>
+          <div class="fld"><span>Takes</span><input type="number" min="1" max="6" step="1" :value="gen.takes" @change="gen.takes = +$event.target.value"></div>
+          <button :class="{on: gen.loop}" @click="gen.loop = !gen.loop"><i class="ph ph-repeat"></i><span x-text="gen.loop ? 'Loop: on' : 'Loop: off'"></span></button>
+          <button class="primary" :disabled="genBusy" @click="generate()"><i class="ph-fill" :class="genBusy ? 'ph-hourglass' : 'ph-lightning'"></i><span x-text="genBusy ? 'Generating…' : 'Generate'"></span></button>
+        </div>
+        <div class="log" x-text="genLog"></div>
+      </div>
+      <div>
+        <div class="fld"><span>Generated (newest first) — click = current sound</span></div>
+        <ul class="genlist">
+          <li x-show="!generated.length" class="hint">nothing generated yet</li>
+          <template x-for="g in generated" :key="g.id">
+            <li :class="{cur: src === 'scratch/desk_gen' && sound === g.id}" @click="pickGenerated(g)" :title="g.prompt">
+              <span class="mdl" x-text="g.model"></span><span class="tk" x-text="g.keepers.length + '×'"></span>
+              <span class="pr" x-text="g.prompt"></span><span class="when" x-text="(g.date || '').slice(11, 16)"></span>
+            </li>
           </template>
-        </select>
-        <label class="fld">Take</label>
-        <select id="selTake" :value="take" @change="take=+$event.target.value; changed()">
-          <option value="0">audition mix (all keepers)</option>
-          <template x-for="i in takeCount()" :key="i">
-            <option :value="i" x-text="'keeper v' + String(i).padStart(2,'0')"></option>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ candidates -->
+  <div class="card">
+    <h2><i class="ph ph-list-checks"></i>Candidates <span class="sub">every take in the current source · ▶ plays the RAW file (no automation) · click the name to make it the desk's current sound · type what your ears say, it saves as you go · ✕ hides a disapproved take</span>
+      <span class="right"><span class="hint" x-text="candStatus"></span>
+        <button class="small" x-show="hiddenCount()" :class="{on: showHidden}" @click="showHidden = !showHidden; changed()"><i class="ph" :class="showHidden ? 'ph-eye-slash' : 'ph-eye'"></i><span x-text="(showHidden ? 'hide ' : 'show ') + hiddenCount() + ' hidden'"></span></button></span></h2>
+    <ul class="cands">
+      <li x-show="!candidates().length" class="hint">no takes in this source</li>
+      <template x-for="c in candidates()" :key="c.path">
+        <li :class="{cur: sound === c.id && take === c.take}">
+          <button class="play icon" :class="{on: rawPlaying === c.path}" @click="toggleRaw(c)" title="Play the raw file at unity — NOT affected by the monitor gain (the only playback that bypasses it)"><i class="ph-fill" :class="rawPlaying === c.path ? 'ph-stop' : 'ph-play'"></i></button>
+          <span class="lbl" @click="pickCandidate(c)" x-text="c.label" :title="c.path"></span>
+          <span class="mdl" x-text="c.model || ''"></span>
+          <input type="text" :value="draft[c.path] !== undefined ? draft[c.path] : (feedback[c.path] && feedback[c.path].text) || ''" :class="{saved: !!(feedback[c.path] && feedback[c.path].text)}"
+                 placeholder="feedback for this take…" @input="draft[c.path] = $event.target.value" @change="saveFeedback(c, $event.target.value)" @keydown.enter="$event.target.blur()">
+          <button class="small icon" :title="hidden(c) ? 'unhide' : 'hide (disapproved)'" @click="setHidden(c, !hidden(c))"><i class="ph" :class="hidden(c) ? 'ph-eye' : 'ph-eye-slash'"></i></button>
+        </li>
+      </template>
+    </ul>
+  </div>
+
+  <!-- ============================================================ top bar -->
+  <div class="bar">
+    <div class="fld grow"><span>Source</span>
+      <input type="text" :value="src" @change="src=$event.target.value; init()" title="out = approved outbox · scratch/<dir> = audition unapproved takes (also ?src=)"></div>
+    <div class="fld grow"><span>Sound</span>
+      <select id="selSound" :value="sound" @change="sound=$event.target.value; onSound()">
+        <template x-for="id in Object.keys(sounds)" :key="id"><option :value="id" x-text="id"></option></template>
+      </select></div>
+    <div class="fld"><span>Take</span>
+      <select id="selTake" :value="take" @change="take=+$event.target.value; seedRegions(); changed(); loadWave()">
+        <option value="0">audition mix</option>
+        <template x-for="i in takeCount()" :key="i"><option :value="i" x-text="'keeper v' + String(i).padStart(2,'0')"></option></template>
+      </select></div>
+    <div class="fld"><span>Transport</span>
+      <div style="display:flex;gap:6px">
+        <button class="primary" @click="play()"><i class="ph-fill" :class="playing ? 'ph-arrow-clockwise' : 'ph-play'"></i><span x-text="playing ? 'Restart' : 'Play'"></span></button>
+        <button @click="stop()"><i class="ph-fill ph-stop"></i>Stop</button>
+        <button :class="{on: loop}" @click="loop = !loop; changed()"><i class="ph ph-repeat"></i><span x-text="loop ? 'Loop on' : 'Loop off'"></span></button>
+      </div></div>
+    <div class="fld" style="margin-left:auto"><span>Monitor · desk-wide gain (all but Candidates ▶) · exported as game gain</span>
+      <div class="strip" style="align-items:center;gap:6px">
+        <div class="ms" style="padding:0" title="master: M = mute ALL automation (raw sound) · S = clear every lane mute/solo">
+          <button class="m" :class="{on: masterMute}" @click="masterMute = !masterMute; changed()">M</button>
+          <button class="s" :class="{on: !masterMute && !anyMs()}" @click="clearMs()">S</button>
+        </div>
+        <span x-component="knob" bind="monitorDb" :value="monitorDb" min="-40" max="6" step="0.5" def="-6" unit="dB" label="Gain"></span>
+        <div x-effect="applyMonitor(monitorDb)"></div>
+        <div x-effect="applyLanes(laneKey())"></div>
+      </div></div>
+  </div>
+
+  <!-- ============================================================ take + monitor -->
+  <div class="card">
+    <h2><i class="ph ph-waveform"></i>Take <span class="sub" x-text="takeInfo()"></span>
+      <span class="right hint">playhead live</span></h2>
+    <div class="cols">
+      <div>
+        <div class="wavehead">
+          <span class="rng" x-text="sel ? sel.a.toFixed(2) + ' s – ' + sel.b.toFixed(2) + ' s  (' + (sel.b - sel.a).toFixed(2) + ' s)' : 'no selection'"></span>
+          <button class="small" :disabled="!sel" @click="sel = null; drawWave()" title="Drop the selection (regions already set stay)."><i class="ph ph-x"></i>clear selection</button>
+        </div>
+        <canvas id="wave" class="cv" width="900" height="96" @pointerdown="selDown($event)" @pointermove="selMove($event); hoverT = _selT($event)" @pointerup="selUp($event)" @pointercancel="selUp($event)" @pointerleave="hoverT = null" @window.keydown="waveKey($event)"></canvas>
+        <div class="trim">
+          <button class="small" style="width:150px;justify-content:center;display:inline-flex;align-items:center" :disabled="!sel" @click="previewSel()" title="Play only the selected window, raw (no automation), from the decoded take. Loops it when the mode is loop. Click again (or press SPACE) to stop."><i class="ph-fill" :class="selPlaying ? 'ph-stop' : 'ph-play'"></i><span x-text="selPlaying ? 'stop window' : 'preview window'"></span></button>
+          <span class="hint"><b>space</b> = preview window / stop · drag to select · hover + <b>I</b> / <b>O</b> = set in / out point at the cursor · <b>[</b> / <b>]</b> nudge in/out by 10 ms (shift: 1 ms)</span>
+        </div>
+        <div class="trim">
+          <span class="hint">sampler — one sample per envelope stage: selection →</span>
+          <template x-for="k in regionKeys" :key="k">
+            <span class="split">
+              <button class="small" :class="[k, {on: !!regions[k]}]" :disabled="!sel && !regions[k]" @click="regionClick(k)" :title="regionTip(k)"><i class="ph" x-show="regions[k] && (!sel || selRegion() === k)" :class="selRegion() === k ? 'ph-check-square' : 'ph-selection'"></i><span x-text="k.toUpperCase()"></span></button>
+              <button class="small x" :class="[k, {on: !!regions[k]}]" x-show="regions[k]" @click="clearRegion(k)" :title="'Unset the ' + k.toUpperCase() + ' region'"><i class="ph ph-x"></i></button>
+            </span>
           </template>
-        </select>
-        <label class="fld">Transport</label>
-        <div class="row">
-          <button class="primary" @click="play()" x-text="playing ? '↻ Restart' : '▶ Play'"></button>
-          <button @click="stop()">⏹ Stop</button>
-          <button class="warn" :class="{on: loop}" @click="loop = !loop; changed()" x-text="loop ? 'Loop: on' : 'Loop: off'"></button>
+          <template x-for="k in regionKeys" :key="'r' + k"><span class="reg" :class="k" x-show="regions[k]" x-text="k + ' ' + regText(k)"></span></template>
+          <button class="small" :class="{on: samplerOn}" :disabled="!regions.sustain" @click="samplerOn = !samplerOn; changed()" title="Sampler on: Play runs ATTACK → HOLD → DECAY once each, loops SUSTAIN, and plays RELEASE on Stop (exported with the card). Off: the whole take plays as one loop."><i class="ph ph-piano-keys"></i><span x-text="samplerOn ? 'Sampler: on' : 'Sampler: off'"></span></button>
+          <button class="small" x-show="regionKeys.some(k => regions[k])" @click="clearRegions()"><i class="ph ph-x"></i>clear regions</button>
+          <span class="hint">Setting a region also sets Layer A's matching ms knob to its length (SUSTAIN has none — it loops). Play = A→H→D once → S loops → R on Stop.</span>
         </div>
         <div class="status" :class="{err: isErr}" x-text="status"></div>
       </div>
-      <div class="card">
-        <h2>Monitor</h2>
-        <div class="knobs">
-          <r-knob data-bind="monitorDb" data-min="-24" data-max="0" data-step="0.5" data-def="-6" data-unit="dB" data-label="Monitor gain"></r-knob>
-        </div>
-        <div x-effect="applyMonitor(monitorDb)"></div>
-        <p class="hint">Live during playback — no restart needed.</p>
+      <div class="salv">
+        <div class="lname p" style="padding-bottom:4px">ATLAS<small>keep only the labeled ranges</small></div>
+        <button class="small" :class="{on: trimLoop}" @click="trimLoop = !trimLoop" :title="trimLoop ? 'Preview mode: LOOP — the preview window (and a stage-region preview) loops; a stage preview re-triggers its envelope stage every pass. Click to switch to one-shot.' : 'Preview mode: ONE-SHOT — the preview window plays once. Click to switch to loop.'"><i class="ph" :class="trimLoop ? 'ph-repeat' : 'ph-arrow-line-right'"></i><span x-text="trimLoop ? 'preview: loop' : 'preview: one-shot'"></span></button>
+        <input type="text" :value="trimName" @input="trimName = $event.target.value" placeholder="new candidate name">
+        <button class="small primary" :disabled="!regionKeys.some(k => regions[k]) || trimBusy" @click="exportAtlas()" title="Compose a NEW candidate from ONLY the labeled stage regions of this take (ATTACK, HOLD, DECAY, SUSTAIN, RELEASE in that order, samples copied verbatim, no gaps, no normalizing) and carry the regions over at their new positions. Unused samples are dropped; the envelope playback works exactly as before because it only reads the regions. Saved under scratch/desk_gen, becomes the current sound. Nothing is approved by this."><i class="ph-fill ph-scissors"></i><span x-text="trimBusy ? 'composing…' : 'Export Ranges to Atlas'"></span></button>
+        <span class="hint" x-text="trimStatus"></span>
       </div>
     </div>
+  </div>
 
+  <!-- ============================================================ AHDSR (FMOD modulator) -->
+  <div class="card">
+    <h2><i class="ph ph-speaker-high"></i>Volume · AHDSR modulator <span class="sub">FMOD order: Initial → Attack → Peak → Hold → Decay → Sustain → Release → Final · levels in dB, times in ms</span>
+      <span class="right">
+        <button class="small" :class="{on: layers.body.enabled}" @click="layers.body.enabled = !layers.body.enabled; changed()"><i class="ph" :class="layers.body.enabled ? 'ph-minus' : 'ph-plus'"></i>Layer B</button>
+        <button class="small" @click="resetLayers()"><i class="ph ph-arrow-counter-clockwise"></i>Reset</button>
+      </span></h2>
     <div>
-      <div class="card">
-        <h2>ADSR envelope × 2 layers — summed live at runtime</h2>
-        <div class="layer-h hit">HIT layer <span>— the patty touch: fast attack, 500 ms hold, decay to silence by ~1 s</span></div>
-        <div class="knobs">
-          <r-knob data-bind="layers.hit.peakDb" data-min="-24" data-max="+6" data-step="0.5" data-def="0" data-unit="dB" data-label="Peak gain"></r-knob>
-          <r-knob data-bind="layers.hit.attackMs" data-min="1" data-max="8000" data-step="1" data-def="5" data-unit="ms" data-label="Attack"></r-knob>
-          <r-knob data-bind="layers.hit.holdMs" data-min="0" data-max="2000" data-step="10" data-def="500" data-unit="ms" data-label="Hold"></r-knob>
-          <r-knob data-bind="layers.hit.decayMs" data-min="10" data-max="3000" data-step="10" data-def="500" data-unit="ms" data-label="Decay"></r-knob>
-          <r-knob data-bind="layers.hit.sustainDb" data-min="-40" data-max="0" data-step="0.5" data-def="-40" data-unit="dB" data-label="Sustain"></r-knob>
-          <r-knob data-bind="layers.hit.releaseMs" data-min="20" data-max="3000" data-step="10" data-def="120" data-unit="ms" data-label="Release"></r-knob>
-        </div>
-        <div class="layer-h body">BODY layer <span>— the sizzle bed: slow 3 s attack swelling up to sustain, sits there</span></div>
-        <div class="knobs">
-          <r-knob data-bind="layers.body.peakDb" data-min="-24" data-max="+6" data-step="0.5" data-def="-3" data-unit="dB" data-label="Peak gain"></r-knob>
-          <r-knob data-bind="layers.body.attackMs" data-min="1" data-max="8000" data-step="10" data-def="3000" data-unit="ms" data-label="Attack"></r-knob>
-          <r-knob data-bind="layers.body.holdMs" data-min="0" data-max="2000" data-step="10" data-def="0" data-unit="ms" data-label="Hold"></r-knob>
-          <r-knob data-bind="layers.body.decayMs" data-min="10" data-max="3000" data-step="10" data-def="200" data-unit="ms" data-label="Decay"></r-knob>
-          <r-knob data-bind="layers.body.sustainDb" data-min="-40" data-max="0" data-step="0.5" data-def="-3" data-unit="dB" data-label="Sustain"></r-knob>
-          <r-knob data-bind="layers.body.releaseMs" data-min="20" data-max="3000" data-step="10" data-def="800" data-unit="ms" data-label="Release"></r-knob>
-        </div>
-        <div class="row" style="margin-top:10px">
-          <p class="hint">Attack/hold linear, decay/release exponential (classic). Sustain is a <i>level</i>, everything else a <i>time</i>.</p>
-          <div style="flex:0 0 auto;margin-left:auto">
-            <button @click="resetLayers()">Reset to suggested</button>
+      <div>
+        <template x-for="L in visibleLayers()" :key="L">
+          <div class="strip" :class="{'lane-off': !laneActive(L)}">
+            <div class="lname" :class="L === 'hit' ? 'a' : 'b'"><span x-text="L === 'hit' ? 'LAYER A' : 'LAYER B'"></span><small x-text="L === 'hit' ? 'hit' : 'body'"></small></div>
+            <div class="ms" title="M = bypass this envelope (flat gain) · S = only soloed lanes active">
+              <button class="m" :class="{on: mute[L]}" @click="mute[L] = !mute[L]; changed()">M</button>
+              <button class="s" :class="{on: solo[L]}" @click="solo[L] = !solo[L]; changed()">S</button>
+            </div>
+            <span x-component="knob" :bind="'layers.'+L+'.initialDb'" :value="layers[L].initialDb" min="-80" max="6" step="0.5" def="-80" unit="dB" label="Initial"></span>
+            <span x-component="knob" :bind="'layers.'+L+'.attackMs'" :value="layers[L].attackMs" min="0" max="8000" step="5" def="5" unit="ms" label="Attack"></span>
+            <span x-component="knob" :bind="'layers.'+L+'.peakDb'" :value="layers[L].peakDb" min="-40" max="6" step="0.5" def="0" unit="dB" label="Peak"></span>
+            <span x-component="knob" :bind="'layers.'+L+'.holdMs'" :value="layers[L].holdMs" min="0" max="4000" step="10" def="0" unit="ms" label="Hold"></span>
+            <span x-component="knob" :bind="'layers.'+L+'.decayMs'" :value="layers[L].decayMs" min="0" max="6000" step="10" def="500" unit="ms" label="Decay"></span>
+            <span x-component="knob" :bind="'layers.'+L+'.sustainDb'" :value="layers[L].sustainDb" min="-80" max="6" step="0.5" def="-3" unit="dB" label="Sustain"></span>
+            <span x-component="knob" :bind="'layers.'+L+'.releaseMs'" :value="layers[L].releaseMs" min="0" max="6000" step="10" def="200" unit="ms" label="Release"></span>
+            <span x-component="knob" :bind="'layers.'+L+'.finalDb'" :value="layers[L].finalDb" min="-80" max="6" step="0.5" def="-80" unit="dB" label="Final"></span>
           </div>
-        </div>
+        </template>
       </div>
-      <div class="card">
-        <h2>Curve — amber HIT + green BODY = cyan SUM (what you hear)</h2>
-        <canvas id="envcurve" width="680" height="240"></canvas>
+      <div style="margin-top:8px">
+        <canvas id="envcurve" class="cv" width="1240" height="210"></canvas>
         <div x-effect="drawEnv(rev)"></div>
-        <div class="legend">
-          <span><i style="background:#ffc861"></i>HIT</span>
-          <span><i style="background:#5ce6a8"></i>BODY</span>
-          <span><i style="background:#4ee2f5"></i>SUM</span>
-        </div>
+        <div class="legend"><span><i style="background:#ffc861"></i>A</span><span x-show="layers.body.enabled"><i style="background:#5ce6a8"></i>B</span><span><i style="background:#4ee2f5"></i>SUM (what you hear)</span>
+          <span class="hint" style="margin-left:auto">A/H/D and R to scale · S = sustain, held until Stop (loop wraps never retrigger) · Layer B = second modulator on the same source, summed (FMOD's hit + bed trick)</span></div>
       </div>
     </div>
   </div>
 
+  <!-- ============================================================ runtime parameter -->
   <div class="card">
-    <h2>Automation JSON — what the agent reads</h2>
-    <pre x-text="json()"></pre>
-    <div class="row" style="margin-top:8px">
-      <button @click="copyJson()">Copy JSON</button>
+    <h2><i class="ph ph-faders"></i>Parameter · fill <span class="sub">0→1 set by the game every frame (cup t / fillT) · filters sweep live in the voice chain</span>
+      <span class="right"><button class="small" :class="{on: paramsOn}" @click="paramsOn = !paramsOn; changed()"><i class="ph ph-faders-horizontal"></i><span x-text="paramsOn ? 'Params on' : 'Params off'"></span></button></span></h2>
+    <div class="strip" :class="{off: !paramsOn, 'lane-off': !laneActive('fill')}">
+      <div class="lname p">LIVE<small>value · preview sweep</small></div>
+      <div class="ms" title="M = bypass the fill filters (flat) · S = only soloed lanes active">
+        <button class="m" :class="{on: mute.fill}" @click="mute.fill = !mute.fill; changed()">M</button>
+        <button class="s" :class="{on: solo.fill}" @click="solo.fill = !solo.fill; changed()">S</button>
+      </div>
+      <span x-component="knob" bind="fill" :value="fill" min="0" max="1" step="0.01" def="0" label="fill"></span>
+      <span x-component="knob" bind="sweepS" :value="sweepS" min="0" max="10" step="0.5" def="3" unit="s" label="Sweep"></span>
+      <div class="sep"></div>
+      <div class="lname a">PEAK<small>resonance rises as it fills</small></div>
+      <span x-component="knob" bind="params.fill.peak.fromHz" :value="params.fill.peak.fromHz" min="80" max="4000" step="10" def="320" unit="Hz" label="Empty"></span>
+      <span x-component="knob" bind="params.fill.peak.toHz" :value="params.fill.peak.toHz" min="80" max="8000" step="10" def="1500" unit="Hz" label="Full"></span>
+      <span x-component="knob" bind="params.fill.peak.q" :value="params.fill.peak.q" min="0.5" max="20" step="0.5" def="7" unit="Q" label="Q"></span>
+      <span x-component="knob" bind="params.fill.peak.gainDb" :value="params.fill.peak.gainDb" min="0" max="24" step="0.5" def="11" unit="dB" label="Boost"></span>
+      <div class="sep"></div>
+      <div class="lname b">LOWPASS<small>brightness closes</small></div>
+      <span x-component="knob" bind="params.fill.lowpass.fromHz" :value="params.fill.lowpass.fromHz" min="500" max="20000" step="100" def="12000" unit="Hz" label="Empty"></span>
+      <span x-component="knob" bind="params.fill.lowpass.toHz" :value="params.fill.lowpass.toHz" min="500" max="20000" step="100" def="3800" unit="Hz" label="Full"></span>
+      <div x-effect="applyFill(fill)"></div>
     </div>
   </div>
 
-  <div class="card">
-    <h2>Coder snippet — the game plays through the same <code>daw.mjs</code> engine this desk uses</h2>
-    <pre class="snip" x-text="snippet()"></pre>
-    <div class="row" style="margin-top:8px">
-      <button @click="copySnippet()">Copy snippet</button>
+  <!-- ============================================================ readouts -->
+  <details>
+    <summary><i class="ph ph-code"></i>Automation JSON &amp; coder snippet <span class="hint" style="text-transform:none;letter-spacing:0">— what <code>__soundman.get()</code> returns · what the game calls</span></summary>
+    <div class="body">
+      <div><pre x-text="json()"></pre><button class="small" style="margin-top:6px" @click="copyJson()"><i class="ph ph-copy"></i>Copy JSON</button></div>
+      <div><pre class="snip" x-text="snippet()"></pre><button class="small" style="margin-top:6px" @click="copySnippet()"><i class="ph ph-copy"></i>Copy snippet</button></div>
     </div>
-  </div>
+  </details>
 
-  <footer>Desk persists to localStorage. Agent dbg: <code>__soundman.help()</code> ·
-    <code>__soundman.get()</code> · <code>__soundman.set({layers:{hit:{decayMs:700}}})</code>
-    <br>Pointer probe (for the drag investigation): <code id="ptrlog">no pointer input seen yet</code></footer>
+  <footer>Desk persists to localStorage. Agent dbg: <code>__soundman.help()</code> · <code>__soundman.get()</code> · <code>__soundman.set({layers:{hit:{decayMs:700}}})</code> · knobs: drag left/right (right = up), wheel, arrows, dbl-click = default, shift = fine.</footer>
 </div>
 
 <script type="module">
 import M from './vendor/m.min.js';
-import { SfxEngine, DEFAULT_LAYERS as ENGINE_DEFAULTS, layerGains, envSum, db2g, VERSION as ENGINE_VERSION } from './daw.mjs';
+import { SfxEngine, DEFAULT_LAYERS as ENGINE_DEFAULTS, SILENCE_DB, layerGains, envSum, db2g, VERSION as ENGINE_VERSION } from './daw.mjs';
 
-/* ---------------------------------------------------------- rotary knobs */
-const knobReg = {};
-window.__knobBuilds = 0;
-class RKnob extends HTMLElement {
-  connectedCallback() {
-    if (this._built) { this.render(this._read()); return; }
-    this._built = true;
-    const d = this.dataset;
-    this._min = +d.min; this._max = +d.max; this._step = +(d.step || 1);
-    this._def = (d.def !== undefined) ? +d.def : this._min;
-    this._unit = d.unit || ''; this._label = d.label || d.bind; this._bind = d.bind;
-    this.tabIndex = 0;
-    this.innerHTML = `<svg class="dial" viewBox="0 0 60 60"></svg>
-      <div class="val"></div><div class="lab"></div>`;
-    this.querySelector('.lab').textContent = this._label;
-    knobReg[this._bind] = this;
-    this.render(this._read());
-    let startY = 0, startV = 0;
-    this.addEventListener('pointerdown', e => {
-      window.__knobHits = (window.__knobHits || 0) + 1;
-      e.preventDefault();
-      startY = e.clientY; startV = this._read();
-      try { this.setPointerCapture(e.pointerId); } catch (err) {}
-      const mv = ev => {
-        const range = this._max - this._min;
-        const dv = (startY - ev.clientY) / 150 * range * (ev.shiftKey ? 0.1 : 1);
-        window.__deskSet(this._bind, this._quant(startV + dv));
-      };
-      const up = () => { this.removeEventListener('pointermove', mv); this.removeEventListener('pointerup', up); };
-      this.addEventListener('pointermove', mv); this.addEventListener('pointerup', up);
-    });
-    this.addEventListener('wheel', e => {
-      e.preventDefault();
-      window.__deskSet(this._bind, this._quant(this._read() + (e.deltaY < 0 ? this._step : -this._step)));
-    }, { passive: false });
-    this.addEventListener('dblclick', () => window.__deskSet(this._bind, this._def));
-    this.addEventListener('keydown', e => {
-      if (e.key === 'ArrowUp' || e.key === 'ArrowRight') { window.__deskSet(this._bind, this._quant(this._read() + this._step)); e.preventDefault(); }
-      if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') { window.__deskSet(this._bind, this._quant(this._read() - this._step)); e.preventDefault(); }
-    });
-    window.__knobBuilds = (window.__knobBuilds || 0) + 1;
-  }
-  _read() {
-    // connectedCallback can run before the module finishes executing
-    // (customElements.define upgrades parsed nodes synchronously), at which
-    // point __deskGet doesn't exist yet — fall back to the default so the
-    // callback completes and listeners attach; init's syncKnobs corrects us.
-    const f = window.__deskGet;
-    if (typeof f !== 'function') return this._def;
-    const v = f(this._bind);
-    return (v === undefined || v === null) ? this._def : v;
-  }
-  _quant(v) {
-    v = Math.min(this._max, Math.max(this._min, v));
-    const n = Math.round(v / this._step);
-    return Math.round(n * this._step * 1000) / 1000;
-  }
-  render(v) {
-    if (v === undefined || v === null) return;
-    const dial = this.querySelector('.dial');
-    if (!dial) return;
-    const t = (v - this._min) / (this._max - this._min);
-    const a0 = -2.35, a1 = 2.35, a = a0 + t * (a1 - a0);
-    const px = x => (30 + 22 * Math.cos(x)).toFixed(1), py = y => (30 + 22 * Math.sin(y)).toFixed(1);
-    const large = (a - a0) > Math.PI ? 1 : 0;
-    dial.innerHTML =
-      `<circle cx="30" cy="30" r="26" fill="#0a0f16" stroke="#2a3a52" stroke-width="3"/>` +
-      `<path d="M ${px(a0)} ${py(a0)} A 22 22 0 ${large} 1 ${px(a)} ${py(a)}" fill="none" stroke="#4ee2f5" stroke-width="4" stroke-linecap="round"/>` +
-      `<line x1="30" y1="30" x2="${px(a)}" y2="${py(a)}" stroke="#e7eef6" stroke-width="3" stroke-linecap="round"/>` +
-      `<circle cx="30" cy="30" r="3.5" fill="#e7eef6"/>`;
-    this.querySelector('.val').textContent = v + (this._unit ? ' ' + this._unit : '');
-  }
-}
-customElements.define('r-knob', RKnob);
-function syncKnobs() { for (const k in knobReg) knobReg[k].render(window.__deskGet(k)); }
+/* ------------------------------------------------------------ knob widget
+   An m-js component (not a custom element): props in, `knob` event out.
+   The host passes :value from its state so a redraw moves the dial; a drag
+   dispatches {bind, value} and the desk writes it back reactively. */
+const fmt = (v, unit, step) => {
+  const d = step < 1 ? (step < 0.1 ? 2 : 1) : 0;
+  const s = (+v).toFixed(d);
+  return unit ? s + ' ' + unit : s;
+};
+M.component('knob', () => ({
+  props: ['bind', 'value', 'min', 'max', 'step', 'def', 'unit', 'label'],
+  bind: '', value: 0, min: 0, max: 1, step: 1, def: 0, unit: '', label: '',
+  drag: null,
+  get t() { const lo = +this.min, hi = +this.max; return Math.min(1, Math.max(0, ((+this.value) - lo) / ((hi - lo) || 1))); },
+  get arc() {
+    const a0 = -2.35, a = a0 + this.t * 4.7, r = 17, c = 22;
+    const px = x => (c + r * Math.cos(x)).toFixed(1), py = y => (c + r * Math.sin(y)).toFixed(1);
+    return `M ${px(a0)} ${py(a0)} A ${r} ${r} 0 ${(a - a0) > Math.PI ? 1 : 0} 1 ${px(a)} ${py(a)}`;
+  },
+  get needle() { const a = -2.35 + this.t * 4.7, c = 22; return { x2: (c + 15 * Math.cos(a)).toFixed(1), y2: (c + 15 * Math.sin(a)).toFixed(1) }; },
+  get text() { return fmt(this.value, typeof this.unit === 'string' ? this.unit : '', +this.step); },
+  quant(v) {
+    const lo = +this.min, hi = +this.max, st = +this.step || 1;
+    v = Math.min(hi, Math.max(lo, v));
+    return Math.round(Math.round(v / st) * st * 1000) / 1000;
+  },
+  emit(el, v) { el.dispatchEvent(new CustomEvent('knob', { bubbles: true, composed: true, detail: { bind: this.bind, value: this.quant(v) } })); },
+  down(e) {   // horizontal drag: right of the grab point = increase, left = decrease; vertical motion is ignored
+    e.preventDefault();
+    this.drag = { x: e.clientX, v: +this.value };
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {}
+  },
+  move(e) {
+    if (!this.drag) return;
+    const range = (+this.max) - (+this.min);
+    const dv = (e.clientX - this.drag.x) / 1200 * range * (e.shiftKey ? 0.1 : 1);   // 1200 px = full range (shift: 10× finer) — 1/8 of the original sensitivity, on request
+    this.emit(e.currentTarget, this.drag.v + dv);
+  },
+  up() { this.drag = null; },
+  wheel(e) { e.preventDefault(); this.emit(e.currentTarget, (+this.value) + (e.deltaY < 0 ? +this.step : -(+this.step))); },
+  key(e) {
+    const st = +this.step;
+    if (e.key === 'ArrowUp' || e.key === 'ArrowRight') { this.emit(e.currentTarget, (+this.value) + st); e.preventDefault(); }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') { this.emit(e.currentTarget, (+this.value) - st); e.preventDefault(); }
+  },
+  template: `<div class="knob" tabindex="0" :title="bind"
+      @pointerdown="down($event)" @pointermove="move($event)" @pointerup="up()" @pointercancel="up()"
+      @wheel="wheel($event)" @dblclick="emit($event.currentTarget, +def)" @keydown="key($event)">
+    <div class="lab" x-text="label"></div>
+    <svg viewBox="0 0 44 44">
+      <circle cx="22" cy="22" r="19" fill="#0a0f16" stroke="#2a3a52" stroke-width="2.5"/>
+      <path :d="arc" fill="none" stroke="#4ee2f5" stroke-width="3" stroke-linecap="round"/>
+      <line x1="22" y1="22" :x2="needle.x2" :y2="needle.y2" stroke="#e7eef6" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="22" cy="22" r="2.5" fill="#e7eef6"/>
+    </svg>
+    <div class="val" x-text="text"></div>
+  </div>`,
+}));
 
 /* ---------------------------------------------------------------- state */
+const DEFAULT_PARAMS = { fill: { peak: { fromHz: 320, toHz: 1500, q: 7, gainDb: 11 }, lowpass: { fromHz: 12000, toHz: 3800 } } };
+const clone = o => JSON.parse(JSON.stringify(o));
 const DEFAULTS = {
   sound: 'sfx_patty_sizzle_loop', take: 1, loop: true, monitorDb: -6,
-  layers: JSON.parse(JSON.stringify(ENGINE_DEFAULTS)),   // daw.mjs owns the suggested shape
+  layers: clone(ENGINE_DEFAULTS),   // daw.mjs owns the suggested shape (FMOD AHDSR per layer)
+  params: clone(DEFAULT_PARAMS), paramsOn: false, fill: 0, sweepS: 3,
 };
-const LSKEY = 'soundman.desk.v2';
+const LSKEY = 'soundman.desk.v4';
 let S = null;
+function mergeParams(base, patch) {
+  const out = clone(base);
+  for (const name in patch) { out[name] = out[name] || {}; for (const sec in patch[name]) out[name][sec] = Object.assign({}, out[name][sec] || {}, patch[name][sec]); }
+  return out;
+}
 function getPath(o, p) { return p.split('.').reduce((a, k) => (a == null ? a : a[k]), o); }
 function setPath(o, p, v) { const ks = p.split('.'); let t = o; for (let i = 0; i < ks.length - 1; i++) t = t[ks[i]]; t[ks[ks.length - 1]] = v; }
-function save() { try { localStorage.setItem(LSKEY, JSON.stringify(__soundman.get())); } catch (e) {} }
-function load() { try { const raw = localStorage.getItem(LSKEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
-
-window.__deskGet = p => getPath(S, p);
-// knob drags mutate state OUTSIDE m-js event handlers, so no redraw is
-// scheduled for them: render the dragged knob at once and kick m-js by hand.
-window.__deskSet = (p, v) => {
-  setPath(S, p, v); S.rev++; save();
-  const k = knobReg[p];
-  if (k) k.render(v);
-  if (M && M.redraw) M.redraw();
-};
+function save() { try { localStorage.setItem(LSKEY, JSON.stringify(Object.assign(__soundman.get(), { fill: S.fill }))); } catch (e) {} }
+function load() {
+  for (const k of [LSKEY, 'soundman.desk.v3', 'soundman.desk.v2']) {   // migrate older desks
+    try { const raw = localStorage.getItem(k); if (raw) return JSON.parse(raw); } catch (e) {}
+  }
+  return null;
+}
+// legacy layer objects (no enabled/initial/final) → FMOD AHDSR fields
+function normLayer(k, L) { return Object.assign({}, ENGINE_DEFAULTS[k], L || {}, L && L.enabled === undefined ? { enabled: true } : {}); }
 
 /* ---------------------------------------------------------------- audio */
 // The desk plays through the SAME engine the game imports (daw.mjs): what you
 // hear here is what SfxEngine.play() does at runtime with the exported card.
 const engine = new SfxEngine();
-let voice = null, rafId = 0;
+let voice = null, rafId = 0, rawRaf = 0, waveBuf = null, previewSrc = null, previewT0 = 0, rawSrc = null;   // raw/preview playback = BufferSources on the engine context (whole file decoded in memory)
+let auditionVoice = null;   // region audition (engine voice, envelope + params + lanes applied)
+let monitorNode = null;   // top-level monitor gain: everything the desk plays goes through it — except the Candidates ▶ (raw, deliberately unaffected)
+function monitorOut() {
+  if (!engine.ctx) return null;
+  if (!monitorNode) { monitorNode = engine.ctx.createGain(); monitorNode.gain.value = db2g(S ? S.monitorDb : -6); monitorNode.connect(engine.ctx.destination); }
+  return monitorNode;
+}
 function takeUrl() {
   const id = S.sound, info = S.sounds[id];
   if (!info) throw new Error('unknown sound: ' + id);
   const file = S.take === 0 ? info.audition : info.keepers[Math.min(S.take, info.keepers.length) - 1];
-  return 'out/' + id + '/' + file;
+  return S.src + '/' + id + '/' + file;
 }
-const curLayers = () => (S ? S.layers : DEFAULTS.layers);
 
 /* --------------------------------------------------------------- component */
 function desk() {
   return {
     sound: DEFAULTS.sound, take: 1, loop: true, monitorDb: -6,
-    layers: JSON.parse(JSON.stringify(DEFAULTS.layers)),
-    sounds: {}, playing: false,
+    layers: clone(DEFAULTS.layers),
+    params: clone(DEFAULTS.params), paramsOn: false, fill: 0, sweepS: 3,
+    mute: { hit: false, body: false, fill: false }, solo: { hit: false, body: false, fill: false }, masterMute: false,   // mixer: session-only, never exported
+    gen: { prompt: '', model: 'sao1', seconds: 6, seed: 1, takes: 2, loop: true }, models: [], generated: [], genBusy: false, genStatus: '', genLog: '',
+    feedback: {}, draft: {}, rawPlaying: null, candStatus: '', showHidden: false,
+    sel: null, selDrag: null, selPlaying: false, trimLoop: true, trimName: '', trimBusy: false, trimStatus: '', hoverT: null,
+    regionKeys: ['attack', 'hold', 'decay', 'sustain', 'release'],
+    regions: { attack: null, hold: null, decay: null, sustain: null, release: null }, samplerOn: false, regionPlaying: null,
+    src: new URLSearchParams(location.search).get('src') || 'out',
+    sounds: {}, playing: false, engineVersion: ENGINE_VERSION,
     status: 'Pick a sound, press Play.', isErr: false, rev: 0,
 
     async init() {
       S = this;
       const saved = load();
-      if (saved) {
-        for (const k of ['sound', 'take', 'loop', 'monitorDb'])
+      if (saved && !this._inited) {
+        for (const k of ['sound', 'take', 'loop', 'monitorDb', 'paramsOn', 'sweepS', 'samplerOn'])
           if (saved[k] !== undefined) this[k] = saved[k];
-        for (const L of ['hit', 'body'])
-          Object.assign(this.layers[L], (saved.layers || {})[L] || {});
+        if (saved.regions) { const map = { head: 'attack', body: 'sustain', tail: 'release' }; for (const k in saved.regions) { const nk = map[k] || k; if (nk in this.regions && saved.regions[k]) this.regions[nk] = saved.regions[k]; } }
+        if (saved.src && !new URLSearchParams(location.search).get('src')) this.src = saved.src;
+        for (const L of ['hit', 'body']) this.layers[L] = normLayer(L, Object.assign({}, this.layers[L], (saved.layers || {})[L] || {}));
+        if (saved.params) this.params = mergeParams(this.params, saved.params);
       }
+      this._inited = true;
       try {
-        const r = await fetch('out/sounds.json');
-        if (!r.ok) throw new Error('fetch out/sounds.json: ' + r.status);
+        const r = await fetch(this.src + '/sounds.json');
+        if (!r.ok) throw new Error('fetch ' + this.src + '/sounds.json: ' + r.status);
         this.sounds = await r.json();
+        this.note('Source ' + this.src + ' — ' + Object.keys(this.sounds).length + ' sound(s).');
       } catch (e) {
-        this.sounds = { sfx_patty_sizzle_loop: { keepers: ['sfx_patty_sizzle_loop_v01.wav'], audition: 'audition.wav', loop: true } };
-        this.note('sounds.json missing — showing fallback entry.', true);
+        this.sounds = {};
+        this.note(e.message + ' — check the Source dir.', true);
+        return;
       }
+      this.loadGenApi(); this.loadFeedback();
+      const fresh = !this.sounds[this.sound] || !saved || saved.sound !== this.sound || saved.src !== this.src;
       if (!this.sounds[this.sound]) this.sound = Object.keys(this.sounds)[0];
+      if (fresh) { this.seedFromManifest(); this.seedRegions(); }
       this.rev++;
-      syncKnobs();
       this.syncSelects();
-      this.drawEnv(this.rev);
+      this.loadWave();
     },
-    takeCount() {
+    takeCount() { const info = this.sounds[this.sound]; return info ? info.keepers.length : 0; },
+
+    /* ---- sampler regions: one window per envelope stage (daw.mjs v1.7) */
+    emptyRegions() { return { attack: null, hold: null, decay: null, sustain: null, release: null }; },
+    regionClick(k) {   // with a selection: set the region; otherwise: make the region the current selection (then "preview window" auditions it through its stage)
+      if (this.sel && !this.selRegion()) { this.setRegion(k); return; }
+      if (this.sel && this.selRegion() === k) { this.setRegion(k); return; }   // re-set from a matching selection (harmless)
+      if (this.regions[k]) { this.stopPreview(); this.sel = { a: this.regions[k][0], b: this.regions[k][1] }; this.drawWave(); M.redraw(); this.note(k.toUpperCase() + ' range selected — preview window plays it through its ' + k + ' stage (looped per preview mode); tweak knobs while it loops.'); }
+      else if (this.sel) this.setRegion(k);
+    },
+    regionTip(k) {
+      const what = { attack: 'ATTACK: plays once at the start under Initial→Peak', hold: 'HOLD: plays once after attack, flat at Peak', decay: 'DECAY: plays once, Peak→Sustain',
+                     sustain: 'SUSTAIN: loop-spliced and held until Stop (required for the sampler)', release: 'RELEASE: plays once on Stop under Release→Final' }[k];
+      const knob = { attack: 'Attack', hold: 'Hold', decay: 'Decay', release: 'Release' }[k];
+      const cur = this.selRegion();
+      return this.regions[k] && (!this.sel || cur === k) ? 'Select the ' + k.toUpperCase() + ' range (' + this.regText(k) + ') as the preview window — then press preview (or SPACE) to hear it through its ' + k + ' stage, looped per the preview mode, and tweak knobs live. Drag a new window first to re-set it.'
+           : this.sel ? 'Set the selection as the ' + what + (knob ? '. Also sets Layer A ' + knob + ' (ms) to the selection length.' : '.')
+           : 'Select a window on the waveform first, then click to make it the ' + what;
+    },
+    regText(k) { const r = this.regions[k]; return r ? r[0].toFixed(3) + '–' + r[1].toFixed(3) + 's' : ''; },
+    setRegion(k) {
+      if (!this.sel) return;
+      const sr = waveBuf ? waveBuf.sampleRate : 48000;   // snap region edges to SAMPLES (ms rounding drifted edges by up to 24 samples)
+      const a = Math.round(this.sel.a * sr) / sr, b = Math.round(this.sel.b * sr) / sr;
+      this.regions[k] = [a, b];
+      const knob = { attack: 'attackMs', hold: 'holdMs', decay: 'decayMs', release: 'releaseMs' }[k];
+      if (knob) this.layers.hit[knob] = Math.round((b - a) * 1000);   // sync the stage's duration knob (Layer A) to the sample length
+      if (k === 'sustain') this.samplerOn = true;
+      this.changed(); this.drawWave();
+      this.note('Region ' + k.toUpperCase() + ' set' + (knob ? ' · Layer A ' + knob + ' = ' + Math.round((b - a) * 1000) + ' ms' : '') + '.');
+    },
+    clearRegion(k) {
+      if (this.regionPlaying === k) this.stopPreview();
+      this.regions[k] = null;
+      if (k === 'sustain') this.samplerOn = false;   // no sustain = no sampler
+      this.changed(); this.drawWave();
+    },
+    clearRegions() { this.stopPreview(); this.regions = this.emptyRegions(); this.samplerOn = false; this.changed(); this.drawWave(); },
+    seedRegions() {   // a catalogue entry (or an exported card) may already carry regions for this take (legacy head/body/tail accepted)
       const info = this.sounds[this.sound];
-      return info ? info.keepers.length : 0;
+      const r = info && info.regions, map = { head: 'attack', body: 'sustain', tail: 'release' };
+      this.regions = this.emptyRegions();
+      if (r) for (const k in r) { const nk = map[k] || k; if (nk in this.regions && r[k]) this.regions[nk] = [+r[k][0], +r[k][1]]; }
+      this.samplerOn = !!this.regions.sustain;
     },
-    onSound() { this.take = 1; this.changed(); },
-    changed() { this.rev++; save(); syncKnobs(); this.syncSelects(); },
-    syncSelects() {
+    async playRegion(k, { loop = (k === 'sustain'), viaPreview = false } = {}) {   // audition ONE region through its envelope stage (engine v1.8); loop = re-trigger the stage every pass
+      if (this.regionPlaying === k && !viaPreview) { this.stopPreview(); return; }
+      const r = this.regions[k]; if (!r || !engine.ensure()) return;
+      this.stopPreview(); this.stopRaw(); this.stop(true);
+      try {
+        if (engine.ctx.state === 'suspended') await engine.ctx.resume();
+        const v = engine.play({ url: takeUrl(), loop, layers: this.layers, gainDb: this.monitorDb,
+          params: this.paramsOn ? this.params : null, paramInit: { fill: this.fill }, lanes: this.laneState(),
+          regions: Object.assign({}, this.regions, { sustain: this.regions.sustain || r }), audition: k, auditionLoop: loop });
+        if (!(await v.ready)) throw new Error('audition failed');
+        auditionVoice = v; this.regionPlaying = k; this.selPlaying = viaPreview; M.redraw();
+        const stage = { attack: 'Initial→Peak over Attack', hold: 'flat at Peak', decay: 'Peak→Sustain over Decay', sustain: 'at Sustain', release: 'Sustain→Final over Release' }[k];
+        this.note('Auditioning ' + k.toUpperCase() + ': ' + stage + (loop ? ', looped — knobs apply live, click again to stop.' : '.'));
+        cancelAnimationFrame(rawRaf);
+        const len = r[1] - r[0];
+        const step = () => {
+          if (auditionVoice !== v) return;
+          if (v.stopped || (!loop && v.time > len + 0.3)) { if (auditionVoice === v) { auditionVoice = null; this.regionPlaying = null; this.selPlaying = false; M.redraw(); this.drawWave(); } return; }
+          this.drawWave(v.sourcePos());
+          const L = this.layers.hit, A = L.attackMs / 1000, H = L.holdMs / 1000, u = loop ? v.time % Math.max(len, 1e-3) : v.time;   // phase within the stage
+          if (k === 'attack') this.drawEnv(this.rev, u);                                      // A from the start
+          else if (k === 'hold') this.drawEnv(this.rev, A + u);                               // inside H
+          else if (k === 'decay') this.drawEnv(this.rev, A + H + u);                          // inside D
+          else if (k === 'sustain') this.drawEnv(this.rev, 1e9);                              // parks in S
+          else this.drawEnv(this.rev, undefined, u);                                         // R from its start
+          rawRaf = requestAnimationFrame(step);
+        };
+        step();
+      } catch (e) { this.note('audition failed: ' + e.message, true); this.regionPlaying = null; this.selPlaying = false; }
+    },
+
+    /* ---- trim / salvage: a window of the loaded take becomes a new candidate (desk_server.py /api/trim) */
+    _selT(e) {   // pointer x -> seconds in the loaded take
+      const cv = document.getElementById('wave'), r = cv.getBoundingClientRect();
+      const dur = waveBuf ? waveBuf.duration : 0;
+      return Math.min(dur, Math.max(0, (e.clientX - r.left) / r.width * dur));
+    },
+    waveKey(e) {   // I / O while hovering the waveform set the in / out point at the cursor; [ ] nudge them; SPACE = preview window / stop
+      const tag = (e.target && e.target.tagName) || '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === ' ' || e.code === 'Space') {   // intercept: no page scroll, no re-firing the last focused button
+        e.preventDefault(); e.stopPropagation();
+        if (e.repeat) return;
+        if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+        if (this.sel || this.selPlaying) this.previewSel();
+        return;
+      }
+      const k = e.key.toLowerCase(); const dur = waveBuf ? waveBuf.duration : 0;
+      const clamp = t => Math.min(dur, Math.max(0, t));
+      if ((k === 'i' || k === 'o') && this.hoverT !== null && waveBuf) {
+        const t = this.hoverT;
+        if (!this.sel) this.sel = { a: t, b: t };
+        if (k === 'i') this.sel = { a: clamp(Math.min(t, this.sel.b)), b: this.sel.b };
+        else this.sel = { a: this.sel.a, b: clamp(Math.max(t, this.sel.a)) };
+      } else if ((k === '[' || k === ']') && this.sel) {
+        // [ nudges the in point earlier, ] nudges the out point later (shift = 1 ms steps, else 10 ms)
+        const d = e.shiftKey ? 0.001 : 0.01;
+        this.sel = k === '[' ? { a: clamp(Math.min(this.sel.a - d, this.sel.b)), b: this.sel.b }
+                             : { a: this.sel.a, b: clamp(Math.max(this.sel.b + d, this.sel.a)) };
+      } else return;
+      e.preventDefault();
+      if (this.sel.b - this.sel.a < 0.001) return;
+      if (!this.trimName) this.trimName = this.sound.replace(/_\d{6}$/, '');
+      this.drawWave(); M.redraw();
+    },
+    selDown(e) { if (!waveBuf) return; e.preventDefault(); const t = this._selT(e); this.selDrag = t; this.sel = { a: t, b: t }; try { e.currentTarget.setPointerCapture(e.pointerId); } catch (x) {} this.drawWave(); },
+    selMove(e) { if (this.selDrag === null) { this.hoverT = this._selT(e); if (!this.playing && !this.selPlaying && !this.rawPlaying) this.drawWave(); return; } const t = this._selT(e); this.sel = { a: Math.min(this.selDrag, t), b: Math.max(this.selDrag, t) }; this.drawWave(); },
+    selUp(e) { if (this.selDrag === null) return; this.selMove(e); this.selDrag = null; if (this.sel.b - this.sel.a < 0.05) this.sel = null; if (!this.trimName) this.trimName = this.sound.replace(/_\d{6}$/, '') ; this.drawWave(); M.redraw(); },
+    selRegion() {   // which stage region (if any) the current selection is
+      if (!this.sel) return null;
+      return this.regionKeys.find(k => this.regions[k] && Math.abs(this.regions[k][0] - this.sel.a) < 0.002 && Math.abs(this.regions[k][1] - this.sel.b) < 0.002) || null;
+    },
+    previewSel() {   // the selected window: through its envelope stage when it IS a region, else raw from the decoded buffer
+      if (this.selPlaying) { this.stopPreview(); return; }
+      if (!this.sel || !waveBuf) return;
+      const k = this.selRegion();
+      if (k) { this.playRegion(k, { loop: this.trimLoop, viaPreview: true }); return; }
+      if (!engine.ensure()) return;
+      const ctx = engine.ctx, { a, b } = this.sel;
+      const src = ctx.createBufferSource(); src.buffer = waveBuf;
+      if (this.trimLoop) { src.loop = true; src.loopStart = a; src.loopEnd = b; }
+      src.connect(monitorOut());
+      const t0 = ctx.currentTime + 0.02;
+      if (this.trimLoop) src.start(t0, a); else src.start(t0, a, b - a);
+      src.onended = () => { if (previewSrc === src) { previewSrc = null; this.selPlaying = false; M.redraw(); this.drawWave(); } };
+      this.stopRaw();
+      previewSrc = src; previewT0 = t0; this.selPlaying = true; M.redraw();
+      cancelAnimationFrame(rawRaf);
+      const step = () => {
+        if (!this.selPlaying || previewSrc !== src) return;
+        const u = Math.max(0, ctx.currentTime - t0), len = Math.max(b - a, 1e-3);
+        this.drawWave(a + (this.trimLoop ? u % len : Math.min(u, len)));
+        rawRaf = requestAnimationFrame(step);
+      };
+      step();
+    },
+    stopPreview() {
+      if (previewSrc) { try { previewSrc.onended = null; previewSrc.stop(); } catch (e) {} previewSrc = null; }
+      if (auditionVoice) { const v = auditionVoice; auditionVoice = null; v.stop({ immediate: true }); this.regionPlaying = null; }   // stop window = at once (20 ms fade), no release tail
+      this.selPlaying = false; this.regionPlaying = null; cancelAnimationFrame(rawRaf); M.redraw(); this.drawWave();
+    },
+    async exportAtlas() {   // the labeled regions become a new, shorter take; the regions ride along at their new offsets
+      if (this.trimBusy || !this.regionKeys.some(k => this.regions[k])) return;
+      const info = this.sounds[this.sound];
+      const file = this.take === 0 ? info.audition : info.keepers[Math.min(this.take, info.keepers.length) - 1];
+      const regions = {}; for (const k of this.regionKeys) if (this.regions[k]) regions[k] = this.regions[k];
+      this.trimBusy = true; this.trimStatus = 'composing…'; M.redraw();
+      try {
+        const r = await fetch('/api/atlas', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ src: this.src, id: this.sound, file, regions, name: this.trimName || undefined,
+            settings: { layers: this.layers, params: this.params, paramsOn: this.paramsOn, monitorDb: this.monitorDb } }) });
+        const j = await r.json();
+        if (!r.ok || j.error) throw new Error(j.error || r.status);
+        this.trimStatus = 'atlas ' + j.id + ' · ' + j.seconds + ' s';
+        console.log(`[atlas ${new Date().toISOString()}] ${this.src}/${this.sound}/${file} regions ${JSON.stringify(regions)} -> ${j.id} ${JSON.stringify(j.regions)}`);
+        this.sel = null;
+        await this.pickGenerated({ id: j.id, model: info.model, prompt: info.prompt });
+      } catch (e) { this.trimStatus = 'failed: ' + e.message; }
+      this.trimBusy = false; M.redraw();
+    },
+    async salvage() {   // (kept for the API; the desk button is now Export Ranges to Atlas)
+      if (!this.sel || this.trimBusy) return;
+      const info = this.sounds[this.sound];
+      const file = this.take === 0 ? info.audition : info.keepers[Math.min(this.take, info.keepers.length) - 1];
+      this.trimBusy = true; this.trimStatus = 'cutting…'; M.redraw();
+      try {
+        const r = await fetch('/api/trim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ src: this.src, id: this.sound, file, start: this.sel.a, end: this.sel.b, loop: this.trimLoop, name: this.trimName || undefined }) });
+        const j = await r.json();
+        if (!r.ok || j.error) throw new Error(j.error || r.status);
+        this.trimStatus = 'saved ' + j.id;
+        console.log(`[salvage ${new Date().toISOString()}] ${this.src}/${this.sound}/${file} [${this.sel.a.toFixed(2)}–${this.sel.b.toFixed(2)} s] loop=${this.trimLoop} -> ${j.id}`);
+        this.sel = null;
+        await this.pickGenerated({ id: j.id, model: info.model, prompt: info.prompt });
+      } catch (e) { this.trimStatus = 'failed: ' + e.message; }
+      this.trimBusy = false; M.redraw();
+    },
+
+    /* ---- candidates: every take in the source, raw play + feedback (desk_server.py /api/feedback) */
+    allCandidates() {
+      const out = [];
+      for (const id of Object.keys(this.sounds)) {
+        const info = this.sounds[id];
+        (info.keepers || []).forEach((f, i) => out.push({ id, take: i + 1, file: f, label: f.replace(/\.wav$/i, ''), model: info.model,
+                                                            path: this.src + '/' + id + '/' + f }));
+      }
+      return out;
+    },
+    hidden(c) { return !!(this.feedback[c.path] && this.feedback[c.path].hidden); },
+    hiddenCount() { return this.allCandidates().filter(c => this.hidden(c)).length; },
+    candidates() { return this.allCandidates().filter(c => this.showHidden || !this.hidden(c)); },
+    async setHidden(c, hidden) {
+      try {
+        await fetch('/api/hide', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: c.path, hidden }) });
+        this.feedback[c.path] = Object.assign({}, this.feedback[c.path] || {}, { hidden });
+        if (!hidden) delete this.feedback[c.path].hidden;
+      } catch (e) { this.candStatus = 'hide failed: ' + e.message; }
+      M.redraw();
+    },
+    async loadFeedback() {
+      try { this.feedback = await fetch('/api/feedback?src=' + this.src).then(r => r.json()); }   // plain: the server matches the raw prefix
+      catch (e) { this.feedback = {}; }
+      const n = Object.values(this.feedback).filter(x => x.text).length;
+      this.candStatus = n ? n + ' note(s) — tell the agent "read the feedback"' : 'no notes yet';
+      M.redraw();
+    },
+    async saveFeedback(c, text) {
+      try {
+        await fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: c.path, text }) });
+        const e = Object.assign({}, this.feedback[c.path] || {});
+        if (text.trim()) Object.assign(e, { text: text.trim(), when: new Date().toISOString() }); else { delete e.text; delete e.when; }
+        if (Object.keys(e).length) this.feedback[c.path] = e; else delete this.feedback[c.path];
+        delete this.draft[c.path];
+        const n = Object.values(this.feedback).filter(x => x.text).length; this.candStatus = 'saved · ' + n + ' note(s)';
+      } catch (e) { this.candStatus = 'save failed: ' + e.message; }
+      M.redraw();
+    },
+    async toggleRaw(c) {   // raw take from its DECODED buffer (whole file in memory, no <audio>, no seeks over HTTP); one at a time
+      if (this.rawPlaying === c.path) { this.stopRaw(); return; }
+      this.stopRaw(); this.stopPreview();
+      if (!engine.ensure()) return;
+      try {
+        const buf = await engine.decode(c.path);
+        const ctx = engine.ctx, src = ctx.createBufferSource(); src.buffer = buf; src.connect(ctx.destination);   // the ONE path that bypasses the monitor gain (raw candidate audition)
+        const t0 = ctx.currentTime + 0.02; src.start(t0);
+        src.onended = () => { if (rawSrc === src) { rawSrc = null; this.rawPlaying = null; M.redraw(); this.drawWave(); } };
+        rawSrc = src; this.rawPlaying = c.path; M.redraw();
+        const mine = c.path === takeUrl();   // playhead only when it is the loaded take
+        cancelAnimationFrame(rawRaf);
+        const step = () => { if (rawSrc !== src) return; if (mine) this.drawWave(Math.max(0, ctx.currentTime - t0)); rawRaf = requestAnimationFrame(step); };
+        step();
+      } catch (e) { this.note('raw play failed: ' + e.message, true); }
+    },
+    stopRaw() {
+      if (rawSrc) { try { rawSrc.onended = null; rawSrc.stop(); } catch (e) {} rawSrc = null; }
+      this.rawPlaying = null; cancelAnimationFrame(rawRaf); M.redraw(); this.drawWave();
+    },
+    pickCandidate(c) { this.sound = c.id; this.take = c.take; this.sel = null; this.seedRegions(); this.changed(); this.loadWave(); this.note('Current: ' + c.label); },
+
+    /* ---- generate (desk_server.py API) */
+    async loadGenApi() {
+      try {
+        const [m, g] = await Promise.all([fetch('/api/models').then(r => r.json()), fetch('/api/generated').then(r => r.json())]);
+        this.models = m; this.generated = g;
+        if (!m.find(x => x.id === this.gen.model && x.available)) { const f = m.find(x => x.available); if (f) this.gen.model = f.id; }
+        if (!this.gen.prompt) { const info = this.sounds[this.sound]; this.gen.prompt = (info && info.prompt) || ''; }
+        this.genStatus = m.filter(x => x.available).length + ' model(s) installed';
+      } catch (e) { this.genStatus = 'no generate API (static server?) — run desk_server.py'; }
+      M.redraw();
+    },
+    async generate() {
+      if (this.genBusy || !this.gen.prompt.trim()) return;
+      this.genBusy = true; this.genLog = ''; this.genStatus = 'submitting…'; M.redraw();
+      // prompt history: how the human iterates the wording (also appended server-side to scratch/prompt_history.jsonl)
+      console.log(`[generate ${new Date().toISOString()}] ${this.gen.model} ${this.gen.seconds}s seed ${this.gen.seed} ×${this.gen.takes} loop=${this.gen.loop}\n${this.gen.prompt}`);
+      try {
+        const body = Object.assign({}, this.gen, { name: this.sound.replace(/_[a-z0-9]+_\d{6}$/, ''), origin: 'desk' });
+        const r = await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const j = await r.json();
+        if (!r.ok || j.error) throw new Error(j.error || r.status);
+        for (;;) {
+          await new Promise(res => setTimeout(res, 1000));
+          const s = await fetch('/api/jobs/' + j.job).then(r => r.json());
+          this.genLog = s.log || ''; this.genStatus = s.state + (s.t0 ? ' ' + Math.round((Date.now() / 1000) - s.t0) + 's' : ''); M.redraw();
+          if (s.state === 'done') { await this.loadGenApi(); this.pickGenerated(this.generated.find(g => g.id === s.result.id)); break; }
+          if (s.state === 'error') throw new Error(s.error);
+        }
+      } catch (e) { this.genStatus = 'failed: ' + e.message; }
+      this.genBusy = false; M.redraw();
+    },
+    async pickGenerated(g) {   // becomes the current sound: source scratch/desk_gen, that id, take 1
+      if (!g) return;
+      this.src = 'scratch/desk_gen'; this.sound = g.id; this.gen.prompt = g.prompt || this.gen.prompt;
+      if (g.model && this.models.find(m => m.id === g.model && m.available)) this.gen.model = g.model;
+      await this.init();
+      this.sound = g.id; this.take = 1; this.changed(); this.loadWave();
+      this.note('Current: ' + g.id + ' (' + g.model + ')');
+    },
+    takeInfo() {
+      const info = this.sounds[this.sound]; if (!info) return '';
+      const f = this.take === 0 ? info.audition : info.keepers[Math.min(this.take, info.keepers.length) - 1];
+      return this.src + '/' + this.sound + '/' + f + (waveBuf ? ' · ' + waveBuf.duration.toFixed(2) + ' s' : '');
+    },
+    visibleLayers() { return this.layers.body.enabled ? ['hit', 'body'] : ['hit']; },
+    // mixer resolution: master mute beats all; else solo wins over mute; else mute
+    lanes() { return ['hit', 'body', 'fill']; },
+    laneActive(k) {
+      if (this.masterMute) return false;
+      const anySolo = this.lanes().some(l => this.solo[l]);
+      return anySolo ? !!this.solo[k] : !this.mute[k];
+    },
+    laneKey() { return this.lanes().map(k => this.laneActive(k) ? 1 : 0).join('') + (this.masterMute ? 'M' : ''); },
+    anyMs() { return this.lanes().some(l => this.mute[l] || this.solo[l]); },
+    clearMs() { for (const l of this.lanes()) { this.mute[l] = false; this.solo[l] = false; } this.masterMute = false; this.changed(); },
+    laneState() { const o = {}; for (const l of this.lanes()) o[l] = this.laneActive(l); return o; },
+    applyLanes() { if (voice) voice.setLanes(this.laneState()); if (auditionVoice) auditionVoice.setLanes(this.laneState()); },
+    seedFromManifest() {   // a newly picked sound: its manifest suggestions (params, layers) seed the knobs
+      const info = this.sounds[this.sound];
+      if (info && info.params) { this.params = mergeParams(this.params, info.params); this.paramsOn = true; }
+      else this.paramsOn = false;
+      if (info && info.layers) for (const L of ['hit', 'body']) this.layers[L] = normLayer(L, info.layers[L] || { enabled: false });
+      if (info && typeof info.paramsOn === 'boolean') this.paramsOn = info.paramsOn;
+      if (info && typeof info.gainDb === 'number') this.monitorDb = info.gainDb;   // an atlas/trim export remembers the desk gain it was made with
+      this.take = 1; this.fill = 0;
+    },
+    onSound() { this.seedFromManifest(); this.seedRegions(); this.changed(); this.loadWave(); },
+    changed() {   // nested writes (layers.hit.x, params.fill.peak.x) are not tracked by the scope proxy: redraw by hand (a no-op diff when nothing changed)
+      this.rev++; save(); this.syncSelects(); M.redraw(); this.drawWave();
+      this.applyMonitor(this.monitorDb); this.applyFill(this.fill);   // live params also for writes that bypass the proxy (__soundman.set)
+      for (const v of [voice, auditionVoice]) if (v) { v.updateLayers(this.layers); v.updateParams(this.paramsOn ? this.params : null); }   // knobs apply to the RUNNING audio (no restart)
+    },
+    onKnob({ bind, value }) {   // every knob lands here (bubbled CustomEvent) — reactive write, m-js redraws
+      setPath(this, bind, value);
+      if (bind === 'take') this.loadWave();
+      this.changed();
+    },
+    syncSelects() {   // async option lists: the select can park on index 0 until the options exist
       const ss = document.getElementById('selSound'), st = document.getElementById('selTake');
       if (ss) ss.value = this.sound;
       if (st) st.value = String(this.take);
@@ -325,87 +853,190 @@ function desk() {
       this._syncT = setTimeout(check, 120);
     },
     note(msg, err) { this.status = msg; this.isErr = !!err; },
-    // monitor rides live on the playing gain node; envelope knobs describe
-    // the NEXT play (they are a scheduled timeline, not a live wire).
-    applyMonitor(db) { if (voice) voice.setGain(db); },
+    // monitor + fill ride live on the playing voice; envelope/filter knobs describe the NEXT play
+    applyMonitor(db) {   // live: the automation voice's master AND the desk-wide monitor node (preview / region play)
+      if (voice) voice.setGain(db);
+      if (auditionVoice) auditionVoice.setGain(db);
+      if (monitorNode) { const now = engine.ctx.currentTime; monitorNode.gain.cancelScheduledValues(now); monitorNode.gain.setTargetAtTime(db2g(db), now, 0.02); }
+    },
+    applyFill(v) { if (voice && this.paramsOn) voice.setParam('fill', v); if (auditionVoice && this.paramsOn) auditionVoice.setParam('fill', v); },
     resetLayers() {
-      this.layers = JSON.parse(JSON.stringify(DEFAULTS.layers));
+      this.layers = clone(ENGINE_DEFAULTS);
+      const info = this.sounds[this.sound];
+      if (info && info.layers) for (const L of ['hit', 'body']) this.layers[L] = normLayer(L, info.layers[L] || { enabled: false });
       this.changed();
-      this.note('Layers reset to suggested shape (percussive hit + swelling bed).');
+      this.note('Layers reset' + (info && info.layers ? ' to the manifest suggestion.' : ' to the engine default.'));
+    },
+
+    async loadWave() {   // decode the take (cached by the engine) and draw it; also warms the buffer for Play
+      try {
+        if (!engine.ensure()) return;
+        const url = takeUrl();
+        waveBuf = await engine.decode(url);
+        this.drawWave();
+      } catch (e) { waveBuf = null; this.drawWave(); }
+    },
+    drawWave(playhead) {
+      const cv = document.getElementById('wave'); if (!cv) return;
+      const c = cv.getContext('2d'), W = cv.width, H = cv.height;
+      c.clearRect(0, 0, W, H);
+      c.fillStyle = '#5f728c'; c.font = '11px monospace';
+      if (!waveBuf) { c.fillText('no take decoded', 10, 18); return; }
+      const d = waveBuf.getChannelData(0), n = d.length, cols = W;
+      c.fillStyle = '#1e2a3c'; c.fillRect(0, H / 2, W, 1);
+      c.fillStyle = '#33ccff';
+      for (let x = 0; x < cols; x++) {
+        const i0 = Math.floor(x / cols * n), i1 = Math.floor((x + 1) / cols * n);
+        let lo = 1, hi = -1;
+        for (let i = i0; i < i1; i += 4) { const v = d[i]; if (v < lo) lo = v; if (v > hi) hi = v; }
+        const y0 = H / 2 - hi * (H / 2 - 4), y1 = H / 2 - lo * (H / 2 - 4);
+        c.fillRect(x, y0, 1, Math.max(1, y1 - y0));
+      }
+      if (waveBuf.duration > 0) {   // sampler regions, one color per envelope stage
+        const cols = { attack: ['rgba(255,200,97,0.16)', '#ffc861'], hold: ['rgba(255,224,138,0.14)', '#ffe08a'], decay: ['rgba(255,159,107,0.16)', '#ff9f6b'], sustain: ['rgba(92,230,168,0.16)', '#5ce6a8'], release: ['rgba(255,119,200,0.16)', '#ff77c8'] };
+        for (const k of this.regionKeys) {
+          const r = this.regions[k]; if (!r) continue;
+          const x0 = r[0] / waveBuf.duration * W, x1 = r[1] / waveBuf.duration * W;
+          c.fillStyle = cols[k][0]; c.fillRect(x0, 0, Math.max(1, x1 - x0), H);
+          c.fillStyle = cols[k][1]; c.fillRect(x0, H - 3, Math.max(1, x1 - x0), 3);
+          c.font = 'bold 10px monospace'; c.fillText(k.toUpperCase(), x0 + 4, 12);
+        }
+      }
+      if (this.sel && waveBuf.duration > 0) {
+        const x0 = this.sel.a / waveBuf.duration * W, x1 = this.sel.b / waveBuf.duration * W;
+        c.fillStyle = 'rgba(78,226,245,0.18)'; c.fillRect(x0, 0, Math.max(1, x1 - x0), H);
+        c.fillStyle = '#4ee2f5'; c.fillRect(x0, 0, 1.5, H); c.fillRect(x1 - 1.5, 0, 1.5, H);
+      }
+      if (this.hoverT !== null && waveBuf.duration > 0 && this.selDrag === null) {   // hover cursor (I/O target)
+        const x = this.hoverT / waveBuf.duration * W;
+        c.fillStyle = 'rgba(231,238,246,0.35)'; c.fillRect(x, 0, 1, H);
+      }
+      if (playhead !== undefined && waveBuf.duration > 0) {
+        const x = ((playhead % waveBuf.duration) / waveBuf.duration) * W;
+        c.fillStyle = '#e7eef6'; c.fillRect(x, 0, 1.5, H);
+      }
     },
 
     async play() {
+      this.stopPreview(); this.stopRaw();
       this.stop(true);
       try {
         if (!engine.ensure()) throw new Error('WebAudio unavailable');
         if (engine.ctx.state === 'suspended') await engine.ctx.resume();
-        voice = engine.play({ url: takeUrl(), loop: this.loop, layers: this.layers, gainDb: this.monitorDb });
+        if (this.sweepS > 0 && this.paramsOn) this.fill = 0;
+        voice = engine.play({ url: takeUrl(), loop: this.loop, layers: this.layers, gainDb: this.monitorDb,
+          params: this.paramsOn ? this.params : null, paramInit: { fill: this.fill }, lanes: this.laneState(),
+          regions: this.samplerOn && this.regions.sustain ? this.regions : null });
         if (!(await voice.ready)) throw new Error('decode/start failed (see console)');
+        waveBuf = waveBuf || engine.buffers[takeUrl()] || null;
         this.playing = true;
-        this.note('Playing ' + this.sound + ' — hit + body live (daw.mjs v' + ENGINE_VERSION + ').');
+        this.note('Playing ' + this.sound + ' take ' + this.take + ' — AHDSR' + (this.paramsOn ? ' + fill' : '') + ' live.');
         const tick = () => {
           if (!this.playing) return;
-          this.drawEnv(this.rev, voice ? voice.time : 0);
+          const t = voice ? voice.time : 0;
+          this.drawEnv(this.rev, t);
+          this.drawWave(voice ? voice.sourcePos() : t);
+          if (voice && this.paramsOn && this.sweepS > 0) {   // preview pour: fill rides 0→1 over sweepS
+            const q = Math.round(Math.min(1, t / this.sweepS) * 100) / 100;
+            if (q !== this.fill) { this.fill = q; voice.setParam('fill', q); }
+          }
           rafId = requestAnimationFrame(tick);
         };
         tick();
       } catch (err) { this.note('Play failed: ' + err.message, true); }
     },
-    stop(silent) {
+    stop(silent) {   // transport Stop: everything the desk is playing — the voice, a stage/preview audition, a raw candidate
+      const was = this.playing;
+      this.stopPreview(); this.stopRaw();
       this.playing = false;
       cancelAnimationFrame(rafId);
-      if (voice) { voice.stop(); voice = null; }   // release tails per layer, source stops after the slowest
-      if (!silent) { this.note('Stopped (release tails played).'); this.drawEnv(this.rev); }
+      if (voice) { voice.stop(); voice = null; }   // release tails per layer (toward Final), source stops after the slowest
+      if (!silent) {
+        this.note('Stopped (release tails toward Final).'); this.drawWave();
+        if (was) this.animateRelease(); else this.drawEnv(this.rev);
+      }
     },
 
-    drawEnv(rev, playhead) {
-      const cv = document.getElementById('envcurve');
-      if (!cv) return;
+    animateRelease() {   // playhead through the R segment after a stop / body-audition release
+      const t0 = performance.now(), R = Math.max(...['hit', 'body'].filter(k => k === 'hit' || this.layers.body.enabled).map(k => this.layers[k].releaseMs)) / 1000 + 0.3;
+      const rel = () => { const t = (performance.now() - t0) / 1000; this.drawEnv(this.rev, undefined, Math.min(t, R)); if (t < R && !this.playing && !this.regionPlaying) rafId = requestAnimationFrame(rel); };
+      rel();
+    },
+    drawEnv(rev, playhead, release) {
+      // time axis: A+H+D to scale | fixed S gap ("until Stop") | R to scale (+ tail). Dotted
+      // dividers + letters mark the FMOD stages; playhead parks in S while sustaining and
+      // runs through R after Stop (`release` = seconds since Stop).
+      const cv = document.getElementById('envcurve'); if (!cv) return;
       const c = cv.getContext('2d'), W = cv.width, H = cv.height;
       const L = S ? S.layers : DEFAULTS.layers;
-      const span = l => l.attackMs / 1000 + l.holdMs / 1000 + l.decayMs / 1000;
-      const tMax = Math.max(span(L.hit), span(L.body), L.body.attackMs / 1000) + 1.5;
-      const N = 160;
-      const X = t => 40 + (t / tMax) * (W - 54);
-      const Y = db => 14 + (1 - (db + 42) / 56) * (H - 30); // -42..+14 dB window
+      const keys = ['hit'].concat(L.body.enabled !== false ? ['body'] : []);
+      const ms = (k, f) => L[k][f] / 1000;
+      const ahd = Math.max(...keys.map(k => ms(k, 'attackMs') + ms(k, 'holdMs') + ms(k, 'decayMs')), 0.05);
+      const R = Math.max(...keys.map(k => ms(k, 'releaseMs')), 0.05) + 0.25;
+      const x0 = 34, x1 = W - 10, gapW = 90, top = 22, bot = H - 18;
+      const pps = (x1 - x0 - gapW) / (ahd + R);          // px per second, shared by both scaled parts
+      const xS0 = x0 + ahd * pps, xR0 = xS0 + gapW;        // sustain gap, release start
+      const Y = db => top + (1 - (db + 60) / 68) * (bot - top);   // -60..+8 dB window
       const toDb = g => 20 * Math.log10(Math.max(g, 1e-4));
       c.clearRect(0, 0, W, H);
-      c.strokeStyle = '#1e2a3c'; c.fillStyle = '#5f728c'; c.font = '10px monospace';
-      for (const db of [0, -10, -20, -30, -40]) {
-        c.beginPath(); c.moveTo(40, Y(db)); c.lineTo(W - 14, Y(db)); c.stroke();
-        c.fillText(db + ' dB', 4, Y(db) + 3);
-      }
-      const series = [
-        [layerGains(L.hit, tMax, N), '#ffc861', [5, 4]],
-        [layerGains(L.body, tMax, N), '#5ce6a8', [5, 4]],
-        [envSum(L, tMax, N), '#4ee2f5', []],
-      ];
+      // grid
+      c.font = '10px monospace'; c.fillStyle = '#5f728c'; c.strokeStyle = '#1e2a3c'; c.setLineDash([]);
+      for (const db of [0, -12, -24, -36, -48]) { c.beginPath(); c.moveTo(x0, Y(db)); c.lineTo(x1, Y(db)); c.stroke(); c.fillText(String(db), 4, Y(db) + 3); }
+      c.fillStyle = '#0b1220'; c.fillRect(xS0, top - 6, gapW, bot - top + 6);   // sustain band
+      // per-layer curves: A/H/D scaled, S flat across the gap, R exponential toward Final
+      const N = 140;
+      const curve = k => {
+        const Lk = L[k], pts = layerGains(Lk, ahd, N).map(([t, g]) => [x0 + t * pps, g]);
+        const sus = Math.max(db2g(Lk.sustainDb), 1e-4), fin = Math.max(db2g(Lk.finalDb ?? -80), 1e-4), tau = Math.max(ms(k, 'releaseMs') / 3, 0.01);
+        pts.push([xR0, sus]);
+        for (let i = 0; i <= 60; i++) { const t = R * i / 60; pts.push([xR0 + t * pps, fin + (sus - fin) * Math.exp(-t / tau)]); }
+        return pts;
+      };
+      const act = k => (S ? S.laneActive(k) : true);
+      const series = keys.map(k => [curve(k), act(k) ? (k === 'hit' ? '#ffc861' : '#5ce6a8') : '#3a4a60', [5, 4]]);
+      const live = series.filter((_, i) => act(keys[i]));
+      const sum = series[0][0].map(([x], i) => [x, live.length ? live.reduce((a, s) => a + s[0][i][1], 0) : 1]);   // all bypassed = raw unity
+      series.push([sum, '#4ee2f5', []]);
       for (const [pts, col, dash] of series) {
-        c.strokeStyle = col; c.lineWidth = col === '#4ee2f5' ? 2.5 : 1.5;
-        c.setLineDash(dash); c.beginPath();
-        pts.forEach(([t, g], i) => { const x = X(t), y = Y(toDb(g)); i ? c.lineTo(x, y) : c.moveTo(x, y); });
-        c.stroke(); c.setLineDash([]); c.lineWidth = 1;
+        c.strokeStyle = col; c.lineWidth = col === '#4ee2f5' ? 2.5 : 1.5; c.setLineDash(dash); c.beginPath();
+        pts.forEach(([x, g], i) => { const y = Y(toDb(g)); i ? c.lineTo(x, y) : c.moveTo(x, y); });
+        c.stroke();
       }
-      if (playhead !== undefined && playhead <= tMax) {
-        const x = X(playhead);
-        c.strokeStyle = '#e7eef6'; c.beginPath(); c.moveTo(x, 8); c.lineTo(x, H - 14); c.stroke();
+      c.setLineDash([]); c.lineWidth = 1;
+      // stage dividers (first layer's stages) + letters
+      const Lh = L[keys[0]];
+      const marks = [['A', x0, x0 + ms(keys[0], 'attackMs') * pps], ['H', null, x0 + (ms(keys[0], 'attackMs') + ms(keys[0], 'holdMs')) * pps], ['D', null, xS0], ['S', null, xR0], ['R', null, xR0 + ms(keys[0], 'releaseMs') * pps]];
+      c.strokeStyle = '#5f728c'; c.setLineDash([2, 4]); c.fillStyle = '#93a5bd'; c.font = 'bold 11px monospace';
+      let prev = x0;
+      for (const [name, , x] of marks) {
+        c.beginPath(); c.moveTo(x, top - 8); c.lineTo(x, bot); c.stroke();
+        if (x - prev > 9) c.fillText(name, prev + (x - prev) / 2 - 3, 12);
+        prev = x;
       }
+      c.setLineDash([]); c.font = '10px monospace'; c.fillStyle = '#5f728c';
+      { const st = ahd > 4 ? 1 : ahd > 1.5 ? 0.5 : 0.25; for (let t = st; t <= ahd + 1e-9; t += st) c.fillText(t + 's', x0 + t * pps - 6, H - 4); }
+      c.fillText('until Stop', xS0 + 14, H - 4);
+      for (const t of [0, R / 2, R - 0.25]) c.fillText('+' + (Math.round(t * 100) / 100) + 's', xR0 + t * pps - 8, H - 4);
+      // playhead
+      let px = null;
+      if (release !== undefined) px = xR0 + Math.min(release, R) * pps;
+      else if (playhead !== undefined) px = playhead < ahd ? x0 + playhead * pps : xS0 + gapW / 2 + (playhead > 1e8 ? Math.sin(performance.now() / 300) : Math.sin(playhead * 3)) * (gapW / 2 - 12);   // parks + drifts in S
+      if (px !== null) { c.strokeStyle = '#e7eef6'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(px, top - 8); c.lineTo(px, bot); c.stroke(); c.lineWidth = 1; }
     },
 
     json() { return JSON.stringify(__soundman.get(), null, 1); },
     snippet() {
-      const g = __soundman.get(), f = l => {
-        const L = g.layers[l];
-        return `  ${l}:  { peakDb: ${L.peakDb}, attackMs: ${L.attackMs}, holdMs: ${L.holdMs}, ` +
-          `decayMs: ${L.decayMs}, sustainDb: ${L.sustainDb}, releaseMs: ${L.releaseMs} }`;
-      };
+      const g = __soundman.get();
       const key = `${g.sound}_v${String(g.take).padStart(2, '0')}`;
-      return `// game side — accepted card drives this at runtime (assets/sfx.json via assets/daw.mjs)\n` +
+      const f = l => { const L = g.layers[l]; return `  ${l}: { enabled: ${L.enabled}, initialDb: ${L.initialDb}, attackMs: ${L.attackMs}, peakDb: ${L.peakDb}, holdMs: ${L.holdMs}, decayMs: ${L.decayMs}, sustainDb: ${L.sustainDb}, releaseMs: ${L.releaseMs}, finalDb: ${L.finalDb} }`; };
+      return `// game side — the accepted card drives this at runtime (assets/sfx.json via assets/daw.mjs)\n` +
         `import { SfxEngine } from './assets/daw.mjs';\n` +
         `const sfx = new SfxEngine({ base: 'assets/' }); await sfx.loadBank('assets/sfx.json');\n` +
-        `const v = sfx.play('${key}', { loop: ${g.loop} });   // layers from the card:\n` +
-        `// { layers: {\n` + f('hit') + `,\n` + f('body') + `,\n// } }\n` +
-        `v.stop();   // release tails play out`;
+        `const v = sfx.play('${key}', { loop: ${g.loop} });   // gainDb ${g.monitorDb} + AHDSR from the card:\n` +
+        `// layers: {\n` + f('hit') + `,\n` + f('body') + `\n// }\n` +
+        (g.params ? `v.setParam('fill', t / fillT);   // every frame: card params ${JSON.stringify(g.params.fill)}\n` : '') +
+        (g.regions ? `// sampler regions from the card: ${JSON.stringify(g.regions)} — attack→hold→decay once, sustain loops, release on stop\n` : '') +
+        `v.stop();   // release toward Final, tails play out`;
     },
     copyJson() { navigator.clipboard.writeText(this.json()).then(() => this.note('JSON copied.')); },
     copySnippet() { navigator.clipboard.writeText(this.snippet()).then(() => this.note('Snippet copied.')); },
@@ -416,44 +1047,33 @@ window.desk = desk;
 /* ------------------------------------------------------- agent dbg fns */
 window.__soundman = {
   help() {
-    return 'SoundMan desk dbg: get() automation JSON {sound,take,loop,monitorDb,layers:{hit,body}} | ' +
+    return 'SoundMan desk dbg: get() automation JSON {sound,take,loop,monitorDb,layers:{hit,body (FMOD AHDSR)},params?:{fill:{peak,lowpass}},regions?:{attack,hold,decay,sustain,release}} | ' +
       'set({layers:{hit:{decayMs:700}}}) deep-merge + redraw | ' +
-      'play() stop() reset() sounds() — agent reads get() after human says done.';
+      'play() stop() reset() seed() sounds() — agent reads get() after human says done.';
   },
   get() {
-    return {
+    const g = {
       sound: S.sound, take: S.take, loop: S.loop, monitorDb: S.monitorDb,
-      layers: JSON.parse(JSON.stringify(S.layers)),
+      layers: clone(S.layers),
+      paramsOn: !!S.paramsOn, sweepS: S.sweepS, src: S.src, samplerOn: !!S.samplerOn,
     };
+    if (S.paramsOn) g.params = clone(S.params);
+    if (S.samplerOn && S.regions.sustain) { g.regions = {}; for (const k of S.regionKeys) if (S.regions[k]) g.regions[k] = S.regions[k].slice(); }
+    return g;
   },
   set(patch) {
     const merge = (t, p) => { for (const k in p) (p[k] && typeof p[k] === 'object' && !Array.isArray(p[k]) && t[k]) ? merge(t[k], p[k]) : t[k] = p[k]; };
-    merge(S, patch); S.rev++; save(); syncKnobs();
-    if (M && M.redraw) M.redraw();
+    merge(S, patch); S.changed();
+    M.redraw();
     return window.__soundman.get();
   },
   play() { S.play(); }, stop() { S.stop(); },
   reset() { S.resetLayers(); return window.__soundman.get(); },
+  seed() { S.seedFromManifest(); S.changed(); S.loadWave(); return window.__soundman.get(); },
   sounds() { return S.sounds; },
+  monitor() { return monitorNode ? { gain: monitorNode.gain.value, db: S.monitorDb } : null; },   // dbg: the desk-wide monitor node
 };
 
-// keep m-js's vdom off the knobs: their light DOM is rendered output, not
-// template — without this, redraws duplicate knob internals.
-document.querySelectorAll('r-knob').forEach(k => k.setAttribute('x-ignore', ''));
-
-// pointer probe: framework-independent witness for the drag investigation.
-// Capture-phase window listeners + direct textContent writes (no m-js
-// involved), so whatever it prints is ground truth about event delivery.
-window.__knobHits = 0;
-for (const t of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) {
-  window.addEventListener(t, e => {
-    const el = document.getElementById('ptrlog');
-    if (!el) return;
-    const tgt = e.target && e.target.closest ? (e.target.closest('r-knob') || {}).dataset || {} : {};
-    el.textContent = `${t} x=${Math.round(e.clientX)} y=${Math.round(e.clientY)}` +
-      ` onKnob=${tgt.bind || 'no'} knobHandlerHits=${window.__knobHits}`;
-  }, true);
-}
 M.start();
 </script>
 </body>

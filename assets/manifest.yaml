@@ -433,3 +433,13 @@ sfx_patty_sizzle_loop:
   keys:
   - sfx_patty_sizzle_loop_v03
   taken: '2026-09-05'
+sfx_soda_pour_loop:
+  files:
+    sfx_soda_pour_loop_v01: sfx/sfx_soda_pour_loop/sfx_soda_pour_loop_v01.wav
+    sfx_soda_pour_loop_v01_mp3: sfx/sfx_soda_pour_loop/sfx_soda_pour_loop_v01.mp3
+  automation: sfx/sfx_soda_pour_loop/automation.yaml
+  loop: true
+  from: out/sfx_soda_pour_loop/ (sound outbox, take 1 = MOSS v2 round-3 atlas, approved 2026-09-06)
+  keys:
+  - sfx_soda_pour_loop_v01
+  taken: '2026-09-06'

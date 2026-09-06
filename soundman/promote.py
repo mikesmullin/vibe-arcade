@@ -39,7 +39,7 @@ def write_wav(path: Path, x: np.ndarray, sr: int):
         w.setnchannels(1)
         w.setsampwidth(2)
         w.setframerate(sr)
-        w.writeframes((np.clip(x, -1, 1) * 32767).astype(np.int16).tobytes())
+        w.writeframes(np.clip(np.round(np.clip(x, -1, 1) * 32768.0), -32768, 32767).astype(np.int16).tobytes())   # round-trip exact (see run.py)
 
 
 def waveform_png(audition: Path, png: Path):

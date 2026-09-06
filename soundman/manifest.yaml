@@ -22,6 +22,19 @@ assets:
     seed: 61001
     synth: {recipe: sizzle}
 
+  - id: sfx_soda_pour_loop
+    prompt: "soda dispensed from a fountain machine into a paper cup full of ice, steady stream, carbonation fizz, occasional ice clinks, close mic, no speech, no music"
+    seconds: 6
+    loop: true
+    variations: 3
+    seed: 62001
+    synth: {recipe: pour}
+    params:            # runtime automation the desk/game drive live (daw.mjs): cup fullness
+      fill: {peak: {fromHz: 320, toHz: 1500, q: 7, gainDb: 11}, lowpass: {fromHz: 12000, toHz: 3800}}
+    layers:            # suggested ADSR seed for the desk (a pour starts at once: no slow swell)
+      hit:  {peakDb: 0, attackMs: 30, holdMs: 150, decayMs: 600, sustainDb: -12, releaseMs: 150}
+      body: {peakDb: -4, attackMs: 250, holdMs: 0, decayMs: 100, sustainDb: -4, releaseMs: 600}
+
   - id: sfx_patty_drop
     prompt: "single raw burger patty dropped onto a hot flat-top grill, short meat slap then grease hiss, no music, close mic"
     seconds: 0.7

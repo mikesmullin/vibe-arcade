@@ -13,6 +13,7 @@ the sound, so feedback lands on the right asset. TTS always runs in the
 foreground so ordering is guaranteed; --bg detaches only the sfx playback.
 """
 import argparse
+import time
 import json
 import subprocess
 import sys
@@ -65,6 +66,27 @@ def spoken(aid: str) -> str:
     return name.replace("_", " ")
 
 
+# how a filename is read aloud: model tokens become words, take numbers become "take N"
+SPOKEN = {"sa3": "stable audio three", "sao1": "stable audio open one", "sfx": "S F X", "tangoflux": "tango flux",
+          "moss": "moss", "v2": "version two", "audiox": "audio X", "turbo": "turbo", "synth": "synth", "base": "base",
+          "small": "small", "medium": "medium", "raw": "raw"}
+
+
+def spoken_file(path, aid):
+    stem = Path(path).stem
+    if stem.startswith(aid + "_"):
+        stem = stem[len(aid) + 1:]
+    words = []
+    for tok in stem.split("_"):
+        if not tok:
+            continue
+        if len(tok) >= 2 and tok[0] == "v" and tok[1:].isdigit():
+            words.append(f"take {int(tok[1:])}")
+        else:
+            words.append(SPOKEN.get(tok.lower(), tok))
+    return ", ".join(words) if words else spoken(aid)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("id", help="outbox id, e.g. sfx_patty_sizzle_loop")
@@ -74,19 +96,37 @@ def main():
                     help="play the full audition mix instead of one keeper")
     ap.add_argument("--file", default=None,
                     help="play a specific file under out/<id>/ (e.g. exports)")
+    ap.add_argument("--files", nargs="*", default=None,
+                    help="compare mode: announce each file's spoken name, then play it, in order")
+    ap.add_argument("--gap", type=float, default=0.4, help="seconds between files in --files mode")
     ap.add_argument("--voice", default="alan",
                     help="voice preset for the announcement (default alan)")
     ap.add_argument("--bg", action="store_true",
                     help="detach sfx playback in background (TTS still blocks)")
     a = ap.parse_args()
 
+    if a.files:
+        announce(f"Sound's done: {spoken(a.id)}. {len(a.files)} candidates.", a.voice)
+        for f in a.files:
+            wav = Path(f) if Path(f).is_file() else HERE / f
+            if not wav.is_file():
+                print(f"skip missing {f}"); continue
+            name = spoken_file(wav, a.id)
+            announce(name, a.voice)
+            print(f"play: {name}  <- {wav}")
+            subprocess.run([sys.executable, str(HERE / "play.py"), str(wav)])
+            time.sleep(a.gap)
+        return
+
     card_path = HERE / "out" / a.id / "intake.yaml"
-    if not card_path.is_file():
-        sys.exit(f"present.py: no outbox card: {card_path}")
-    card = yaml.safe_load(open(card_path)) or {}
+    card = yaml.safe_load(open(card_path)) or {} if card_path.is_file() else {}
     files = list((card.get("game_keys") or {}).values())
     if a.file:
-        wav = HERE / "out" / a.id / a.file
+        # a path (scratch previews / exports) or a name under out/<id>/
+        cand = [Path(a.file), HERE / a.file, HERE / "out" / a.id / a.file]
+        wav = next((c for c in cand if c.is_file()), cand[-1])
+    elif not card:
+        sys.exit(f"present.py: no outbox card: {card_path} (use --file for scratch takes)")
     elif a.all:
         wav = HERE / "out" / a.id / "audition.wav"
     else:

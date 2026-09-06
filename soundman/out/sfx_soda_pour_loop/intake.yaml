@@ -1,0 +1,29 @@
+id: sfx_soda_pour_loop
+date: '2026-09-06'
+engine: moss_soundeffect_v2
+rendered: "moss_v2 (MOSS-SoundEffect v2.0, Apache-2.0) \xB7 desk round 3 (rounds/pour_r3.yaml,\
+  \ prompt pour_r3_fast_stream, seed 21, 12 s) \xB7 Export Ranges to Atlas (labeled\
+  \ stage regions only, 8.986 s)"
+sample_rate: 48000
+loop: true
+game_keys:
+  sfx_soda_pour_loop_v01: sfx_soda_pour_loop_v01.wav
+seed: 21
+copy_as: 'cp soundman/out/sfx_soda_pour_loop/sfx_soda_pour_loop_v01.wav assets/sfx/sfx_soda_pour_loop/sfx_soda_pour_loop_v01.wav
+
+  '
+assets_snippet: 'sfx_soda_pour_loop_v01: A+''sfx/sfx_soda_pour_loop/sfx_soda_pour_loop_v01.wav'',
+
+  '
+listen_verify: "reviewed on the Sound Desk (daw.html, Candidates + stage regions);\
+  \ post-accept: cook2.html?debug, tap the soda machine \u2014 Loops.set('soda') plays\
+  \ it with the card's regions/AHDSR/gain"
+notes: "prompt was: soda fountain machine dispensing carbonated soda into a paper\
+  \ cup full of ice, strong fast stream splashing and gurgling, loud fizzing carbonation\
+  \ bubbles, ice cubes clinking and settling, close mic, no music, no speech \xB7\
+  \ human: \"premium quality\" (round-3 note: very impressive, 76%+) \xB7 sampler\
+  \ regions + AHDSR + gain on automation.yaml; raw/ holds job.json + the desk settings\
+  \ backup"
+approved: 2026-09-06 (take 1 = the atlas of pour_r3_fast_stream_moss_v2_223758 v01,
+  approved by human on the desk; promoted from scratch/promote_soda/)
+license: "Apache-2.0 (MOSS-SoundEffect v2.0) \u2014 commercial OK"

@@ -1,0 +1,38 @@
+# Round 2 — soda pour. Built from the human's round-1 notes (scratch/feedback.json, 2026-09-05):
+#   SAO 1.0 was the only model in the running (50–60%): "water at a slow trickle / thin straw",
+#   "ice dropped, then filling a metal container slowly" -> wants a STRONG FAST stream, real
+#   carbonation fizz, a paper/plastic cup (not glass/metal), ice that settles, no slow trickle.
+#   SA3 (0–2%: electronic noise / fumbling), TangoFlux (1%: radio + voices), MOSS (5–20%: steam,
+#   dishwasher hum), AudioX (10–15%: silverware in rain). One SA3 retry at low guidance to rule
+#   out my sampler settings; a couple of MOSS/AudioX takes on the strongest prompt.
+defaults: {seconds: 6, loop: true, takes: 2}
+jobs:
+  - name: pour_r2_fast_stream
+    model: sao1
+    seed: 11
+    takes: 3
+    prompt: "soda fountain machine dispensing carbonated soda into a paper cup full of ice, strong fast stream splashing and gurgling, loud fizzing carbonation bubbles, ice cubes clinking and settling, close mic, no music, no speech"
+  - name: pour_r2_fizz_cola
+    model: sao1
+    seed: 21
+    takes: 3
+    prompt: "carbonated cola pouring quickly from a fountain nozzle into a plastic cup with ice cubes, heavy fizz and bubbling foam, gurgling liquid, ice rattling, close-up mono recording, no music"
+  - name: pour_r2_fill_cup
+    model: sao1
+    seed: 31
+    takes: 3
+    prompt: "fast pour of fizzy soft drink filling a cup of ice, rushing liquid stream, crackling carbonation hiss rising as the cup fills, ice shifting, restaurant soda dispenser, close mic, no music, no voices"
+  - name: pour_r2_fast_stream
+    model: moss_v2
+    seed: 11
+    prompt: "soda fountain machine dispensing carbonated soda into a paper cup full of ice, strong fast stream splashing and gurgling, loud fizzing carbonation bubbles, ice cubes clinking and settling, close mic, no music, no speech"
+  - name: pour_r2_fast_stream
+    model: audiox_turbo
+    seed: 11
+    prompt: "soda fountain machine dispensing carbonated soda into a paper cup full of ice, strong fast stream splashing and gurgling, loud fizzing carbonation bubbles, ice cubes clinking and settling, close mic, no music, no speech"
+  - name: pour_r2_sa3_lowcfg
+    model: sa3_small_sfx
+    seed: 11
+    cfg: 4.5
+    steps: 60
+    prompt: "soda fountain machine dispensing carbonated soda into a paper cup full of ice, strong fast stream splashing and gurgling, loud fizzing carbonation bubbles, ice cubes clinking and settling, close mic, no music, no speech"
