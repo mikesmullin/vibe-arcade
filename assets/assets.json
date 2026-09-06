@@ -45,6 +45,8 @@
  "mouth_smile": "art/face_mouth/face_mouth_smile.png",
  "mug_empty": "art/coffee_mug/coffee_mug_empty.png",
  "mug_full": "art/coffee_mug/coffee_mug_full.png",
+ "music_diner_loop_v01": "music/music_diner_loop/music_diner_loop_v01.wav",
+ "music_diner_loop_v01_mp3": "music/music_diner_loop/music_diner_loop_v01.mp3",
  "napkins": "art/napkin_dispenser/napkin_dispenser.png",
  "pan": "art/frying_pan/frying_pan.png",
  "patty_burnt": "art/patty/patty_burnt.png",

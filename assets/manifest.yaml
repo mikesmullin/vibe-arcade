@@ -443,3 +443,13 @@ sfx_soda_pour_loop:
   keys:
   - sfx_soda_pour_loop_v01
   taken: '2026-09-06'
+music_diner_loop:
+  files:
+    music_diner_loop_v01: music/music_diner_loop/music_diner_loop_v01.wav
+    music_diner_loop_v01_mp3: music/music_diner_loop/music_diner_loop_v01.mp3
+  automation: music/music_diner_loop/automation.yaml
+  loop: true
+  from: out/music_diner_loop/ (sound outbox, take 1 = sa3_medium desk round 1, approved 2026-09-06)
+  keys:
+  - music_diner_loop_v01
+  taken: '2026-09-06'

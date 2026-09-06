@@ -92,6 +92,13 @@ button:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.15)}
 #dbgPanel .lbl{color:#8fa5d6;font-size:11.5px;margin-top:8px;line-height:1.5;font-family:ui-monospace,monospace;white-space:pre-wrap}
 #dbgPanel input,#dbgPanel select{background:#10162a;color:#fff;border:1px solid #46598f;border-radius:7px;padding:4px 6px;font-size:12.5px}
 #dbgPanel input[type=number]{width:56px}#dbgPanel input[type=text]{width:150px}
+/* ---------- volume panel (tap the audio button; hides after 5s idle) ---------- */
+#volPanel{position:fixed;z-index:30;display:flex;gap:12px;background:rgba(20,35,55,.94);border:1px solid #3a4a75;border-radius:14px;padding:12px 14px 10px;pointer-events:auto;box-shadow:0 6px 24px rgba(0,0,0,.4)}
+#volPanel.hidden{display:none}
+.volcol{display:flex;flex-direction:column;align-items:center;gap:6px}
+.vwrap{width:30px;height:120px;display:flex;align-items:center;justify-content:center}
+.vwrap input[type=range]{width:120px;flex:none;transform:rotate(-90deg);accent-color:#ffb703;cursor:pointer}
+.volcol label{color:#cfe3ff;font-size:11px;font-weight:700}
 /* ---------- edit toolbar (debug) ---------- */
 #edtool{position:fixed;left:calc(8px + env(safe-area-inset-left,0px));top:50%;transform:translateY(-50%);z-index:31;display:flex;flex-direction:column;gap:6px;background:#1d2436ee;border:1px solid #3a4a75;border-radius:12px;padding:6px}
 #edtool.hidden{display:none}
@@ -129,6 +136,10 @@ body.ed-move #game canvas{cursor:move}body.ed-scale #game canvas{cursor:nwse-res
   </div>
 </div>
 
+<div id="volPanel" class="hidden">
+  <div class="volcol"><div class="vwrap"><input type="range" id="volMusicRg" min="0" max="100" step="1" value="100"></div><label>music</label></div>
+  <div class="volcol"><div class="vwrap"><input type="range" id="volSfxRg" min="0" max="100" step="1" value="100"></div><label>sfx</label></div>
+</div>
 <div id="story" class="hidden">
   <header><span>📖 Storybook</span><span class="hbtns"><button id="labelToggle" class="on" title="Toggle labels">Aa</button><button id="storyHide" title="Hide sidebar">⟨</button></span></header>
   <nav id="storyNav"></nav>
@@ -238,11 +249,19 @@ document.addEventListener('fullscreenchange',()=>{applySize();syncFsButton();});
 /* ======================================================================
    audio (tiny synth)
    ====================================================================== */
-/* 3-mode sound, copied from cook.html: 0 = Music + SFX, 1 = SFX only, 2 = Muted */
-let soundMode=parseInt(localStorage.getItem('cookfever2.sound'))||0;
+/* volume prefs: music + sfx sliders (0..100). migrates the old 3-mode toggle once. */
+let volMusic=100,volSfx=100;
+try{
+  const v=JSON.parse(localStorage.getItem('cookfever2.vol')||'null');
+  if(v&&+v.m>=0&&+v.s>=0){volMusic=+v.m;volSfx=+v.s;}
+  else{const legacy=parseInt(localStorage.getItem('cookfever2.sound'))||0;
+    volMusic=legacy===0?100:0;volSfx=legacy===2?0:100;}
+}catch(e){}
+const saveVol=()=>{try{localStorage.setItem('cookfever2.vol',JSON.stringify({m:volMusic,s:volSfx}));}catch(e){}};
+const lin=v=>v<=0?0:v/100, dbOf=v=>v<=0?-60:20*Math.log10(v/100);
 const Sfx=new SfxEngine({base:'assets/'});   // keepers + automation cards from assets/sfx.json (bank loaded at boot); literal path: A is declared later
 const Audio={ctx:null,master:null,musicGain:null,muted:false,
-  ensure(){if(!this.ctx){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;this.ctx=new AC();this.master=this.ctx.createGain();this.master.gain.value=.8;this.master.connect(this.ctx.destination);this.musicGain=this.ctx.createGain();this.musicGain.gain.value=(soundMode===0)?.4:0;this.musicGain.connect(this.master);Sfx.setContext(this.ctx,this.ctx.destination);/* keepers bypass the synth master (.8) so a card's gain sounds exactly as on the desk */}if(this.ctx.state==='suspended')this.ctx.resume();},
+  ensure(){if(!this.ctx){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;this.ctx=new AC();this.master=this.ctx.createGain();this.master.gain.value=.8;this.master.connect(this.ctx.destination);this.musicGain=this.ctx.createGain();this.musicGain.gain.value=.4*lin(volMusic);this.musicGain.connect(this.master);Sfx.setContext(this.ctx,this.ctx.destination);/* keepers bypass the synth master (.8) so a card's gain sounds exactly as on the desk */}if(this.ctx.state==='suspended')this.ctx.resume();},
   tone({f=440,f2=null,t=.15,type='sine',v=.2,when=0}){if(!this.ctx||this.muted)return;const c=this.ctx,o=c.createOscillator(),g=c.createGain(),t0=c.currentTime+when;o.type=type;o.frequency.setValueAtTime(f,t0);if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(1,f2),t0+t);g.gain.setValueAtTime(v,t0);g.gain.exponentialRampToValueAtTime(.0001,t0+t);o.connect(g);g.connect(this.master);o.start(t0);o.stop(t0+t+.03);},
   noise({t=.2,v=.15,freq=1000}){if(!this.ctx||this.muted)return;const c=this.ctx,len=Math.floor(c.sampleRate*t),buf=c.createBuffer(1,len,c.sampleRate),d=buf.getChannelData(0);for(let i=0;i<len;i++)d[i]=Math.random()*2-1;const n=c.createBufferSource();n.buffer=buf;const f=c.createBiquadFilter();f.type='lowpass';f.frequency.value=freq;const g=c.createGain();g.gain.setValueAtTime(v,c.currentTime);g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+t);n.connect(f);f.connect(g);g.connect(this.master);n.start();},
 };
@@ -295,7 +314,8 @@ const Music={
 /* Looping keepers with runtime automation (SfxEngine). A station "wants" a loop every
    update it is active (Loops.set); frame() sweeps loops nobody wanted for 250 ms — so
    pause/end/menu/dispose/mute all stop it with its release tail, no per-path plumbing. */
-const SND={sizzle:'sfx_patty_sizzle_loop_v03',pour:'sfx_soda_pour_loop_v01'};   // game keys from assets/sfx.json (both accepted; Loops.set warns once + no-ops for any key not in the bank)
+const SND={sizzle:'sfx_patty_sizzle_loop_v03',pour:'sfx_soda_pour_loop_v01',music:'music_diner_loop_v01'};   // game keys from assets/sfx.json (all accepted; Loops.set warns once + no-ops for any key not in the bank)
+const MUSIC_DB=-1.9;   // music bus trim: -20% amplitude on the keeper voice (runtime only; the card still ships flat at 0 dB)
 const SIZZLE_RESTART_ON_ADD=true;   // experimental (2026-09-05): adding an item to a grill that already has one restarts the sizzle from the top; set false to revert
 const Loops={v:{},want:{},warned:{},
   set(name,key,on){this.want[name]=on?performance.now():0;if(on&&!this.v[name]&&Audio.ctx&&!Audio.muted){if(!Sfx.bank[key]){if(!this.warned[key]){this.warned[key]=1;console.warn('[Loops] sound key not in bank yet: '+key);}return;}const v=Sfx.play(key,{loop:true});if(v)this.v[name]=v;}},
@@ -304,18 +324,35 @@ const Loops={v:{},want:{},warned:{},
   stop(name,opts){const v=this.v[name];if(v){v.stop(opts);delete this.v[name];}this.want[name]=0;},
   stopAll(){for(const n in this.v)this.stop(n);},
 };
-function applySoundMode(){
-  if(Audio.ctx&&Audio.musicGain)Audio.musicGain.gain.value=(soundMode===0)?.4:0;
-  Audio.muted=(soundMode===2);
-  $('muteBtn').textContent=['🔊','🔉','🔇'][soundMode];
-  $('muteBtn').title=['Music + SFX','SFX only','Muted'][soundMode];
+function syncVol(){   // volumes -> gains + audio-button icon + slider positions
+  Audio.muted=(volMusic<=0&&volSfx<=0);
+  if(Audio.ctx){
+    if(Audio.master)Audio.master.gain.value=.8*lin(volSfx);
+    if(Audio.musicGain)Audio.musicGain.gain.value=.4*lin(volMusic);
+  }
+  const b=$('muteBtn');
+  if(volMusic<=0&&volSfx<=0){b.textContent='🔇';b.title='Muted';}
+  else if(volMusic<=0){b.textContent='🔉';b.title='SFX only';}
+  else if(volSfx<=0){b.textContent='🎵';b.title='Music only';}
+  else{b.textContent='🔊';b.title='Music + SFX';}
+  const rm=$('volMusicRg'),rs=$('volSfxRg');
+  if(rm&&document.activeElement!==rm)rm.value=volMusic;
+  if(rs&&document.activeElement!==rs)rs.value=volSfx;
 }
-function toggleMute(){
-  soundMode=(soundMode+1)%3;
-  try{localStorage.setItem('cookfever2.sound',soundMode);}catch(e){}
-  applySoundMode();
+/* volume panel: tap the audio button to show it right below; any poke resets the 5s hide timer */
+let volTimer=null;
+function pokeVol(){clearTimeout(volTimer);volTimer=setTimeout(()=>$('volPanel').classList.add('hidden'),5000);}
+function toggleVolPanel(){
+  const p=$('volPanel');
+  if(!p.classList.contains('hidden')){p.classList.add('hidden');clearTimeout(volTimer);return;}
+  const r=$('muteBtn').getBoundingClientRect();
+  p.style.top=(r.bottom+8)+'px';p.style.right=Math.max(8,innerWidth-r.right)+'px';
+  syncVol();p.classList.remove('hidden');pokeVol();
 }
-applySoundMode();
+$('volPanel').addEventListener('pointerdown',pokeVol);
+$('volMusicRg').addEventListener('input',e=>{volMusic=+e.target.value;saveVol();syncVol();pokeVol();});
+$('volSfxRg').addEventListener('input',e=>{volSfx=+e.target.value;saveVol();syncVol();pokeVol();});
+syncVol();
 
 /* ======================================================================
    assets (game sprites in assets/ — copies of the art outbox; code manifest:
@@ -1212,7 +1249,7 @@ function updateWorld(dt){
   updateFx(dt);
 }
 function endLevel(win){
-  if(G.mode!=='playing')return;G.mode='end';Music.stop();Time.unfreeze();syncPauseBtn();
+  if(G.mode!=='playing')return;G.mode='end';Music.stop();$('volPanel').classList.add('hidden');Time.unfreeze();syncPauseBtn();
   for(const p of piles.slice())collectPile(p);
   let stars=0;if(win){const [s1,s2,s3]=starThresholds(G.cfg);stars=G.score>=s3?3:G.score>=s2?2:1;SAVE.level=Math.max(SAVE.level,G.level+1);}
   SAVE.best[G.level]=Math.max(SAVE.best[G.level]||0,stars);SAVE.coins+=G.coins;save();
@@ -1221,7 +1258,7 @@ function endLevel(win){
     $('endServed').textContent='Served '+G.served+'/'+G.cfg.goal;$('endCoins').textContent='+'+G.coins+' 🪙';$('nextBtn').classList.toggle('hidden',!win);$('end').classList.remove('hidden');},600);
 }
 function showMenu(){
-  G.mode='menu';Music.stop();Time.unfreeze();syncPauseBtn();clearWorld();
+  G.mode='menu';Music.stop();$('volPanel').classList.add('hidden');Time.unfreeze();syncPauseBtn();clearWorld();
   $('end').classList.add('hidden');$('paused').classList.add('hidden');$('hud').classList.add('hidden');$('story').classList.add('hidden');$('storyRestore').classList.add('hidden');
   const sp=$('menuStars').children,best=SAVE.best[SAVE.level]||0;for(let i=0;i<3;i++)sp[i].classList.toggle('on',i<best);
   $('menuLevel').textContent='Level '+SAVE.level;$('menuCoins').textContent='🪙 '+SAVE.coins;$('menu').classList.remove('hidden');
@@ -1237,7 +1274,7 @@ function resumeGame(){if(G.mode!=='paused')return;G.mode='playing';Time.unfreeze
 $('pauseBtn').onclick=()=>{Audio.ensure();G.mode==='paused'?resumeGame():pauseGame();};
 $('menuBtn').onclick=()=>{if(G.mode==='playing'){G.mode='paused';Music.stop();Time.freeze(true);syncPauseBtn();$('paused').classList.remove('hidden');}else if(G.mode==='story')showMenu();};
 $('resumeBtn').onclick=()=>resumeGame();$('quitBtn').onclick=showMenu;
-$('muteBtn').onclick=()=>{Audio.ensure();toggleMute();};
+$('muteBtn').onclick=()=>{Audio.ensure();syncVol();toggleVolPanel();};
 $('storyHide').onclick=()=>setStorySidebar(true);$('storyRestore').onclick=()=>setStorySidebar(false);
 $('labelToggle').onclick=()=>{setLabelVisibility(!labelVisible);$('labelToggle').classList.toggle('on',labelVisible);};
 
@@ -1368,7 +1405,12 @@ function tick(dt){
   else if(G.mode==='pose'){updateWorld(dt);for(const o of poseTicks)o.update(dt);}
 }
 function render(){renderer.render(scene,camera);}
-function frame(){const dt=Time.advance();if(dt>0){tick(dt);if(G.mode==='playing')Music.tick();}Loops.sweep();render();requestAnimationFrame(frame);}
+function frame(){const dt=Time.advance();if(dt>0){tick(dt);if(G.mode==='playing'){
+  if(Sfx.bank[SND.music]){Loops.set('music',SND.music,volMusic>0);const m=Loops.v.music;if(m){const w=MUSIC_DB+dbOf(volMusic);if(m.gainDb!==w)m.setGain(w);}}
+  else if(volMusic>0)Music.tick();
+  if(volSfx<=0){Loops.stop('grill');Loops.stop('soda');}   // sfx slider at 0: don't burn CPU on silent keeper loops; stations re-want them when audible
+  else for(const n of ['grill','soda']){const v=Loops.v[n];if(v){if(v._baseDb==null)v._baseDb=v.gainDb;const w=v._baseDb+dbOf(volSfx);if(v.gainDb!==w)v.setGain(w);}}
+}}Loops.sweep();render();requestAnimationFrame(frame);}   // gameplay music: the keeper loop while its slider is up (chiptune synth is fallback only when the bank key is missing)
 
 /* ---------- poser: isolate one object on a studio backdrop ---------- */
 function backdropTexture(kind,opts={}){

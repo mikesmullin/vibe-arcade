@@ -1,4 +1,38 @@
 {
+ "music_diner_loop_v01": {
+  "automation": "music/music_diner_loop/automation.yaml",
+  "gainDb": 0,
+  "layers": {
+   "body": {
+    "attackMs": 3000,
+    "decayMs": 200,
+    "enabled": false,
+    "finalDb": -80,
+    "holdMs": 0,
+    "initialDb": -80,
+    "peakDb": -3,
+    "releaseMs": 800,
+    "sustainDb": -3
+   },
+   "hit": {
+    "attackMs": 10,
+    "decayMs": 0,
+    "enabled": true,
+    "finalDb": -80,
+    "holdMs": 0,
+    "initialDb": 0,
+    "peakDb": 0,
+    "releaseMs": 300,
+    "sustainDb": 0
+   }
+  },
+  "loop": true,
+  "mp3": "music/music_diner_loop/music_diner_loop_v01.mp3",
+  "params": null,
+  "regions": null,
+  "take": 1,
+  "wav": "music/music_diner_loop/music_diner_loop_v01.wav"
+ },
  "sfx_patty_sizzle_loop_v03": {
   "automation": "sfx/sfx_patty_sizzle_loop/automation.yaml",
   "gainDb": -18.5,
