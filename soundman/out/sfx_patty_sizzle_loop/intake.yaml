@@ -1,0 +1,20 @@
+id: sfx_patty_sizzle_loop
+date: '2026-09-05'
+engine: stable_audio_3_small_sfx
+rendered: synth/sizzle
+sample_rate: 48000
+loop: true
+game_keys:
+  sfx_patty_sizzle_loop_v03: sfx_patty_sizzle_loop_v03.wav
+seed: 61001
+copy_as: 'cp soundman/out/sfx_patty_sizzle_loop/sfx_patty_sizzle_loop_v03.wav assets/sfx/sfx_patty_sizzle_loop/sfx_patty_sizzle_loop_v03.wav
+
+  '
+assets_snippet: 'sfx_patty_sizzle_loop_v03: A+''sfx/sfx_patty_sizzle_loop/sfx_patty_sizzle_loop_v03.wav'',
+
+  '
+listen_verify: python3 present.py sfx_patty_sizzle_loop (pre-accept, voice announce
+  + playback); post-accept playback check in cook2.html?debug (code side)
+notes: 'prompt was: close-up hamburger patty sizzling on grill, steady grease crackle,
+  no speech, no music'
+approved: 2026-09-05 (takes 3 approved by human; promoted from scratch/promote_test/)

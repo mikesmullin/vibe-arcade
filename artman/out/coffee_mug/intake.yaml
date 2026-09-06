@@ -1,0 +1,15 @@
+id: coffee_mug
+date: 2026-09-05
+game_keys:
+  mug_empty: coffee_mug_empty.png
+  mug_full: coffee_mug_full.png
+seed: 43501
+bg: solid bright green
+cutout: key
+copy_as: |
+  cp artman/out/coffee_mug/coffee_mug_empty.png assets/art/coffee_mug/coffee_mug_empty.png
+  cp artman/out/coffee_mug/coffee_mug_full.png assets/art/coffee_mug/coffee_mug_full.png
+assets_snippet: |
+  mug_empty: A+'art/coffee_mug/coffee_mug_empty.png',
+  mug_full: A+'art/coffee_mug/coffee_mug_full.png',
+pose_verify: "cook2.html?pose=key:mug_empty&bg=grid&zoom=2&freeze=1&nocache"

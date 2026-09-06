@@ -1,7 +1,7 @@
 node_modules/
 server.lock
 /tmp/
-assetgen/.venv/
-assetgen/out/*/raw/
-assetgen/scratch/
-assetgen/__pycache__/
+artman/.venv/
+artman/out/*/raw/
+artman/scratch/
+artman/__pycache__/

@@ -1,0 +1,15 @@
+id: tool_rotate
+date: 2026-09-05
+game_keys:
+  tool_rotate_off: tool_rotate_off.png
+  tool_rotate_on: tool_rotate_on.png
+seed: 63103
+bg: solid bright green
+cutout: key
+copy_as: |
+  cp artman/out/tool_rotate/tool_rotate_off.png assets/art/tool_rotate/tool_rotate_off.png
+  cp artman/out/tool_rotate/tool_rotate_on.png assets/art/tool_rotate/tool_rotate_on.png
+assets_snippet: |
+  tool_rotate_off: A+'art/tool_rotate/tool_rotate_off.png',
+  tool_rotate_on: A+'art/tool_rotate/tool_rotate_on.png',
+pose_verify: "cook2.html?pose=key:tool_rotate_off&bg=grid&zoom=2&freeze=1&nocache"

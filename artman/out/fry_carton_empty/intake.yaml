@@ -1,0 +1,13 @@
+id: fry_carton_empty
+date: 2026-09-05
+game_keys:
+  carton_empty: fry_carton_empty.png
+seed: 43911
+bg: solid bright magenta
+cutout: key
+copy_as: |
+  cp artman/out/fry_carton_empty/fry_carton_empty.png assets/art/fry_carton_empty/fry_carton_empty.png
+assets_snippet: |
+  carton_empty: A+'art/fry_carton_empty/fry_carton_empty.png',
+pose_verify: "cook2.html?pose=key:carton_empty&bg=grid&zoom=2&freeze=1&nocache"
+notes: empty red-black striped carton matching the in-carton fry keepers; stack-of-cartons target for the cooked-pile drop

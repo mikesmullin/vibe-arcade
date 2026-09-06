@@ -1,0 +1,19 @@
+id: tool_rect
+date: 2026-09-05
+game_keys:
+  tool_rect_off: tool_rect_off.png
+  tool_rect_off_alt: tool_rect_off_alt.png
+  tool_rect_on: tool_rect_on.png
+seed: 65104
+bg: solid bright green
+cutout: key
+copy_as: |
+  cp artman/out/tool_rect/tool_rect_off.png assets/art/tool_rect/tool_rect_off.png
+  cp artman/out/tool_rect/tool_rect_off_alt.png assets/art/tool_rect/tool_rect_off_alt.png
+  cp artman/out/tool_rect/tool_rect_on.png assets/art/tool_rect/tool_rect_on.png
+assets_snippet: |
+  tool_rect_off: A+'art/tool_rect/tool_rect_off.png',
+  tool_rect_off_alt: A+'art/tool_rect/tool_rect_off_alt.png',
+  tool_rect_on: A+'art/tool_rect/tool_rect_on.png',
+pose_verify: "cook2.html?pose=key:tool_rect_on&bg=grid&zoom=2&freeze=1&nocache"
+notes: rectangle-draw tool (trigger areas). ON shipped (explore_rect2 s3, seed 65107, user-picked): plus fused on the corner. OFF candidates for the code side to choose: tool_rect_off.png (same-seed hashtag fusion glitch, do not prefer) vs tool_rect_off_alt.png (explore_rect2 s2: clean rect, single plus floating just off the corner)

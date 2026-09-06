@@ -165,6 +165,7 @@ body.ed-move #game canvas{cursor:move}body.ed-scale #game canvas{cursor:nwse-res
   <button data-tool="move" data-icon="move" title="Move: drag a sprite to change its position (M)"><img alt="move"></button>
   <button data-tool="scale" data-icon="scale" title="Scale: drag up = bigger, down = smaller (S)"><img alt="scale"></button>
   <button data-tool="rotate" data-icon="rotate" title="Rotate: drag left/right (R)"><img alt="rotate"></button>
+  <button data-tool="rect" data-icon="rect" title="Rect: draw trigger zones, logs bounds to console (T)"><img alt="rect"></button>
   <button data-tool="log" data-icon="log" title="Dump all edits to the console"><img alt="log"></button>
 </div>
 <div id="gizmo"><span class="tag"></span></div>
@@ -180,6 +181,7 @@ body.ed-move #game canvas{cursor:move}body.ed-scale #game canvas{cursor:nwse-res
 
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+import { SfxEngine } from './assets/daw.mjs';   // accepted copy of the sound engine (raw keepers + live ADSR)
 
 /* ======================================================================
    helpers
@@ -236,8 +238,9 @@ document.addEventListener('fullscreenchange',()=>{applySize();syncFsButton();});
 /* ======================================================================
    audio (tiny synth)
    ====================================================================== */
+const Sfx=new SfxEngine({base:'assets/'});   // keepers + automation cards from assets/sfx.json (bank loaded at boot); literal path: A is declared later
 const Audio={ctx:null,master:null,muted:false,
-  ensure(){if(!this.ctx){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;this.ctx=new AC();this.master=this.ctx.createGain();this.master.gain.value=.8;this.master.connect(this.ctx.destination);}if(this.ctx.state==='suspended')this.ctx.resume();},
+  ensure(){if(!this.ctx){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;this.ctx=new AC();this.master=this.ctx.createGain();this.master.gain.value=.8;this.master.connect(this.ctx.destination);Sfx.setContext(this.ctx,this.ctx.destination);/* keepers bypass the synth master (.8) so a card's gain sounds exactly as on the desk */}if(this.ctx.state==='suspended')this.ctx.resume();},
   tone({f=440,f2=null,t=.15,type='sine',v=.2,when=0}){if(!this.ctx||this.muted)return;const c=this.ctx,o=c.createOscillator(),g=c.createGain(),t0=c.currentTime+when;o.type=type;o.frequency.setValueAtTime(f,t0);if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(1,f2),t0+t);g.gain.setValueAtTime(v,t0);g.gain.exponentialRampToValueAtTime(.0001,t0+t);o.connect(g);g.connect(this.master);o.start(t0);o.stop(t0+t+.03);},
   noise({t=.2,v=.15,freq=1000}){if(!this.ctx||this.muted)return;const c=this.ctx,len=Math.floor(c.sampleRate*t),buf=c.createBuffer(1,len,c.sampleRate),d=buf.getChannelData(0);for(let i=0;i<len;i++)d[i]=Math.random()*2-1;const n=c.createBufferSource();n.buffer=buf;const f=c.createBiquadFilter();f.type='lowpass';f.frequency.value=freq;const g=c.createGain();g.gain.setValueAtTime(v,c.currentTime);g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+t);n.connect(f);f.connect(g);g.connect(this.master);n.start();},
 };
@@ -253,6 +256,17 @@ const SFX={
   burn:()=>{Audio.noise({t:.3,v:.13,freq:900});Audio.tone({f:220,f2:60,t:.3,type:'triangle',v:.12});},
   sad:()=>{Audio.tone({f:392,t:.18,v:.14});Audio.tone({f:311,t:.3,v:.14,when:.16});},
   star:i=>Audio.tone({f:[784,988,1318][i]||1568,t:.22,type:'triangle',v:.2}),
+};
+/* Looping keepers with runtime automation (SfxEngine). A station "wants" a loop every
+   update it is active (Loops.set); frame() sweeps loops nobody wanted for 250 ms — so
+   pause/end/menu/dispose/mute all stop it with its release tail, no per-path plumbing. */
+const SND={sizzle:'sfx_patty_sizzle_loop_v03'};   // game keys from assets/sfx.json
+const SIZZLE_RESTART_ON_ADD=true;   // experimental (2026-09-05): adding an item to a grill that already has one restarts the sizzle from the top; set false to revert
+const Loops={v:{},want:{},
+  set(name,key,on){this.want[name]=on?performance.now():0;if(on&&!this.v[name]&&Audio.ctx&&!Audio.muted){const v=Sfx.play(key,{loop:true});if(v)this.v[name]=v;}},
+  sweep(){const now=performance.now();for(const n in this.v)if(now-(this.want[n]||0)>250||Audio.muted){this.v[n].stop();delete this.v[n];}},
+  stop(name,opts){const v=this.v[name];if(v){v.stop(opts);delete this.v[name];}this.want[name]=0;},
+  stopAll(){for(const n in this.v)this.stop(n);},
 };
 
 /* ======================================================================
@@ -271,7 +285,7 @@ const ASSETS={
   cheese_fresh:A+'art/cheese_slices/cheese_slices_fresh.png',cheese_melted:A+'art/cheese_slices/cheese_slices_melted.png',cheese_burnt:A+'art/cheese_slices/cheese_slices_burnt.png',fries_raw:A+'art/fries/fries_raw.png',fries_cooked:A+'art/fries/fries_cooked.png',plate:A+'art/plate/plate.png',
   cup_empty:A+'art/cup/cup_empty.png',cup_full:A+'art/cup/cup_full.png',
   mug_empty:A+'art/coffee_mug/coffee_mug_empty.png',mug_full:A+'art/coffee_mug/coffee_mug_full.png',
-  grill:A+'art/grill/grill.png',pan:A+'art/frying_pan/frying_pan.png',fry_station_raised:A+'art/fry_station/fry_station_raised.png',fry_station_lowered:A+'art/fry_station/fry_station_lowered.png',soda_machine:A+'art/soda_machine/soda_machine.png',
+  grill:A+'art/grill/grill.png',pan:A+'art/frying_pan/frying_pan.png',fry_station_raised:A+'art/fry_station/fry_station_raised.png',fry_station_lowered:A+'art/fry_station/fry_station_lowered.png',soda_machine:A+'art/soda_machine/soda_machine.png',soda_stream_long:A+'art/soda_stream_long/soda_stream_long.png',
   fries_pile_raw:A+'art/fries_pile/fries_pile_raw.png',fries_pile_cooked:A+'art/fries_pile/fries_pile_cooked.png',carton_empty:A+'art/fry_carton_empty/fry_carton_empty.png',
   trash:A+'art/trash_bin/trash_bin.png',prep_tray:A+'art/prep_tray/prep_tray.png',napkins:A+'art/napkin_dispenser/napkin_dispenser.png',ketchup:A+'art/ketchup_bottle/ketchup_bottle.png',
   coin:A+'art/coin/coin.png',coin_stack:A+'art/coin_stack/coin_stack.png',bubble:A+'art/speech_bubble/speech_bubble.png',
@@ -281,6 +295,7 @@ const ASSETS={
   tool_pointer_off:A+'art/tool_pointer/tool_pointer_off.png',tool_pointer_on:A+'art/tool_pointer/tool_pointer_on.png',tool_move_off:A+'art/tool_move/tool_move_off.png',tool_move_on:A+'art/tool_move/tool_move_on.png',
   tool_scale_off:A+'art/tool_scale/tool_scale_off.png',tool_scale_on:A+'art/tool_scale/tool_scale_on.png',tool_rotate_off:A+'art/tool_rotate/tool_rotate_off.png',tool_rotate_on:A+'art/tool_rotate/tool_rotate_on.png',
   tool_log_off:A+'art/tool_log/tool_log_off.png',tool_log_on:A+'art/tool_log/tool_log_on.png',
+  tool_rect_off:A+'art/tool_rect/tool_rect_off_alt.png',tool_rect_on:A+'art/tool_rect/tool_rect_on.png',
   eye_open:A+'art/face_eye/face_eye_open.png',eye_closed:A+'art/face_eye/face_eye_closed.png',brow:A+'art/face_brow/face_brow.png',
   mouth_neutral:A+'art/face_mouth/face_mouth_neutral.png',mouth_smile:A+'art/face_mouth/face_mouth_smile.png',mouth_frown:A+'art/face_mouth/face_mouth_frown.png',mouth_open:A+'art/face_mouth/face_mouth_open.png',
 };
@@ -295,6 +310,7 @@ async function loadAll(onProgress){
   const bust=new URLSearchParams(location.search).has('nocache')?'?t='+Date.now():'';   // ?nocache re-fetches everything
   const texOf=async src=>{const t=await loader.loadAsync(src);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;t.generateMipmaps=true;t.minFilter=THREE.LinearMipmapLinearFilter;return t;};
   try{const r=await fetch('assets/assets.json');if(r.ok){const j=await r.json();for(const k in j)ASSETS[k]=A+j[k];}}catch(e){}   // code manifest overlay; ASSETS literal is the fallback
+  Sfx.loadBank('assets/sfx.json').catch(e=>console.warn('sfx bank unavailable',e));   // keepers + automation; missing keys warn + no-op
   prog(.05);
   try{const r=await fetch('assets/art/atlas.json'+bust);if(r.ok){const j=await r.json();FRAME=j.frames||{};const pages=j.pages||[];
     await Promise.all(pages.map(async (p,i)=>{try{PAGE_TEX[i]=await texOf('assets/art/'+p+bust);const im=PAGE_TEX[i].image;PAGE_SIZE[i]={w:im.width,h:im.height};}catch(e){console.warn('missing atlas page',p);}}));}}catch(e){console.warn('atlas unavailable, loading loose files',e);}
@@ -341,6 +357,7 @@ camera.position.z=500;
 const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.localClippingEnabled=true;   // pour stream clip window (materials without clippingPlanes are unaffected)
 renderer.setClearColor(0x0f3a46);
 $('game').appendChild(renderer.domElement);
 let view={w:1,h:1,fw:W,fh:H};              // frustum size in design units
@@ -688,11 +705,14 @@ class Grill extends Station{
   accepts(item,slot){return slot&&!slot.item&&((item.kind==='patty'||item.kind==='sausage')&&item.state==='raw'||item.kind==='cheese'&&item.state==='fresh');}
   drop(item,slot){
     if(!this.accepts(item,slot))return false;
+    const had=this.slots.some(s=>s.item&&s.item!==item);   // another item already sizzling here?
     slot.item=item;item.station=this;item.slot=slot;slot.t=0;item.home=null;
     item.g.position.set(slot.x,slot.y+8,0);item.set('cooking');item.setLayer(L.ITEM);   // set() refreshes, which applies the pan pose
+    if(had&&SIZZLE_RESTART_ON_ADD){Loops.stop('grill',{immediate:true});Loops.set('grill',SND.sizzle,true);}   // experimental: a new item on a busy grill restarts the loop from the top
     SFX.sizzle();return true;
   }
-  take(item){const s=item.slot;if(s){s.item=null;s.bar.visible=false;}item.station=null;item.slot=null;item.g.scale.setScalar(1);}
+  take(item){const s=item.slot;if(s){s.item=null;s.bar.visible=false;}item.station=null;item.slot=null;item.g.scale.setScalar(1);
+    if(!this.slots.some(x=>x.item))Loops.stop('grill',{immediate:true});}   // pickup (tap or drag start) of the last item: sizzle cuts at once; a failed drop reattaches and update() restarts it from the top
   update(dt){
     for(const s of this.slots){
       if(!s.item)continue;
@@ -704,6 +724,7 @@ class Grill extends Station{
         if(s.t>=this.burnT){it.set('burnt');s.bar.visible=false;SFX.burn();spawnSmoke(s.x,s.y+40);}}
       else if(it.state==='burnt'){s.smoke-=dt;if(s.smoke<=0){s.smoke=.7;spawnSmoke(s.x+(Math.random()-.5)*30,s.y+40,1);}}
     }
+    Loops.set('grill',SND.sizzle,this.slots.some(s=>s.item));   // sizzle loop, unbroken, while ≥1 item sits on the grill (cooking, cooked, burnt) — until it is picked up
   }
   poseState(st){ // poser: none | raw | cooking | cooked | burnt (patty in every pan), sausage_<state>, or cheese_fresh|cheese_melted
     for(const s of this.slots){if(s.item){s.item.dispose();s.item=null;s.bar.visible=false;}}
@@ -768,15 +789,35 @@ class PlateRack{
 
 /** Soda machine: tap → cup fills → full cup pickable. */
 class SodaMachine extends Station{
-  constructor(x,y,w=220,rot=0){super('soda_machine',x,y,w,{ay:0});this.spr.rotation.z=rot;this.machineK=w/220;this.machineRot=rot;this.cup=null;this.t=0;this.fillT=3;const c=Math.cos(rot),s=Math.sin(rot);this.cupPos={x:x+(-28*c-92*s),y:y+(-28*s+92*c)};/* cup on the grate under the nozzle, hand-posed 2026-09-05, rotated with the machine */this.bar=makeBar(70);this.bar.position.set(this.cupPos.x,this.cupPos.y+62,0);scene.add(this.bar);}
+  static streamTex=null;static streamLoading=false;
+  static ensureStreamTex(){ // dedicated (non-atlas) texture: the pour scrolls offset.y with RepeatWrapping, which atlas frames can't do without bleeding into neighbours
+    if(this.streamTex||this.streamLoading)return;this.streamLoading=true;
+    const bust=new URLSearchParams(location.search).has('nocache')?'?t='+Date.now():'';
+    new THREE.TextureLoader().loadAsync(ASSETS.soda_stream_long+bust).then(t=>{t.colorSpace=THREE.SRGBColorSpace;t.wrapT=THREE.RepeatWrapping;t.wrapS=THREE.ClampToEdgeWrapping;SodaMachine.streamTex=t;}).catch(()=>{});}
+  constructor(x,y,w=220,rot=0){super('soda_machine',x,y,w,{ay:0});this.spr.rotation.z=rot;this.machineK=w/220;this.machineRot=rot;this.cup=null;this.t=0;this.fillT=3;const c=Math.cos(rot),s=Math.sin(rot);this.cupPos={x:x+(-28*c-92*s),y:y+(-28*s+92*c)};/* cup on the grate under the nozzle, hand-posed 2026-09-05, rotated with the machine */this.bar=makeBar(70);this.bar.position.set(this.cupPos.x,this.cupPos.y+62,0);scene.add(this.bar);this.stream=null;this.streamTx=null;SodaMachine.ensureStreamTex();}
+  /** pour = full-strip artwork plane (posed pos/rot, fixed narrowness) seen through a posed clip rect.
+      artwork and clip are independent by design: scaling the clip must never squash the column. */
+  buildStream(){
+    if(this.stream||!SodaMachine.streamTex)return;
+    const k=this.machineK,colW=38*k;
+    const tx=SodaMachine.streamTex;
+    tx.repeat.set(1,1);tx.offset.set(0,0);
+    const m=new THREE.Mesh(planeGeo(.5,.5),new THREE.MeshBasicMaterial({map:tx,transparent:true,depthTest:false,depthWrite:false}));
+    m.renderOrder=L.ITEM+1;
+    m.position.set(this.cupPos.x-15.6,this.cupPos.y+44.9,0);m.rotation.z=0.14;m.scale.set(colW,colW*1056/254,1);   // artwork pose (poser 2026-09-05)
+    const cx=this.cupPos.x-18.6,cy=this.cupPos.y+63.6,hw=24.2/2,hh=45.8/2;   // clip window pose (same session)
+    m.material.clippingPlanes=[new THREE.Plane(new THREE.Vector3(1,0,0),-(cx-hw)),new THREE.Plane(new THREE.Vector3(-1,0,0),cx+hw),new THREE.Plane(new THREE.Vector3(0,1,0),-(cy-hh)),new THREE.Plane(new THREE.Vector3(0,-1,0),cy+hh)];
+    m.userData.key='soda_stream_long';m.userData.editName='SodaMachine.stream';
+    scene.add(m);this.stream=m;this.streamTx=tx;
+  }
   onTap(){if(selected||this.cup)return false;this.cup=new Item('cup','empty',this.cupPos.x,this.cupPos.y);this.cup.station=this;this.cup.refresh();this.t=0;SFX.pop();return true;}   // hands full: refuse so the held item falls through to deselect (same cleanup as a failed drop)
   poseState(st){ // poser: none | empty | filling | full
     if(this.cup){this.cup.dispose();this.cup=null;this.bar.visible=false;}
     if(st==='none'||!st)return;
     this.onTap();if(st==='filling'){this.t=this.fillT*.5;this.update(0);}else if(st==='full'){this.cup.set('full');this.bar.visible=false;}}
-  take(item){if(item===this.cup){this.cup=null;this.bar.visible=false;}item.station=null;}
-  update(dt){if(this.cup&&this.cup.state==='empty'){this.t+=dt;this.bar.visible=true;this.bar.set(this.t/this.fillT,0x60a5fa);if(this.t>=this.fillT){this.cup.set('full');this.bar.visible=false;SFX.ding();}}}
-  dispose(){super.dispose();removeObj(this.bar);this.cup&&this.cup.dispose();}
+  take(item){if(item===this.cup){this.cup=null;this.bar.visible=false;}item.station=null;if(this.stream)this.stream.visible=false;}
+  update(dt){if(this.cup&&this.cup.state==='empty'){this.t+=dt;this.buildStream();if(this.stream){this.stream.visible=true;this.streamTx.offset.y=(this.streamTx.offset.y+dt*1.1)%1;}this.bar.visible=true;this.bar.set(this.t/this.fillT,0x60a5fa);if(this.t>=this.fillT){this.cup.set('full');this.bar.visible=false;if(this.stream)this.stream.visible=false;SFX.ding();}}}
+  dispose(){super.dispose();removeObj(this.bar);if(this.stream){removeObj(this.stream);this.stream.material.dispose();this.stream=null;}this.cup&&this.cup.dispose();}
 }
 /** Fryer: raw pile in (basket lowers) → cooked pile out (basket raises); pile must be cartoned before serving (no burn). Tap the fries tray then the fryer, or tap the fryer directly. */
 class Fryer extends Station{
@@ -846,6 +887,8 @@ class Customer{
   }
   dispose(){removeI(this.i);this.p.dispose();removeObj(this.bub);}
 }
+/* tip spawn zones, posed as rect1-4 in the Layout studio 2026-09-05 (one per customer slot) */
+const TIP_ZONES=[[-523.5,79.2,-413.6,120.8],[-252.2,74.2,-94.1,109.1],[97.3,80.8,293.7,114.1],[450.1,74.2,603.3,109.1]];
 function spawnAngry(x,y){const s=sprite('hud_angry',{w:60,layer:L.FX,x,y});s.material.opacity=0;scene.add(s);tw(s.material,{opacity:1},.15);tw(s.position,{y:y+30},.9,easeOut,()=>{tw(s.material,{opacity:0},.3,easeOut,()=>removeObj(s));});}
 
 /* ---------- coin piles (tips), coin burst, smoke ---------- */
@@ -924,7 +967,7 @@ function serveCustomer(c,it){
   const base=DISH[c.dish].base,p=clamp(c.patience,0,1);
   const coins=Math.round(base*(.6+p*.6));
   G.addCoins(coins,c.p.g.position.x,CUST_Y+200,{fly:true});
-  if(p>.5)new CoinPile(c.p.g.position.x+40,COUNTER_Y-120,Math.round(base*.4));
+  if(p>.5){const z=TIP_ZONES[c.slot]||TIP_ZONES[0];new CoinPile(z[0]+Math.random()*(z[2]-z[0]),z[1]+Math.random()*(z[3]-z[1]),Math.round(base*.4));}
   SFX.serve();G.onServed&&G.onServed(c);
 }
 const ndcTmp={x:0,y:0};
@@ -932,6 +975,7 @@ let pDown=null;
 function onDown(e){
   if(e.button===1)return;   // middle button pans the poser
   if(e.target.closest&&e.target.closest('button,.overlay,.panel,#story,#hud .r,#dbgPanel,#dbgToggle,#edtool'))return;
+  if(Editor.tool==='rect'){Editor.onDown(e);return;}
   if(Layout.active){Layout.onDown(e);return;}
   if(Editor.tool){Editor.onDown(e);return;}
   if(e.cancelable)e.preventDefault();
@@ -943,6 +987,7 @@ function onDown(e){
   renderer.domElement.setPointerCapture&&renderer.domElement.setPointerCapture(e.pointerId);
 }
 function onMove(e){
+  if(Editor.tool==='rect'){Editor.onMove(e);return;}
   if(Layout.active){Layout.onMove(e);return;}
   if(Editor.tool){Editor.onMove(e);return;}
   if(!pDown)return;
@@ -962,6 +1007,7 @@ function onMove(e){
   if(drag){drag.it.g.position.set(p.x+drag.ox,p.y+drag.oy+30,0);}
 }
 function onUp(e){
+  if(Editor.tool==='rect'){Editor.onUp(e);return;}
   if(Layout.active){Layout.onUp(e);return;}
   if(Editor.tool){Editor.onUp(e);return;}
   if(!pDown)return;
@@ -1248,7 +1294,7 @@ page('Scene','The background plate is one image edited from the reference screen
 window.__cook={toDesign:(cx,cy)=>clientToDesign(cx,cy),toClient:(x,y)=>designToClient(x,y),hoverAt(x,y){const c=designToClient(x,y);renderer.domElement.dispatchEvent(new PointerEvent('pointermove',{clientX:c.x,clientY:c.y,pointerId:1,bubbles:true}));},hit(x,y){const h=hitTest(x,y);return h&&(h.owner.constructor.name+(h.owner.kind?':'+h.owner.kind:''));},tapAt(x,y){const c=designToClient(x,y);const cv=renderer.domElement;const ev=t=>new PointerEvent(t,{clientX:c.x,clientY:c.y,pointerId:1,bubbles:true,cancelable:true});cv.dispatchEvent(ev('pointerdown'));cv.dispatchEvent(ev('pointerup'));},
   dragTo(x0,y0,x1,y1){const a=designToClient(x0,y0),b=designToClient(x1,y1);const cv=renderer.domElement;const ev=(t,p)=>new PointerEvent(t,{clientX:p.x,clientY:p.y,pointerId:1,bubbles:true,cancelable:true});cv.dispatchEvent(ev('pointerdown',a));for(let i=1;i<=6;i++)cv.dispatchEvent(ev('pointermove',{x:lerp(a.x,b.x,i/6),y:lerp(a.y,b.y,i/6)}));cv.dispatchEvent(ev('pointerup',b));},
   state(){return {mode:G.mode,sel:selected&&selected.kind+':'+selected.state,items:scene.children.length,customers:customers.map(c=>c.state+':'+c.dish+':'+c.patience.toFixed(2)),stations:stations.map(s=>s.constructor.name+(s.slots?':'+s.slots.map(x=>x.item?x.item.kind+'/'+x.item.state:(x.item===null&&x.pan?'-':'plate['+(x.item&&x.item.stack||[]).join('+')+']')).join(','):'')),coins:G.coins,served:G.served};},
-  G,scene,customers,stations};
+  G,scene,customers,stations,sfx:Sfx,loops:Loops};
 /* ======================================================================
    main loop + time-travel debug harness (ported from cook.html / museum harness.js)
    ====================================================================== */
@@ -1270,7 +1316,7 @@ function tick(dt){
   else if(G.mode==='pose'){updateWorld(dt);for(const o of poseTicks)o.update(dt);}
 }
 function render(){renderer.render(scene,camera);}
-function frame(){const dt=Time.advance();if(dt>0)tick(dt);render();requestAnimationFrame(frame);}
+function frame(){const dt=Time.advance();if(dt>0)tick(dt);Loops.sweep();render();requestAnimationFrame(frame);}
 
 /* ---------- poser: isolate one object on a studio backdrop ---------- */
 function backdropTexture(kind,opts={}){
@@ -1309,7 +1355,8 @@ const Pose={
       if(st.poseState)st.poseState(b);           // e.g. station:sodamachine:full (bars set their own visibility)
       const show=n=>{n.visible=true;n.traverse&&n.traverse(k=>k.visible=true);};
       if(st.spr)show(st.spr);if(st.slots)for(const sl of st.slots){sl.pan&&show(sl.pan);sl.item&&show(sl.item.g);}
-      if(st.cup)show(st.cup.g);if(st.item)show(st.item.g);if(st.decor)st.decor.forEach(show);
+      if(st.cup)show(st.cup.g);if(st.buildStream){const tryShow=()=>{st.buildStream();if(st.stream){show(st.stream);st.stream.visible=true;render();}else setTimeout(tryShow,200);};tryShow();}   // pour effect, forced visible for posing
+      if(st.item)show(st.item.g);if(st.decor)st.decor.forEach(show);
       o=st;o.root=st.spr||st.slots[0].item.g;}
     else{const key=type==='key'?a:spec;const sp=sprite(key,{w:400,layer:L.ITEM});scene.add(sp);o={root:sp};}
     this.obj=o;this.zoom=zoom;this.pan={x:0,y:0};this.frame();render();
@@ -1475,7 +1522,7 @@ const Layout={
     this.groups=[];
     const add=(name,list,hint)=>this.groups.push({name,list,hint});
     const soda=stations.find(s=>s.constructor.name==='SodaMachine');
-    if(soda)add('Soda machine',()=>[soda.spr,...(soda.cup?[soda.cup.g]:[]),soda.bar].filter(Boolean),'paste into buildKitchen()');
+    if(soda)add('Soda machine',()=>[soda.spr,...(soda.cup?[soda.cup.g]:[]),...(soda.stream?[soda.stream]:[]),soda.bar].filter(Boolean),'paste into buildKitchen()');
     const trash=stations.find(s=>s.constructor.name==='Trash');
     if(trash)add('Trash can',()=>[trash.spr],'paste into buildKitchen()');
     const tray=(kind,label)=>{const t=stations.find(s=>s.constructor.name==='Tray'&&s.kind===kind);if(t)add(label,()=>[t.spr,...t.decor],'paste into buildKitchen()');};
@@ -1569,8 +1616,16 @@ page('Layout','Full countertop in the poser: every station, plate, customer and 
   Layout.activate(body);
 });
 /* ---------- edit tools: move / scale / rotate any sprite (debug) ---------- */
+function rectLabel(txt,leftX,topY,size=22){ // zone tag: left-anchored immediately above the rect
+  const cv=document.createElement('canvas');const g=cv.getContext('2d');const font=`700 ${size*2}px Fredoka, sans-serif`;g.font=font;const w=Math.ceil(g.measureText(txt).width)+28;cv.width=w;cv.height=size*2+20;g.font=font;g.textBaseline='middle';g.textAlign='left';g.lineWidth=8;g.strokeStyle='rgba(0,0,0,.6)';g.strokeText(txt,14,cv.height/2);g.fillStyle='#7db4ff';g.fillText(txt,14,cv.height/2);
+  const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;
+  const m=new THREE.Mesh(planeGeo(0,.5),new THREE.MeshBasicMaterial({map:t,transparent:true,depthTest:false,depthWrite:false}));
+  m.renderOrder=L.FX+8;m.scale.set(cv.width/2,cv.height/2,1);m.position.set(leftX,topY+m.scale.y/2,0);
+  m.userData.key='label';m.userData.editName="Rect:'"+txt+"'";scene.add(m);return m;
+}
+function rectLabelPlace(m,leftX,topY){m.position.set(leftX,topY+m.scale.y/2,0);}
 const Editor={
-  tool:'',hover:null,sel:null,drag:null,edits:[],
+  tool:'',hover:null,sel:null,drag:null,edits:[],rectN:0,rects:[],rectDrag:null,
   setTool(t){this.tool=t||'';document.querySelectorAll('#edtool button').forEach(b=>{const on=b.dataset.tool===this.tool;b.classList.toggle('on',on);b.querySelector('img').src=iconURL('tool_'+b.dataset.icon+(on?'_on':'_off'),88);});
     document.body.classList.remove('ed-move','ed-scale','ed-rotate');if(this.tool)document.body.classList.add('ed-'+this.tool);if(!this.tool)this.setHover(null);},
   /** smallest visible sprite under the design point (so parts inside composites win over their parents) */
@@ -1598,13 +1653,41 @@ const Editor={
     return {kind:'sprite',x:+o.position.x.toFixed(1),y:+o.position.y.toFixed(1),w:+Math.abs(o.scale.x).toFixed(1),h:+o.scale.y.toFixed(1),rot:+o.rotation.z.toFixed(3)};
   },
   describe(o){const v=this.values(o);return v.kind==='puppetPart'?`x ${v.x} y ${v.y} sx ${v.sx} rot ${v.rot} (head-w units)`:v.kind==='headGroup'?`headY ${v.headY} dx ${v.dx} scale ${v.scale} rot ${v.rot}`:`x ${v.x} y ${v.y} w ${v.w} h ${v.h} rot ${v.rot}`;},
-  onDown(e){if(e.button===1)return;const p=clientToDesign(e.clientX,e.clientY);const o=this.pick(p.x,p.y);if(!o||this.tool==='log')return;
+  rectDown(e){if(this.rectDrag)this.rectUp();
+    const p=clientToDesign(e.clientX,e.clientY);
+    const n=(this.rectN||0)+1;this.rectN=n;
+    const fill=new THREE.Mesh(planeGeo(.5,.5),new THREE.MeshBasicMaterial({color:0x3a86ff,transparent:true,opacity:.15,depthTest:false,depthWrite:false}));fill.renderOrder=L.FX+6;
+    const sq=[new THREE.Vector3(-.5,-.5,0),new THREE.Vector3(.5,-.5,0),new THREE.Vector3(.5,.5,0),new THREE.Vector3(-.5,.5,0)];
+    const border=new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(sq),new THREE.LineBasicMaterial({color:0x3a86ff,depthTest:false,transparent:true}));border.renderOrder=L.FX+7;
+    const g=new THREE.Group();g.add(fill,border);g.position.set(p.x,p.y,0);scene.add(g);
+    const label=rectLabel('rect'+n,p.x,p.y);
+    this.rectDrag={name:'rect'+n,x0:p.x,y0:p.y,g,fill,border,label};
+    this.box(null);
+    renderer.domElement.setPointerCapture&&renderer.domElement.setPointerCapture(e.pointerId);},
+  rectMove(e){const d=this.rectDrag;if(!d)return;
+    const p=clientToDesign(e.clientX,e.clientY);
+    const cx=(d.x0+p.x)/2,cy=(d.y0+p.y)/2,w=Math.abs(p.x-d.x0),h=Math.abs(p.y-d.y0);
+    d.g.position.set(cx,cy,0);d.fill.scale.set(Math.max(w,.001),Math.max(h,.001),1);d.border.scale.copy(d.fill.scale);
+    rectLabelPlace(d.label,cx-w/2,cy+h/2+6);
+    render();},
+  rectUp(){const d=this.rectDrag;if(!d)return;this.rectDrag=null;
+    const w=Math.abs(d.fill.scale.x),h=Math.abs(d.fill.scale.y);
+    if(w<8||h<8){scene.remove(d.g);scene.remove(d.label);return;}   // click without drag: discard
+    const cx=d.g.position.x,cy=d.g.position.y;
+    const entry={name:d.name,tool:'rect',x0:+(cx-w/2).toFixed(1),y0:+(cy-h/2).toFixed(1),x1:+(cx+w/2).toFixed(1),y1:+(cy+h/2).toFixed(1),cx:+cx.toFixed(1),cy:+cy.toFixed(1),w:+w.toFixed(1),h:+h.toFixed(1)};
+    this.rects.push({name:d.name,g:d.g,label:d.label,bounds:entry});
+    this.edits.push(entry);
+    console.debug('[rect]',d.name,entry);
+    if(Layout.active)Layout.log('[rect] '+d.name+' '+JSON.stringify({x0:entry.x0,y0:entry.y0,x1:entry.x1,y1:entry.y1}));
+    this.box(null);},
+  onDown(e){if(e.button===1)return;if(this.tool==='rect'){this.rectDown(e);return;}const p=clientToDesign(e.clientX,e.clientY);const o=this.pick(p.x,p.y);if(!o||this.tool==='log')return;
     this.sel=o;const v=this.values(o);const isHead=o.userData.part==='headF'||o.userData.part==='headS';
     this.drag={o,start:p,x0:e.clientX,y0:e.clientY,before:v,pos:o.position.clone(),scale:o.scale.clone(),rot:o.rotation.z,
       off:JSON.parse(JSON.stringify((o.userData.puppet&&(isHead?o.userData.puppet.editOff.headG:o.userData.puppet.editOff[o.userData.part]))||{}))};
     this.box(o,true);renderer.domElement.setPointerCapture&&renderer.domElement.setPointerCapture(e.pointerId);},
   onMove(e){
     if(midPan)return;
+    if(this.tool==='rect'){this.rectMove(e);return;}
     const p=clientToDesign(e.clientX,e.clientY);
     if(!this.drag){const o=this.pick(p.x,p.y);if(o!==this.hover)this.setHover(o);return;}
     const d=this.drag,o=d.o,pu=o.userData.puppet;
@@ -1637,6 +1720,7 @@ const Editor={
     this.box(o,true);render();
   },
   onUp(e){
+    if(this.tool==='rect'){this.rectUp();return;}
     const d=this.drag;if(!d)return;this.drag=null;
     const after=this.values(d.o);const name=this.name(d.o);
     const entry={name,tool:this.tool,before:d.before,after,t:+Time.T.toFixed(2)};
@@ -1650,7 +1734,7 @@ const Editor={
   dump(){const out=this.edits.map(e=>({name:e.name,tool:e.tool,before:e.before,after:e.after}));console.debug('[edits] '+out.length+' edits\n'+JSON.stringify(out,null,1));return out;},
 };
 document.querySelectorAll('#edtool button').forEach(b=>b.onclick=()=>{const t=b.dataset.tool;if(t==='log'){Editor.dump();return;}Editor.setTool(Editor.tool===t?'':t);});
-addEventListener('keydown',e=>{if(e.target.matches('input,textarea,select'))return;if(e.key==='m')Editor.setTool('move');if(e.key==='s')Editor.setTool('scale');if(e.key==='r')Editor.setTool('rotate');if(e.key==='Escape')Editor.setTool('');});
+addEventListener('keydown',e=>{if(e.target.matches('input,textarea,select'))return;if(e.key==='m')Editor.setTool('move');if(e.key==='s')Editor.setTool('scale');if(e.key==='r')Editor.setTool('rotate');if(e.key==='t')Editor.setTool('rect');if(e.key==='Escape')Editor.setTool('');});
 renderer.domElement.addEventListener('pointerleave',()=>{if(!Editor.drag)Editor.setHover(null);});
 // poser camera: mouse wheel zooms about the cursor, middle-button drag pans
 renderer.domElement.addEventListener('wheel',e=>{
@@ -1671,12 +1755,12 @@ const endMid=e=>{if(midPan&&(e.button===1||e.type==='pointercancel'))midPan=null
 renderer.domElement.addEventListener('pointerup',endMid,{capture:true});renderer.domElement.addEventListener('pointercancel',endMid,{capture:true});
 renderer.domElement.addEventListener('auxclick',e=>{if(e.button===1)e.preventDefault();});
 window.__cook.edit=Editor;window.__cook.edits=Editor.edits;
-const DBG_HELP=`__cook.edit — edit tools (debug toolbar on the left: ▲ pointer, ✥ move, ⤢ scale, ⟳ rotate, 📋 dump)
+const DBG_HELP=`__cook.edit — edit tools (debug toolbar on the left: ▲ pointer, ✥ move, ⤢ scale, ⟳ rotate, ▭ rect, 📋 dump)
   hover highlights the smallest sprite under the cursor (parts inside composites are pickable); drag to edit.
   every drag logs console.debug('[edit]', name, before, after); __cook.edit.dump() prints all edits as JSON.
   puppet face parts log offsets in head-width units (paste into POSE / CHAR); dragging the head texture moves the
   whole head group and logs headY; everything else logs design px.
-  keys: m / s / r select a tool, Esc = pointer.
+  keys: m / s / r / t select a tool, Esc = pointer. rect tool: drag a trigger zone; logs rectN + bounds.
 __cook.dbg — time travel
   dbg.freeze() / dbg.unfreeze() / dbg.toggle()   stop the sim (render keeps going)
   dbg.step(n=1)        advance n frames of 1/60 s, then render

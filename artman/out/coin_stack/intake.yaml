@@ -1,0 +1,10 @@
+id: coin_stack
+date: 2026-09-05
+game_keys:
+  coin_stack: coin_stack.png
+seed: 50101
+copy_as: |
+  cp artman/out/coin_stack/coin_stack.png assets/art/coin_stack/coin_stack.png
+assets_snippet: |
+  coin_stack: A+'art/coin_stack/coin_stack.png',
+pose_verify: "cook2.html?pose=key:coin_stack&bg=grid&zoom=2&freeze=1&nocache"

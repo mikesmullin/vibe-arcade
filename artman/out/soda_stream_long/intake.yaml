@@ -1,0 +1,13 @@
+id: soda_stream_long
+date: 2026-09-05
+game_keys:
+  soda_stream_long: soda_stream_long.png
+seed: 44111
+bg: solid bright green
+cutout: key
+copy_as: |
+  cp artman/out/soda_stream_long/soda_stream_long.png assets/art/soda_stream_long/soda_stream_long.png
+assets_snippet: |
+  soda_stream_long: A+'art/soda_stream_long/soda_stream_long.png',
+pose_verify: "cook2.html?pose=key:soda_stream_long&bg=grid&zoom=2&freeze=1&nocache"
+notes: 254x1056 vertically TILEABLE clip-and-scroll strip (replaces the 2-frame loop idea). klein kept growing a foam cap + rounded tail, so the final is built deterministically: crop render rows 140..1336 (pure body), then a 140-row cross-dissolve of the tail into the head (loop ends match exactly, verified by stacking two copies: scratch/seam_check.png shows no edge). Scroll along Y through a clipped window and wrap modulo height for a perfect pour loop

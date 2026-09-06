@@ -1,0 +1,10 @@
+id: hud_coins
+date: 2026-09-05
+game_keys:
+  hud_coins: hud_coins.png
+seed: 50301
+copy_as: |
+  cp artman/out/hud_coins/hud_coins.png assets/art/hud_coins/hud_coins.png
+assets_snippet: |
+  hud_coins: A+'art/hud_coins/hud_coins.png',
+pose_verify: "cook2.html?pose=key:hud_coins&bg=grid&zoom=2&freeze=1&nocache"

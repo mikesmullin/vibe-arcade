@@ -1,0 +1,15 @@
+id: tool_move
+date: 2026-09-05
+game_keys:
+  tool_move_off: tool_move_off.png
+  tool_move_on: tool_move_on.png
+seed: 61102
+bg: solid bright green
+cutout: key
+copy_as: |
+  cp artman/out/tool_move/tool_move_off.png assets/art/tool_move/tool_move_off.png
+  cp artman/out/tool_move/tool_move_on.png assets/art/tool_move/tool_move_on.png
+assets_snippet: |
+  tool_move_off: A+'art/tool_move/tool_move_off.png',
+  tool_move_on: A+'art/tool_move/tool_move_on.png',
+pose_verify: "cook2.html?pose=key:tool_move_off&bg=grid&zoom=2&freeze=1&nocache"

@@ -1,0 +1,16 @@
+id: soda_stream
+date: 2026-09-05
+game_keys:
+  soda_stream_flow1: soda_stream_flow1.png
+  soda_stream_flow2: soda_stream_flow2.png
+seed: 44101
+bg: solid bright green
+cutout: key
+copy_as: |
+  cp artman/out/soda_stream/soda_stream_flow1.png assets/art/soda_stream/soda_stream_flow1.png
+  cp artman/out/soda_stream/soda_stream_flow2.png assets/art/soda_stream/soda_stream_flow2.png
+assets_snippet: |
+  soda_stream_flow1: A+'art/soda_stream/soda_stream_flow1.png',
+  soda_stream_flow2: A+'art/soda_stream/soda_stream_flow2.png',
+pose_verify: "cook2.html?pose=key:soda_stream_flow1&bg=grid&zoom=2&freeze=1&nocache"
+notes: 2-frame pour loop shown above the cup while filling. Chain-edit pair so both frames share column position/width and only the wobble side + foam swap. Orange matches cup_full; first flow2 had detached blobs, regenerated with an attached-foam guard

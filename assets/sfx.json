@@ -1,0 +1,28 @@
+{
+ "sfx_patty_sizzle_loop_v03": {
+  "automation": "sfx/sfx_patty_sizzle_loop/automation.yaml",
+  "gainDb": -18.5,
+  "layers": {
+   "body": {
+    "attackMs": 2410,
+    "decayMs": 2690,
+    "holdMs": 130,
+    "peakDb": -13,
+    "releaseMs": 820,
+    "sustainDb": -7
+   },
+   "hit": {
+    "attackMs": 268,
+    "decayMs": 2420,
+    "holdMs": 680,
+    "peakDb": 0,
+    "releaseMs": 420,
+    "sustainDb": -34.5
+   }
+  },
+  "loop": true,
+  "mp3": "sfx/sfx_patty_sizzle_loop/sfx_patty_sizzle_loop_v03.mp3",
+  "take": 3,
+  "wav": "sfx/sfx_patty_sizzle_loop/sfx_patty_sizzle_loop_v03.wav"
+ }
+}

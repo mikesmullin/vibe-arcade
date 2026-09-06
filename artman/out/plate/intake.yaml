@@ -1,0 +1,12 @@
+id: plate
+date: 2026-09-05
+game_keys:
+  plate: plate.png
+seed: 42701
+bg: solid bright green
+cutout: key
+copy_as: |
+  cp artman/out/plate/plate.png assets/art/plate/plate.png
+assets_snippet: |
+  plate: A+'art/plate/plate.png',
+pose_verify: "cook2.html?pose=key:plate&bg=grid&zoom=2&freeze=1&nocache"

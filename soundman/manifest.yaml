@@ -1,0 +1,44 @@
+# soundman manifest: list in, wavs out.  Run: python3 run.py [asset ids]
+project: diner_sfx
+out: out
+engine: stable_audio_3_small_sfx   # target diffusion engine; backend renders today
+sample_rate: 48000
+channels: 1                        # mono one-shots and loops
+
+post:
+  highpass: 80        # Hz, everything
+  fade_out_ms: 12     # one-shots only; loops use the crossfade splice instead
+  peak_db: -1.0       # peak-normalize keepers; in-game gain per bus (code side)
+  loop_xfade: 0.5     # seconds folded tail-into-head for seamless loops
+
+backend: synth   # synth (numpy, works today) | comfy (Stable Audio via ComfyUI — needs model install)
+
+assets:
+  - id: sfx_patty_sizzle_loop
+    prompt: "close-up hamburger patty sizzling on grill, steady grease crackle, no speech, no music"
+    seconds: 6
+    loop: true
+    variations: 3
+    seed: 61001
+    synth: {recipe: sizzle}
+
+  - id: sfx_patty_drop
+    prompt: "single raw burger patty dropped onto a hot flat-top grill, short meat slap then grease hiss, no music, close mic"
+    seconds: 0.7
+    variations: 6
+    seed: 61011
+    synth: {recipe: drop}
+
+  - id: sfx_patty_burn
+    prompt: "burger patty burning, harsh crackle and smoke hiss, short, no alarm, no music"
+    seconds: 1.0
+    variations: 4
+    seed: 61021
+    synth: {recipe: burn}
+
+  - id: sfx_ui_coin
+    prompt: "bright cartoon coin collect chime, short, clean, no reverb tail mess"
+    seconds: 0.35
+    variations: 4
+    seed: 61031
+    synth: {recipe: coin}

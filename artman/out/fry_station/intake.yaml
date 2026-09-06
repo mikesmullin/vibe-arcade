@@ -1,0 +1,16 @@
+id: fry_station
+date: 2026-09-05
+game_keys:
+  fry_station_raised: fry_station_raised.png
+  fry_station_lowered: fry_station_lowered.png
+seed: 43802
+bg: solid bright green
+cutout: key
+copy_as: |
+  cp artman/out/fry_station/fry_station_raised.png assets/art/fry_station/fry_station_raised.png
+  cp artman/out/fry_station/fry_station_lowered.png assets/art/fry_station/fry_station_lowered.png
+assets_snippet: |
+  fry_station_raised: A+'art/fry_station/fry_station_raised.png',
+  fry_station_lowered: A+'art/fry_station/fry_station_lowered.png',
+pose_verify: "cook2.html?pose=key:fry_station_lowered&bg=grid&zoom=2&freeze=1&nocache"
+notes: one-basket single-vat redesign; chain-edit pair so both states share the unit. Seed 43801's lowered blew the oil out of the vat (kept in git-ignored scratch/explore_fry only)

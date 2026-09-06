@@ -1,0 +1,408 @@
+bun_bottom:
+  date: '2026-09-05'
+  files:
+  - bun_bottom.png
+  keys:
+  - bun_bottom
+bun_top:
+  date: '2026-09-05'
+  files:
+  - bun_top.png
+  keys:
+  - bun_top
+bun_whole:
+  date: '2026-09-05'
+  files:
+  - bun_whole.png
+  keys:
+  - bun_whole
+cheese_slices:
+  date: '2026-09-05'
+  files:
+  - cheese_slices_fresh.png
+  - cheese_slices_melted.png
+  - cheese_slices_burnt.png
+  keys:
+  - cheese_fresh
+  - cheese_melted
+  - cheese_burnt
+cheese_slice:
+  date: '2026-09-05'
+  files:
+  - cheese_slice.png
+  keys:
+  - cheese
+coffee_mug:
+  date: '2026-09-05'
+  files:
+  - coffee_mug_empty.png
+  - coffee_mug_full.png
+  keys:
+  - mug_empty
+  - mug_full
+coin:
+  date: '2026-09-05'
+  files:
+  - coin.png
+  keys:
+  - coin
+coin_stack:
+  date: '2026-09-05'
+  files:
+  - coin_stack.png
+  keys:
+  - coin_stack
+cup:
+  date: '2026-09-05'
+  files:
+  - cup_empty.png
+  - cup_full.png
+  keys:
+  - cup_empty
+  - cup_full
+cust_man_body:
+  date: '2026-09-05'
+  files:
+  - cust_man_body_front.png
+  - cust_man_body_side.png
+  keys:
+  - man_body_front
+  - man_body_side
+cust_man_ear:
+  date: '2026-09-05'
+  files:
+  - cust_man_ear.png
+  keys:
+  - man_ear
+cust_man_head:
+  date: '2026-09-05'
+  files:
+  - cust_man_head_front.png
+  - cust_man_head_side.png
+  keys:
+  - man_head_front
+  - man_head_side
+cust_man_nose:
+  date: '2026-09-05'
+  files:
+  - cust_man_nose.png
+  keys:
+  - man_nose
+cust_woman_body:
+  date: '2026-09-05'
+  files:
+  - cust_woman_body_front.png
+  - cust_woman_body_side.png
+  keys:
+  - woman_body_front
+  - woman_body_side
+cust_woman_ear:
+  date: '2026-09-05'
+  files:
+  - cust_woman_ear.png
+  keys:
+  - woman_ear
+cust_woman_head:
+  date: '2026-09-05'
+  files:
+  - cust_woman_head_front.png
+  - cust_woman_head_side.png
+  keys:
+  - woman_head_front
+  - woman_head_side
+cust_woman_nose:
+  date: '2026-09-05'
+  files:
+  - cust_woman_nose.png
+  keys:
+  - woman_nose
+draft_cust_man_body:
+  files:
+  - cust_man_body_front.png
+  - cust_man_body_side.png
+  status: internal (edit-pass source, not game art)
+draft_cust_man_head:
+  files:
+  - cust_man_head_front.png
+  - cust_man_head_side.png
+  status: internal (edit-pass source, not game art)
+draft_cust_woman_body:
+  files:
+  - cust_woman_body_front.png
+  - cust_woman_body_side.png
+  status: internal (edit-pass source, not game art)
+draft_cust_woman_head:
+  files:
+  - cust_woman_head_front.png
+  - cust_woman_head_side.png
+  status: internal (edit-pass source, not game art)
+face_brow:
+  date: '2026-09-05'
+  files:
+  - face_brow.png
+  keys:
+  - brow
+face_eye:
+  date: '2026-09-05'
+  files:
+  - face_eye_closed.png
+  - face_eye_open.png
+  keys:
+  - eye_closed
+  - eye_open
+face_mouth:
+  date: '2026-09-05'
+  files:
+  - face_mouth_frown.png
+  - face_mouth_neutral.png
+  - face_mouth_open.png
+  - face_mouth_smile.png
+  keys:
+  - mouth_frown
+  - mouth_neutral
+  - mouth_open
+  - mouth_smile
+fries:
+  date: '2026-09-05'
+  files:
+  - fries.png
+  - fries_cooked.png
+  - fries_raw.png
+  keys:
+  - fries_cooked
+  - fries_raw
+  superseded_by_fries_pile: fries_raw.png (raw-in-carton retired; use fries_pile_raw instead). fries_cooked.png stays as the cartoned/plated keeper.
+fryer:
+  date: '2026-09-05'
+  files:
+  - fryer.png
+  keys:
+  - fryer
+fries_pile:
+  date: '2026-09-05'
+  files:
+  - fries_pile_raw.png
+  - fries_pile_cooked.png
+  keys:
+  - fries_pile_raw
+  - fries_pile_cooked
+fry_carton_empty:
+  date: '2026-09-05'
+  files:
+  - fry_carton_empty.png
+  keys:
+  - carton_empty
+fry_station:
+  date: '2026-09-05'
+  files:
+  - fry_station_raised.png
+  - fry_station_lowered.png
+  keys:
+  - fry_station_raised
+  - fry_station_lowered
+frying_pan:
+  date: '2026-09-05'
+  files:
+  - frying_pan.png
+  keys:
+  - pan
+grill:
+  date: '2026-09-05'
+  files:
+  - grill.png
+  keys:
+  - grill
+hotdog_bun:
+  date: '2026-09-05'
+  files:
+  - hotdog_bun_empty.png
+  - hotdog_bun_assembled.png
+  keys:
+  - hotdog_bun
+  - hotdog
+hud_angry:
+  date: '2026-09-05'
+  files:
+  - hud_angry.png
+  keys:
+  - hud_angry
+hud_clock:
+  date: '2026-09-05'
+  files:
+  - hud_clock.png
+  keys:
+  - hud_clock
+hud_coins:
+  date: '2026-09-05'
+  files:
+  - hud_coins.png
+  keys:
+  - hud_coins
+hud_customer:
+  date: '2026-09-05'
+  files:
+  - hud_customer.png
+  keys:
+  - hud_customer
+hud_heart:
+  date: '2026-09-05'
+  files:
+  - hud_heart.png
+  keys:
+  - hud_heart
+hud_lock:
+  date: '2026-09-05'
+  files:
+  - hud_lock.png
+  keys:
+  - hud_lock
+hud_star:
+  date: '2026-09-05'
+  files:
+  - hud_star_off.png
+  - hud_star_on.png
+  keys:
+  - hud_star_off
+  - hud_star_on
+hud_xp:
+  date: '2026-09-05'
+  files:
+  - hud_xp.png
+  keys:
+  - hud_xp
+ketchup_bottle:
+  date: '2026-09-05'
+  files:
+  - ketchup_bottle.png
+  keys:
+  - ketchup
+napkin_dispenser:
+  date: '2026-09-05'
+  files:
+  - napkin_dispenser.png
+  keys:
+  - napkins
+patty:
+  date: '2026-09-05'
+  files:
+  - patty_burnt.png
+  - patty_cooked.png
+  - patty_cooking.png
+  - patty_raw.png
+  keys:
+  - patty_burnt
+  - patty_cooked
+  - patty_cooking
+  - patty_raw
+plate:
+  date: '2026-09-05'
+  files:
+  - plate.png
+  keys:
+  - plate
+prep_tray:
+  date: '2026-09-05'
+  files:
+  - prep_tray.png
+  keys:
+  - prep_tray
+sausage:
+  date: '2026-09-05'
+  files:
+  - sausage_burnt.png
+  - sausage_cooked.png
+  - sausage_cooking.png
+  - sausage_raw.png
+  keys:
+  - sausage_burnt
+  - sausage_cooked
+  - sausage_cooking
+  - sausage_raw
+scene_diner:
+  date: '2026-09-05'
+  files:
+  - scene_diner.png
+  keys:
+  - scene
+soda_machine:
+  date: '2026-09-05'
+  files:
+  - soda_machine.png
+  keys:
+  - soda_machine
+soda_stream:
+  date: '2026-09-05'
+  files:
+  - soda_stream_flow1.png
+  - soda_stream_flow2.png
+  keys:
+  - soda_stream_flow1
+  - soda_stream_flow2
+soda_stream_long:
+  date: '2026-09-05'
+  files:
+  - soda_stream_long.png
+  keys:
+  - soda_stream_long
+speech_bubble:
+  date: '2026-09-05'
+  files:
+  - speech_bubble.png
+  keys:
+  - bubble
+tool_log:
+  date: '2026-09-05'
+  files:
+  - tool_log_off.png
+  - tool_log_on.png
+  keys:
+  - tool_log_off
+  - tool_log_on
+tool_move:
+  date: '2026-09-05'
+  files:
+  - tool_move_off.png
+  - tool_move_on.png
+  keys:
+  - tool_move_off
+  - tool_move_on
+tool_pointer:
+  date: '2026-09-05'
+  files:
+  - tool_pointer_off.png
+  - tool_pointer_on.png
+  keys:
+  - tool_pointer_off
+  - tool_pointer_on
+tool_rotate:
+  date: '2026-09-05'
+  files:
+  - tool_rotate_off.png
+  - tool_rotate_on.png
+  keys:
+  - tool_rotate_off
+  - tool_rotate_on
+tool_scale:
+  date: '2026-09-05'
+  files:
+  - tool_scale_off.png
+  - tool_scale_on.png
+  keys:
+  - tool_scale_off
+  - tool_scale_on
+tool_rect:
+  date: '2026-09-05'
+  files:
+  - tool_rect_off.png
+  - tool_rect_off_alt.png
+  - tool_rect_on.png
+  keys:
+  - tool_rect_off
+  - tool_rect_off_alt
+  - tool_rect_on
+trash_bin:
+  date: '2026-09-05'
+  files:
+  - trash_bin.png
+  keys:
+  - trash

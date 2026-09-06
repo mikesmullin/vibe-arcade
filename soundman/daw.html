@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SoundMan Agent</title>
+<style>
+  :root{
+    --bg:#07090d; --panel:#0d131c; --panel2:#111927; --line:#1e2a3c; --line2:#2a3a52;
+    --ink:#e7eef6; --dim:#93a5bd; --dimmer:#5f728c;
+    --cyan:#4ee2f5; --amber:#ffc861; --green:#5ce6a8; --pink:#ff77c8;
+    --mono:"MonoLisa","JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;padding:18px;max-width:1180px;margin:0 auto}
+  header{display:flex;align-items:baseline;gap:12px;margin-bottom:4px}
+  h1{font-size:22px;letter-spacing:.02em}
+  h1 .tag{font-size:11px;font-weight:600;color:var(--amber);border:1px solid var(--amber);border-radius:20px;padding:2px 10px;margin-left:8px;vertical-align:middle;white-space:nowrap}
+  .sub{color:var(--dim);font-size:12.5px;margin-bottom:14px}
+  .sub b{color:var(--pink)}
+  .grid{display:grid;grid-template-columns:250px 1fr;gap:14px}
+  @media(max-width:900px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px}
+  .card h2{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--dimmer);margin-bottom:10px}
+  .layer-h{font-size:12px;font-weight:700;margin:12px 0 8px}
+  .layer-h.hit{color:var(--amber)} .layer-h.body{color:var(--green)}
+  .layer-h:first-of-type{margin-top:0}
+  .layer-h span{font-weight:400;color:var(--dimmer);font-size:11.5px}
+  label.fld{display:block;font-size:12px;color:var(--dim);margin:8px 0 3px}
+  select{width:100%;background:var(--panel2);color:var(--ink);border:1px solid var(--line2);border-radius:8px;padding:7px 9px;font-size:13px;font-family:var(--sans)}
+  .row{display:flex;gap:8px;align-items:center}
+  button{background:var(--panel2);color:var(--ink);border:1px solid var(--line2);border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans)}
+  button:hover{border-color:var(--cyan);color:var(--cyan)}
+  button.primary{background:var(--cyan);border-color:var(--cyan);color:#04262b}
+  button.primary:hover{filter:brightness(1.1);color:#04262b}
+  button.warn.on{background:var(--amber);border-color:var(--amber);color:#3a2704}
+  .knobs{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:10px}
+  r-knob{display:block;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 6px 8px;text-align:center;cursor:ns-resize;user-select:none;-webkit-user-select:none;touch-action:none}
+  r-knob:focus{outline:2px solid var(--cyan);outline-offset:1px}
+  r-knob .dial{width:58px;height:58px;margin:0 auto}
+  r-knob .val{font-family:var(--mono);font-size:12px;color:var(--cyan);margin-top:4px}
+  r-knob .lab{font-size:11px;color:var(--dim);margin-top:1px}
+  #envcurve{width:100%;height:auto;background:#05070b;border:1px solid var(--line);border-radius:10px;display:block}
+  pre{background:#05070b;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-family:var(--mono);font-size:12px;line-height:1.6;overflow-x:auto;white-space:pre-wrap;color:var(--green)}
+  pre.snip{color:var(--dim)}
+  .status{font-size:12.5px;color:var(--dim);margin-top:8px;min-height:20px}
+  .status.err{color:#ff7a7a}
+  .hint{font-size:12px;color:var(--dimmer);margin-top:10px}
+  .hint code{font-family:var(--mono);color:var(--dim);font-size:11.5px}
+  .legend{display:flex;gap:16px;font-size:12px;color:var(--dim);margin-top:8px}
+  .legend i{display:inline-block;width:18px;height:3px;vertical-align:middle;margin-right:5px}
+  footer{margin-top:6px;font-size:12px;color:var(--dimmer)}
+</style>
+</head>
+<body>
+<div id="app" x-data="desk()" x-init="init()">
+  <header>
+    <h1>SoundMan Agent <span class="tag">CODE SIDE: HANDS OFF</span></h1>
+  </header>
+  <p class="sub">Shared sound-design desk. Human tweaks knobs, agent reads them via
+    <b><code>__soundman.get()</code></b>. Game code lives elsewhere — nothing here ships.</p>
+
+  <div class="grid">
+    <div>
+      <div class="card">
+        <h2>Sound</h2>
+        <label class="fld">Outbox id</label>
+        <select id="selSound" :value="sound" @change="sound=$event.target.value; onSound()">
+          <template x-for="id in Object.keys(sounds)" :key="id">
+            <option :value="id" x-text="id"></option>
+          </template>
+        </select>
+        <label class="fld">Take</label>
+        <select id="selTake" :value="take" @change="take=+$event.target.value; changed()">
+          <option value="0">audition mix (all keepers)</option>
+          <template x-for="i in takeCount()" :key="i">
+            <option :value="i" x-text="'keeper v' + String(i).padStart(2,'0')"></option>
+          </template>
+        </select>
+        <label class="fld">Transport</label>
+        <div class="row">
+          <button class="primary" @click="play()" x-text="playing ? '↻ Restart' : '▶ Play'"></button>
+          <button @click="stop()">⏹ Stop</button>
+          <button class="warn" :class="{on: loop}" @click="loop = !loop; changed()" x-text="loop ? 'Loop: on' : 'Loop: off'"></button>
+        </div>
+        <div class="status" :class="{err: isErr}" x-text="status"></div>
+      </div>
+      <div class="card">
+        <h2>Monitor</h2>
+        <div class="knobs">
+          <r-knob data-bind="monitorDb" data-min="-24" data-max="0" data-step="0.5" data-def="-6" data-unit="dB" data-label="Monitor gain"></r-knob>
+        </div>
+        <div x-effect="applyMonitor(monitorDb)"></div>
+        <p class="hint">Live during playback — no restart needed.</p>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <h2>ADSR envelope × 2 layers — summed live at runtime</h2>
+        <div class="layer-h hit">HIT layer <span>— the patty touch: fast attack, 500 ms hold, decay to silence by ~1 s</span></div>
+        <div class="knobs">
+          <r-knob data-bind="layers.hit.peakDb" data-min="-24" data-max="+6" data-step="0.5" data-def="0" data-unit="dB" data-label="Peak gain"></r-knob>
+          <r-knob data-bind="layers.hit.attackMs" data-min="1" data-max="8000" data-step="1" data-def="5" data-unit="ms" data-label="Attack"></r-knob>
+          <r-knob data-bind="layers.hit.holdMs" data-min="0" data-max="2000" data-step="10" data-def="500" data-unit="ms" data-label="Hold"></r-knob>
+          <r-knob data-bind="layers.hit.decayMs" data-min="10" data-max="3000" data-step="10" data-def="500" data-unit="ms" data-label="Decay"></r-knob>
+          <r-knob data-bind="layers.hit.sustainDb" data-min="-40" data-max="0" data-step="0.5" data-def="-40" data-unit="dB" data-label="Sustain"></r-knob>
+          <r-knob data-bind="layers.hit.releaseMs" data-min="20" data-max="3000" data-step="10" data-def="120" data-unit="ms" data-label="Release"></r-knob>
+        </div>
+        <div class="layer-h body">BODY layer <span>— the sizzle bed: slow 3 s attack swelling up to sustain, sits there</span></div>
+        <div class="knobs">
+          <r-knob data-bind="layers.body.peakDb" data-min="-24" data-max="+6" data-step="0.5" data-def="-3" data-unit="dB" data-label="Peak gain"></r-knob>
+          <r-knob data-bind="layers.body.attackMs" data-min="1" data-max="8000" data-step="10" data-def="3000" data-unit="ms" data-label="Attack"></r-knob>
+          <r-knob data-bind="layers.body.holdMs" data-min="0" data-max="2000" data-step="10" data-def="0" data-unit="ms" data-label="Hold"></r-knob>
+          <r-knob data-bind="layers.body.decayMs" data-min="10" data-max="3000" data-step="10" data-def="200" data-unit="ms" data-label="Decay"></r-knob>
+          <r-knob data-bind="layers.body.sustainDb" data-min="-40" data-max="0" data-step="0.5" data-def="-3" data-unit="dB" data-label="Sustain"></r-knob>
+          <r-knob data-bind="layers.body.releaseMs" data-min="20" data-max="3000" data-step="10" data-def="800" data-unit="ms" data-label="Release"></r-knob>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <p class="hint">Attack/hold linear, decay/release exponential (classic). Sustain is a <i>level</i>, everything else a <i>time</i>.</p>
+          <div style="flex:0 0 auto;margin-left:auto">
+            <button @click="resetLayers()">Reset to suggested</button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Curve — amber HIT + green BODY = cyan SUM (what you hear)</h2>
+        <canvas id="envcurve" width="680" height="240"></canvas>
+        <div x-effect="drawEnv(rev)"></div>
+        <div class="legend">
+          <span><i style="background:#ffc861"></i>HIT</span>
+          <span><i style="background:#5ce6a8"></i>BODY</span>
+          <span><i style="background:#4ee2f5"></i>SUM</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Automation JSON — what the agent reads</h2>
+    <pre x-text="json()"></pre>
+    <div class="row" style="margin-top:8px">
+      <button @click="copyJson()">Copy JSON</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Coder snippet — the game plays through the same <code>daw.mjs</code> engine this desk uses</h2>
+    <pre class="snip" x-text="snippet()"></pre>
+    <div class="row" style="margin-top:8px">
+      <button @click="copySnippet()">Copy snippet</button>
+    </div>
+  </div>
+
+  <footer>Desk persists to localStorage. Agent dbg: <code>__soundman.help()</code> ·
+    <code>__soundman.get()</code> · <code>__soundman.set({layers:{hit:{decayMs:700}}})</code>
+    <br>Pointer probe (for the drag investigation): <code id="ptrlog">no pointer input seen yet</code></footer>
+</div>
+
+<script type="module">
+import M from './vendor/m.min.js';
+import { SfxEngine, DEFAULT_LAYERS as ENGINE_DEFAULTS, layerGains, envSum, db2g, VERSION as ENGINE_VERSION } from './daw.mjs';
+
+/* ---------------------------------------------------------- rotary knobs */
+const knobReg = {};
+window.__knobBuilds = 0;
+class RKnob extends HTMLElement {
+  connectedCallback() {
+    if (this._built) { this.render(this._read()); return; }
+    this._built = true;
+    const d = this.dataset;
+    this._min = +d.min; this._max = +d.max; this._step = +(d.step || 1);
+    this._def = (d.def !== undefined) ? +d.def : this._min;
+    this._unit = d.unit || ''; this._label = d.label || d.bind; this._bind = d.bind;
+    this.tabIndex = 0;
+    this.innerHTML = `<svg class="dial" viewBox="0 0 60 60"></svg>
+      <div class="val"></div><div class="lab"></div>`;
+    this.querySelector('.lab').textContent = this._label;
+    knobReg[this._bind] = this;
+    this.render(this._read());
+    let startY = 0, startV = 0;
+    this.addEventListener('pointerdown', e => {
+      window.__knobHits = (window.__knobHits || 0) + 1;
+      e.preventDefault();
+      startY = e.clientY; startV = this._read();
+      try { this.setPointerCapture(e.pointerId); } catch (err) {}
+      const mv = ev => {
+        const range = this._max - this._min;
+        const dv = (startY - ev.clientY) / 150 * range * (ev.shiftKey ? 0.1 : 1);
+        window.__deskSet(this._bind, this._quant(startV + dv));
+      };
+      const up = () => { this.removeEventListener('pointermove', mv); this.removeEventListener('pointerup', up); };
+      this.addEventListener('pointermove', mv); this.addEventListener('pointerup', up);
+    });
+    this.addEventListener('wheel', e => {
+      e.preventDefault();
+      window.__deskSet(this._bind, this._quant(this._read() + (e.deltaY < 0 ? this._step : -this._step)));
+    }, { passive: false });
+    this.addEventListener('dblclick', () => window.__deskSet(this._bind, this._def));
+    this.addEventListener('keydown', e => {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowRight') { window.__deskSet(this._bind, this._quant(this._read() + this._step)); e.preventDefault(); }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') { window.__deskSet(this._bind, this._quant(this._read() - this._step)); e.preventDefault(); }
+    });
+    window.__knobBuilds = (window.__knobBuilds || 0) + 1;
+  }
+  _read() {
+    // connectedCallback can run before the module finishes executing
+    // (customElements.define upgrades parsed nodes synchronously), at which
+    // point __deskGet doesn't exist yet — fall back to the default so the
+    // callback completes and listeners attach; init's syncKnobs corrects us.
+    const f = window.__deskGet;
+    if (typeof f !== 'function') return this._def;
+    const v = f(this._bind);
+    return (v === undefined || v === null) ? this._def : v;
+  }
+  _quant(v) {
+    v = Math.min(this._max, Math.max(this._min, v));
+    const n = Math.round(v / this._step);
+    return Math.round(n * this._step * 1000) / 1000;
+  }
+  render(v) {
+    if (v === undefined || v === null) return;
+    const dial = this.querySelector('.dial');
+    if (!dial) return;
+    const t = (v - this._min) / (this._max - this._min);
+    const a0 = -2.35, a1 = 2.35, a = a0 + t * (a1 - a0);
+    const px = x => (30 + 22 * Math.cos(x)).toFixed(1), py = y => (30 + 22 * Math.sin(y)).toFixed(1);
+    const large = (a - a0) > Math.PI ? 1 : 0;
+    dial.innerHTML =
+      `<circle cx="30" cy="30" r="26" fill="#0a0f16" stroke="#2a3a52" stroke-width="3"/>` +
+      `<path d="M ${px(a0)} ${py(a0)} A 22 22 0 ${large} 1 ${px(a)} ${py(a)}" fill="none" stroke="#4ee2f5" stroke-width="4" stroke-linecap="round"/>` +
+      `<line x1="30" y1="30" x2="${px(a)}" y2="${py(a)}" stroke="#e7eef6" stroke-width="3" stroke-linecap="round"/>` +
+      `<circle cx="30" cy="30" r="3.5" fill="#e7eef6"/>`;
+    this.querySelector('.val').textContent = v + (this._unit ? ' ' + this._unit : '');
+  }
+}
+customElements.define('r-knob', RKnob);
+function syncKnobs() { for (const k in knobReg) knobReg[k].render(window.__deskGet(k)); }
+
+/* ---------------------------------------------------------------- state */
+const DEFAULTS = {
+  sound: 'sfx_patty_sizzle_loop', take: 1, loop: true, monitorDb: -6,
+  layers: JSON.parse(JSON.stringify(ENGINE_DEFAULTS)),   // daw.mjs owns the suggested shape
+};
+const LSKEY = 'soundman.desk.v2';
+let S = null;
+function getPath(o, p) { return p.split('.').reduce((a, k) => (a == null ? a : a[k]), o); }
+function setPath(o, p, v) { const ks = p.split('.'); let t = o; for (let i = 0; i < ks.length - 1; i++) t = t[ks[i]]; t[ks[ks.length - 1]] = v; }
+function save() { try { localStorage.setItem(LSKEY, JSON.stringify(__soundman.get())); } catch (e) {} }
+function load() { try { const raw = localStorage.getItem(LSKEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
+
+window.__deskGet = p => getPath(S, p);
+// knob drags mutate state OUTSIDE m-js event handlers, so no redraw is
+// scheduled for them: render the dragged knob at once and kick m-js by hand.
+window.__deskSet = (p, v) => {
+  setPath(S, p, v); S.rev++; save();
+  const k = knobReg[p];
+  if (k) k.render(v);
+  if (M && M.redraw) M.redraw();
+};
+
+/* ---------------------------------------------------------------- audio */
+// The desk plays through the SAME engine the game imports (daw.mjs): what you
+// hear here is what SfxEngine.play() does at runtime with the exported card.
+const engine = new SfxEngine();
+let voice = null, rafId = 0;
+function takeUrl() {
+  const id = S.sound, info = S.sounds[id];
+  if (!info) throw new Error('unknown sound: ' + id);
+  const file = S.take === 0 ? info.audition : info.keepers[Math.min(S.take, info.keepers.length) - 1];
+  return 'out/' + id + '/' + file;
+}
+const curLayers = () => (S ? S.layers : DEFAULTS.layers);
+
+/* --------------------------------------------------------------- component */
+function desk() {
+  return {
+    sound: DEFAULTS.sound, take: 1, loop: true, monitorDb: -6,
+    layers: JSON.parse(JSON.stringify(DEFAULTS.layers)),
+    sounds: {}, playing: false,
+    status: 'Pick a sound, press Play.', isErr: false, rev: 0,
+
+    async init() {
+      S = this;
+      const saved = load();
+      if (saved) {
+        for (const k of ['sound', 'take', 'loop', 'monitorDb'])
+          if (saved[k] !== undefined) this[k] = saved[k];
+        for (const L of ['hit', 'body'])
+          Object.assign(this.layers[L], (saved.layers || {})[L] || {});
+      }
+      try {
+        const r = await fetch('out/sounds.json');
+        if (!r.ok) throw new Error('fetch out/sounds.json: ' + r.status);
+        this.sounds = await r.json();
+      } catch (e) {
+        this.sounds = { sfx_patty_sizzle_loop: { keepers: ['sfx_patty_sizzle_loop_v01.wav'], audition: 'audition.wav', loop: true } };
+        this.note('sounds.json missing — showing fallback entry.', true);
+      }
+      if (!this.sounds[this.sound]) this.sound = Object.keys(this.sounds)[0];
+      this.rev++;
+      syncKnobs();
+      this.syncSelects();
+      this.drawEnv(this.rev);
+    },
+    takeCount() {
+      const info = this.sounds[this.sound];
+      return info ? info.keepers.length : 0;
+    },
+    onSound() { this.take = 1; this.changed(); },
+    changed() { this.rev++; save(); syncKnobs(); this.syncSelects(); },
+    syncSelects() {
+      const ss = document.getElementById('selSound'), st = document.getElementById('selTake');
+      if (ss) ss.value = this.sound;
+      if (st) st.value = String(this.take);
+      clearTimeout(this._syncT);
+      const check = () => {
+        const bad = (ss && ss.value !== this.sound) || (st && st.value !== String(this.take));
+        if (!bad) return;
+        if (ss) ss.value = this.sound;
+        if (st) st.value = String(this.take);
+        this._syncT = setTimeout(check, 120);
+      };
+      this._syncT = setTimeout(check, 120);
+    },
+    note(msg, err) { this.status = msg; this.isErr = !!err; },
+    // monitor rides live on the playing gain node; envelope knobs describe
+    // the NEXT play (they are a scheduled timeline, not a live wire).
+    applyMonitor(db) { if (voice) voice.setGain(db); },
+    resetLayers() {
+      this.layers = JSON.parse(JSON.stringify(DEFAULTS.layers));
+      this.changed();
+      this.note('Layers reset to suggested shape (percussive hit + swelling bed).');
+    },
+
+    async play() {
+      this.stop(true);
+      try {
+        if (!engine.ensure()) throw new Error('WebAudio unavailable');
+        if (engine.ctx.state === 'suspended') await engine.ctx.resume();
+        voice = engine.play({ url: takeUrl(), loop: this.loop, layers: this.layers, gainDb: this.monitorDb });
+        if (!(await voice.ready)) throw new Error('decode/start failed (see console)');
+        this.playing = true;
+        this.note('Playing ' + this.sound + ' — hit + body live (daw.mjs v' + ENGINE_VERSION + ').');
+        const tick = () => {
+          if (!this.playing) return;
+          this.drawEnv(this.rev, voice ? voice.time : 0);
+          rafId = requestAnimationFrame(tick);
+        };
+        tick();
+      } catch (err) { this.note('Play failed: ' + err.message, true); }
+    },
+    stop(silent) {
+      this.playing = false;
+      cancelAnimationFrame(rafId);
+      if (voice) { voice.stop(); voice = null; }   // release tails per layer, source stops after the slowest
+      if (!silent) { this.note('Stopped (release tails played).'); this.drawEnv(this.rev); }
+    },
+
+    drawEnv(rev, playhead) {
+      const cv = document.getElementById('envcurve');
+      if (!cv) return;
+      const c = cv.getContext('2d'), W = cv.width, H = cv.height;
+      const L = S ? S.layers : DEFAULTS.layers;
+      const span = l => l.attackMs / 1000 + l.holdMs / 1000 + l.decayMs / 1000;
+      const tMax = Math.max(span(L.hit), span(L.body), L.body.attackMs / 1000) + 1.5;
+      const N = 160;
+      const X = t => 40 + (t / tMax) * (W - 54);
+      const Y = db => 14 + (1 - (db + 42) / 56) * (H - 30); // -42..+14 dB window
+      const toDb = g => 20 * Math.log10(Math.max(g, 1e-4));
+      c.clearRect(0, 0, W, H);
+      c.strokeStyle = '#1e2a3c'; c.fillStyle = '#5f728c'; c.font = '10px monospace';
+      for (const db of [0, -10, -20, -30, -40]) {
+        c.beginPath(); c.moveTo(40, Y(db)); c.lineTo(W - 14, Y(db)); c.stroke();
+        c.fillText(db + ' dB', 4, Y(db) + 3);
+      }
+      const series = [
+        [layerGains(L.hit, tMax, N), '#ffc861', [5, 4]],
+        [layerGains(L.body, tMax, N), '#5ce6a8', [5, 4]],
+        [envSum(L, tMax, N), '#4ee2f5', []],
+      ];
+      for (const [pts, col, dash] of series) {
+        c.strokeStyle = col; c.lineWidth = col === '#4ee2f5' ? 2.5 : 1.5;
+        c.setLineDash(dash); c.beginPath();
+        pts.forEach(([t, g], i) => { const x = X(t), y = Y(toDb(g)); i ? c.lineTo(x, y) : c.moveTo(x, y); });
+        c.stroke(); c.setLineDash([]); c.lineWidth = 1;
+      }
+      if (playhead !== undefined && playhead <= tMax) {
+        const x = X(playhead);
+        c.strokeStyle = '#e7eef6'; c.beginPath(); c.moveTo(x, 8); c.lineTo(x, H - 14); c.stroke();
+      }
+    },
+
+    json() { return JSON.stringify(__soundman.get(), null, 1); },
+    snippet() {
+      const g = __soundman.get(), f = l => {
+        const L = g.layers[l];
+        return `  ${l}:  { peakDb: ${L.peakDb}, attackMs: ${L.attackMs}, holdMs: ${L.holdMs}, ` +
+          `decayMs: ${L.decayMs}, sustainDb: ${L.sustainDb}, releaseMs: ${L.releaseMs} }`;
+      };
+      const key = `${g.sound}_v${String(g.take).padStart(2, '0')}`;
+      return `// game side — accepted card drives this at runtime (assets/sfx.json via assets/daw.mjs)\n` +
+        `import { SfxEngine } from './assets/daw.mjs';\n` +
+        `const sfx = new SfxEngine({ base: 'assets/' }); await sfx.loadBank('assets/sfx.json');\n` +
+        `const v = sfx.play('${key}', { loop: ${g.loop} });   // layers from the card:\n` +
+        `// { layers: {\n` + f('hit') + `,\n` + f('body') + `,\n// } }\n` +
+        `v.stop();   // release tails play out`;
+    },
+    copyJson() { navigator.clipboard.writeText(this.json()).then(() => this.note('JSON copied.')); },
+    copySnippet() { navigator.clipboard.writeText(this.snippet()).then(() => this.note('Snippet copied.')); },
+  };
+}
+window.desk = desk;
+
+/* ------------------------------------------------------- agent dbg fns */
+window.__soundman = {
+  help() {
+    return 'SoundMan desk dbg: get() automation JSON {sound,take,loop,monitorDb,layers:{hit,body}} | ' +
+      'set({layers:{hit:{decayMs:700}}}) deep-merge + redraw | ' +
+      'play() stop() reset() sounds() — agent reads get() after human says done.';
+  },
+  get() {
+    return {
+      sound: S.sound, take: S.take, loop: S.loop, monitorDb: S.monitorDb,
+      layers: JSON.parse(JSON.stringify(S.layers)),
+    };
+  },
+  set(patch) {
+    const merge = (t, p) => { for (const k in p) (p[k] && typeof p[k] === 'object' && !Array.isArray(p[k]) && t[k]) ? merge(t[k], p[k]) : t[k] = p[k]; };
+    merge(S, patch); S.rev++; save(); syncKnobs();
+    if (M && M.redraw) M.redraw();
+    return window.__soundman.get();
+  },
+  play() { S.play(); }, stop() { S.stop(); },
+  reset() { S.resetLayers(); return window.__soundman.get(); },
+  sounds() { return S.sounds; },
+};
+
+// keep m-js's vdom off the knobs: their light DOM is rendered output, not
+// template — without this, redraws duplicate knob internals.
+document.querySelectorAll('r-knob').forEach(k => k.setAttribute('x-ignore', ''));
+
+// pointer probe: framework-independent witness for the drag investigation.
+// Capture-phase window listeners + direct textContent writes (no m-js
+// involved), so whatever it prints is ground truth about event delivery.
+window.__knobHits = 0;
+for (const t of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) {
+  window.addEventListener(t, e => {
+    const el = document.getElementById('ptrlog');
+    if (!el) return;
+    const tgt = e.target && e.target.closest ? (e.target.closest('r-knob') || {}).dataset || {} : {};
+    el.textContent = `${t} x=${Math.round(e.clientX)} y=${Math.round(e.clientY)}` +
+      ` onKnob=${tgt.bind || 'no'} knobHandlerHits=${window.__knobHits}`;
+  }, true);
+}
+M.start();
+</script>
+</body>
+</html>

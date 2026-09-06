@@ -1,0 +1,41 @@
+id: sfx_patty_sizzle_loop
+date: '2026-09-05'
+take: 3
+keeper: sfx_patty_sizzle_loop_v03.wav
+keeper_mp3: sfx_patty_sizzle_loop_v03.mp3
+raw_note: "mp3 is the raw keeper transcoded \u2014 NO automation baked in; the game\
+  \ applies layers live at runtime"
+layers:
+  hit:
+    peakDb: 0
+    attackMs: 268
+    holdMs: 680
+    decayMs: 2420
+    sustainDb: -34.5
+    releaseMs: 420
+  body:
+    peakDb: -13
+    attackMs: 2410
+    holdMs: 130
+    decayMs: 2690
+    sustainDb: -7
+    releaseMs: 820
+monitorDb: -18.5
+monitor_note: "playback gain \u2014 applied live on the voice by daw.mjs (desk ==\
+  \ game); never rendered into audio"
+render:
+  mp3: libmp3lame 128k mono 48000Hz
+  ffmpeg: ffmpeg version n8.1.2 Copyright (c) 2000-2026 the FFmpeg developers
+files:
+  sfx_patty_sizzle_loop_v03.mp3: sfx_patty_sizzle_loop_v03.mp3
+sha256_mp3: 14a67116cf980dd950a9faf114a251fc6952d99d6b6f4477aa22eb7e69f8d7ec
+copy_as: 'cp soundman/out/sfx_patty_sizzle_loop/sfx_patty_sizzle_loop_v03.wav assets/sfx/sfx_patty_sizzle_loop/sfx_patty_sizzle_loop_v03.wav
+
+  cp soundman/out/sfx_patty_sizzle_loop/sfx_patty_sizzle_loop_v03.mp3 assets/sfx/sfx_patty_sizzle_loop/sfx_patty_sizzle_loop_v03.mp3
+
+  cp soundman/out/sfx_patty_sizzle_loop/automation.yaml assets/sfx/sfx_patty_sizzle_loop/automation.yaml
+
+  '
+command: python3 export.py --settings '<get() JSON>' --force
+determinism: same keeper + same ffmpeg build -> same bytes (sha256 above; rerun with
+  --force and cmp)

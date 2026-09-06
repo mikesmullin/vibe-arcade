@@ -1,0 +1,15 @@
+id: cup
+date: 2026-09-05
+game_keys:
+  cup_empty: cup_empty.png
+  cup_full: cup_full.png
+seed: 45003
+bg: solid bright green
+cutout: key
+copy_as: |
+  cp artman/out/cup/cup_empty.png assets/art/cup/cup_empty.png
+  cp artman/out/cup/cup_full.png assets/art/cup/cup_full.png
+assets_snippet: |
+  cup_empty: A+'art/cup/cup_empty.png',
+  cup_full: A+'art/cup/cup_full.png',
+pose_verify: "cook2.html?pose=key:cup_empty&bg=grid&zoom=2&freeze=1&nocache"

@@ -348,6 +348,13 @@ soda_machine:
   keys:
   - soda_machine
   taken: '2026-09-05'
+soda_stream_long:
+  files:
+    soda_stream_long: art/soda_stream_long/soda_stream_long.png
+  from: out/soda_stream_long/ (art outbox; replaces the 2-frame idea)
+  keys:
+  - soda_stream_long
+  taken: '2026-09-05'
 speech_bubble:
   files:
     bubble: art/speech_bubble/speech_bubble.png
@@ -391,6 +398,15 @@ tool_rotate:
   - tool_rotate_off
   - tool_rotate_on
   taken: '2026-09-05'
+tool_rect:
+  files:
+    tool_rect_off: art/tool_rect/tool_rect_off_alt.png
+    tool_rect_on: art/tool_rect/tool_rect_on.png
+  from: out/tool_rect/ (off-alt) + scratch/explore_rect2/s2 (matching on-state)
+  keys:
+  - tool_rect_off
+  - tool_rect_on
+  taken: '2026-09-05'
 tool_scale:
   files:
     tool_scale_off: art/tool_scale/tool_scale_off.png
@@ -406,4 +422,14 @@ trash_bin:
   from: out/trash_bin/ (art outbox)
   keys:
   - trash
+  taken: '2026-09-05'
+sfx_patty_sizzle_loop:
+  files:
+    sfx_patty_sizzle_loop_v03: sfx/sfx_patty_sizzle_loop/sfx_patty_sizzle_loop_v03.wav
+    sfx_patty_sizzle_loop_v03_mp3: sfx/sfx_patty_sizzle_loop/sfx_patty_sizzle_loop_v03.mp3
+  automation: sfx/sfx_patty_sizzle_loop/automation.yaml
+  loop: true
+  from: out/sfx_patty_sizzle_loop/ (sound outbox, take 3, approved 2026-09-05)
+  keys:
+  - sfx_patty_sizzle_loop_v03
   taken: '2026-09-05'

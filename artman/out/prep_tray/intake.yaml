@@ -1,0 +1,12 @@
+id: prep_tray
+date: 2026-09-05
+game_keys:
+  prep_tray: prep_tray.png
+seed: 43001
+bg: solid bright green
+cutout: key
+copy_as: |
+  cp artman/out/prep_tray/prep_tray.png assets/art/prep_tray/prep_tray.png
+assets_snippet: |
+  prep_tray: A+'art/prep_tray/prep_tray.png',
+pose_verify: "cook2.html?pose=key:prep_tray&bg=grid&zoom=2&freeze=1&nocache"

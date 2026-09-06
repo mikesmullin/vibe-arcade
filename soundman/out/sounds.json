@@ -1,0 +1,9 @@
+{
+ "sfx_patty_sizzle_loop": {
+  "audition": "audition.wav",
+  "keepers": [
+   "sfx_patty_sizzle_loop_v03.wav"
+  ],
+  "loop": true
+ }
+}

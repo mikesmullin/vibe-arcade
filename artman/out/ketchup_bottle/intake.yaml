@@ -1,0 +1,12 @@
+id: ketchup_bottle
+date: 2026-09-05
+game_keys:
+  ketchup: ketchup_bottle.png
+seed: 43401
+bg: solid bright green
+cutout: key
+copy_as: |
+  cp artman/out/ketchup_bottle/ketchup_bottle.png assets/art/ketchup_bottle/ketchup_bottle.png
+assets_snippet: |
+  ketchup: A+'art/ketchup_bottle/ketchup_bottle.png',
+pose_verify: "cook2.html?pose=key:ketchup&bg=grid&zoom=2&freeze=1&nocache"

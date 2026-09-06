@@ -1,0 +1,10 @@
+id: hud_xp
+date: 2026-09-05
+game_keys:
+  hud_xp: hud_xp.png
+seed: 50501
+copy_as: |
+  cp artman/out/hud_xp/hud_xp.png assets/art/hud_xp/hud_xp.png
+assets_snippet: |
+  hud_xp: A+'art/hud_xp/hud_xp.png',
+pose_verify: "cook2.html?pose=key:hud_xp&bg=grid&zoom=2&freeze=1&nocache"

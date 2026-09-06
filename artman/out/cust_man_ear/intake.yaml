@@ -1,0 +1,10 @@
+id: cust_man_ear
+date: 2026-09-05
+game_keys:
+  man_ear: cust_man_ear.png
+seed: 52201
+copy_as: |
+  cp artman/out/cust_man_ear/cust_man_ear.png assets/art/cust_man_ear/cust_man_ear.png
+assets_snippet: |
+  man_ear: A+'art/cust_man_ear/cust_man_ear.png',
+pose_verify: "cook2.html?pose=key:man_ear&bg=grid&zoom=2&freeze=1&nocache"

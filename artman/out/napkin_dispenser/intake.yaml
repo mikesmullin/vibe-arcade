@@ -1,0 +1,12 @@
+id: napkin_dispenser
+date: 2026-09-05
+game_keys:
+  napkins: napkin_dispenser.png
+seed: 43101
+bg: solid bright green
+cutout: key
+copy_as: |
+  cp artman/out/napkin_dispenser/napkin_dispenser.png assets/art/napkin_dispenser/napkin_dispenser.png
+assets_snippet: |
+  napkins: A+'art/napkin_dispenser/napkin_dispenser.png',
+pose_verify: "cook2.html?pose=key:napkins&bg=grid&zoom=2&freeze=1&nocache"

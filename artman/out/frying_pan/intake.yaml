@@ -1,0 +1,10 @@
+id: frying_pan
+date: 2026-09-05
+game_keys:
+  pan: frying_pan.png
+seed: 42401
+copy_as: |
+  cp artman/out/frying_pan/frying_pan.png assets/art/frying_pan/frying_pan.png
+assets_snippet: |
+  pan: A+'art/frying_pan/frying_pan.png',
+pose_verify: "cook2.html?pose=key:pan&bg=grid&zoom=2&freeze=1&nocache"

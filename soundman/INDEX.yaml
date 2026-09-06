@@ -1,0 +1,9 @@
+# SOUNDMAN INDEX — finished outbox ids (sound-written). Code side: ls out/*/intake.yaml works just as well.
+sfx_patty_sizzle_loop:
+  backend: synth/sizzle
+  date: '2026-09-05'
+  files:
+  - sfx_patty_sizzle_loop_v03.wav
+  keys:
+  - sfx_patty_sizzle_loop_v03
+  loop: true

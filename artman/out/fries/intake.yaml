@@ -1,0 +1,18 @@
+id: fries
+date: 2026-09-05
+game_keys:
+  fries_cooked: fries_cooked.png
+  fries_raw: fries_raw.png
+unused (in outbox but NOT referenced by game — do not copy):
+  - fries.png
+seed: 43301
+bg: solid bright magenta
+cutout: key
+copy_as: |
+  cp artman/out/fries/fries_cooked.png assets/art/fries/fries_cooked.png
+  cp artman/out/fries/fries_raw.png assets/art/fries/fries_raw.png
+assets_snippet: |
+  fries_cooked: A+'art/fries/fries_cooked.png',
+  fries_raw: A+'art/fries/fries_raw.png',
+pose_verify: "cook2.html?pose=key:fries_cooked&bg=grid&zoom=2&freeze=1&nocache"
+notes: fries.png is a superseded keeper; fries_raw.png (raw-in-carton) is retired, use out/fries_pile/fries_pile_raw.png instead. fries_cooked.png stays as the cartoned/plated keeper
