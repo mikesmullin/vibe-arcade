@@ -189,7 +189,7 @@ fry_carton_empty:
   from: out/fry_carton_empty/ (art outbox)
   keys:
   - carton_empty
-  taken: '2026-09-05'
+  taken: '2026-09-06'
 fry_station:
   files:
     fry_station_lowered: art/fry_station/fry_station_lowered.png

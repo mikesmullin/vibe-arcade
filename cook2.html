@@ -1087,7 +1087,7 @@ function onMove(e){
       const h=pDown.hit;let it=null;
       if(selected){it=selected;selected=null;}
       else if(h&&h.owner instanceof Item&&h.drag&&h.owner.kind==='plate'&&isLoneContainer(h.owner)){it=splitContainer(h.owner);it.g.position.set(p.x,p.y,0);}   // lone container lifts off; the plate stays bare
-      else if(h&&h.owner instanceof Item&&h.drag&&canPick(h.owner)){it=h.owner;detachItem(it);it.refresh();it.g.position.set(p.x,p.y,0);}   // pop to full size and snap to the pointer so ox/oy start at 0 and it adheres during the drag (like tray spawns)
+      else if(h&&h.owner instanceof Item&&h.drag&&(canPick(h.owner)||(h.owner.state==='cooking'&&h.owner.station instanceof Grill))){it=h.owner;detachItem(it);it.refresh();it.g.position.set(p.x,p.y,0);}   // cooking grill items: drag pauses cooking (take clears the slot so update() skips it); failed drop reattaches and resumes from the same t
       else if(h&&h.owner instanceof Fryer&&h.owner.item&&canPick(h.owner.item)){it=h.owner.item;detachItem(it);it.refresh();it.g.position.set(p.x,p.y,0);}   // fryer pile is invisible in the machine: grab it off the station and it appears in hand
       else if(h&&h.owner instanceof Tray){it=h.owner.dragOut();detachItem(it);if(it)it.g.position.set(p.x,p.y,0);}   // spawner: item pops into existence at the tray, not the cursor — snap it to the pointer so ox/oy start at 0 and it adheres during the drag
       if(it){drag={it,ox:it.g.position.x-p.x,oy:it.g.position.y-p.y,origin:{x:it.g.position.x,y:it.g.position.y}};it.setLayer(L.DRAG);it.g.scale.setScalar(1.15);SFX.pop();}

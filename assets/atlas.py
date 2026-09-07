@@ -103,6 +103,8 @@ def main():
     items = []
     for key in sorted(mapping):
         src = HERE / mapping[key]
+        if src.suffix.lower() not in ('.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp'):
+            continue   # audio keepers live in assets.json too (sfx bank); the atlas packs images only
         im = Image.open(src).convert("RGBA")
         cap = MAX_DIM.get(mapping[key].split('/')[0], MAX_DIM_DEFAULT)
         if max(im.width, im.height) > cap:
