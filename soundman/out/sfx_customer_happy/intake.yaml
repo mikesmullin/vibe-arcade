@@ -1,0 +1,30 @@
+id: sfx_customer_happy
+date: '2026-09-06'
+engine: moss_soundeffect_v2
+rendered: "moss_v2 (MOSS-SoundEffect v2.0, Apache-2.0) \xB7 desk round 1 (rounds/customer_r1.yaml,\
+  \ prompt cust_r1_happy, seed 41) \xB7 Export Ranges to Atlas by human (labeled SUSTAIN\
+  \ 0.81\u20131.50 s of take v01 -> 0.681 s cut, samples verbatim, mono 48 kHz, peak\
+  \ -1 dB)"
+sample_rate: 48000
+loop: false
+game_keys:
+  sfx_customer_happy_v01: sfx_customer_happy_v01.wav
+seed: 41
+copy_as: 'cp soundman/out/sfx_customer_happy/sfx_customer_happy_v01.wav assets/sfx/sfx_customer_happy/sfx_customer_happy_v01.wav
+
+  '
+assets_snippet: 'sfx_customer_happy_v01: A+''sfx/sfx_customer_happy/sfx_customer_happy_v01.wav'',
+
+  '
+listen_verify: 'reviewed on the Sound Desk (daw.html?src=scratch/desk_gen, Candidates);
+  post-accept: cook2.html?debug, serve a customer fast'
+notes: "prompt was: happy customer delighted eating sounds, cheerful mmm and yum,\
+  \ satisfied lip smacking, cartoon diner, close mic, no words, no music \xB7 human:\
+  \ \"nice, gibberish but i like it (multi-lingual friendly)\" 70% (desk feedback\
+  \ 2026-09-06; could work for woman customer if range-cut \u2014 this keeper IS that\
+  \ cut). SUSTAIN label was the cut range, not a playback instruction: regions null,\
+  \ play once. Layers neutral unity (human tuned nothing \u2014 desk carried soda\
+  \ AHDSR/gain, deliberately not used)."
+approved: 2026-09-06 (take 1 = desk atlas cust_r1_happy_moss_v2_atlas_011033 v01,
+  cut+approved by human on the desk; promoted from scratch/promote_happy/)
+license: "Apache-2.0 (MOSS-SoundEffect v2.0) \u2014 commercial OK"

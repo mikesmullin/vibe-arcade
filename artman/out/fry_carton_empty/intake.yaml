@@ -1,8 +1,8 @@
 id: fry_carton_empty
-date: 2026-09-05
+date: 2026-09-06
 game_keys:
   carton_empty: fry_carton_empty.png
-seed: 43911
+seed: 43913
 bg: solid bright magenta
 cutout: key
 copy_as: |
@@ -10,4 +10,4 @@ copy_as: |
 assets_snippet: |
   carton_empty: A+'art/fry_carton_empty/fry_carton_empty.png',
 pose_verify: "cook2.html?pose=key:carton_empty&bg=grid&zoom=2&freeze=1&nocache"
-notes: empty red-black striped carton matching the in-carton fry keepers; stack-of-cartons target for the cooked-pile drop
+notes: empty scoop-front red-black carton matching fries_cooked (short/wide, low front lip, empty white interior); stack-of-cartons target for the cooked-pile drop. 2026-09-06 redraw locked to out/fries/raw/fries_cooked.png; s2 winner.

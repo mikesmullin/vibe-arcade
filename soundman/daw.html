@@ -234,7 +234,7 @@
       <div style="display:flex;gap:6px">
         <button class="primary" @click="play()"><i class="ph-fill" :class="playing ? 'ph-arrow-clockwise' : 'ph-play'"></i><span x-text="playing ? 'Restart' : 'Play'"></span></button>
         <button @click="stop()"><i class="ph-fill ph-stop"></i>Stop</button>
-        <button :class="{on: loop}" @click="loop = !loop; changed()"><i class="ph ph-repeat"></i><span x-text="loop ? 'Loop on' : 'Loop off'"></span></button>
+        <button :class="{on: loop}" @click="toggleLoop()" title="Loop on: Play repeats; turning it OFF mid-loop finishes the current pass, then stops (release tail plays)."><i class="ph ph-repeat"></i><span x-text="loop ? 'Loop on' : 'Loop off'"></span></button>
       </div></div>
     <div class="fld" style="margin-left:auto"><span>Monitor · desk-wide gain (all but Candidates ▶) · exported as game gain</span>
       <div class="strip" style="align-items:center;gap:6px">
@@ -260,7 +260,7 @@
         </div>
         <canvas id="wave" class="cv" width="900" height="96" @pointerdown="selDown($event)" @pointermove="selMove($event); hoverT = _selT($event)" @pointerup="selUp($event)" @pointercancel="selUp($event)" @pointerleave="hoverT = null" @window.keydown="waveKey($event)"></canvas>
         <div class="trim">
-          <button class="small" style="width:150px;justify-content:center;display:inline-flex;align-items:center" :disabled="!sel" @click="previewSel()" title="Play only the selected window, raw (no automation), from the decoded take. Loops it when the mode is loop. Click again (or press SPACE) to stop."><i class="ph-fill" :class="selPlaying ? 'ph-stop' : 'ph-play'"></i><span x-text="selPlaying ? 'stop window' : 'preview window'"></span></button>
+          <button class="small" style="width:150px;justify-content:center;display:inline-flex;align-items:center" :disabled="!sel" @click="previewSel()" title="Play only the selected window, raw (no automation), from the decoded take. Loops it only when preview-loop mode is on AND transport Loop is on. Click again (or press SPACE) to stop."><i class="ph-fill" :class="selPlaying ? 'ph-stop' : 'ph-play'"></i><span x-text="selPlaying ? 'stop window' : 'preview window'"></span></button>
           <span class="hint"><b>space</b> = preview window / stop · drag to select · hover + <b>I</b> / <b>O</b> = set in / out point at the cursor · <b>[</b> / <b>]</b> nudge in/out by 10 ms (shift: 1 ms)</span>
         </div>
         <div class="trim">
@@ -280,7 +280,7 @@
       </div>
       <div class="salv">
         <div class="lname p" style="padding-bottom:4px">ATLAS<small>keep only the labeled ranges</small></div>
-        <button class="small" :class="{on: trimLoop}" @click="trimLoop = !trimLoop" :title="trimLoop ? 'Preview mode: LOOP — the preview window (and a stage-region preview) loops; a stage preview re-triggers its envelope stage every pass. Click to switch to one-shot.' : 'Preview mode: ONE-SHOT — the preview window plays once. Click to switch to loop.'"><i class="ph" :class="trimLoop ? 'ph-repeat' : 'ph-arrow-line-right'"></i><span x-text="trimLoop ? 'preview: loop' : 'preview: one-shot'"></span></button>
+        <button class="small" :class="{on: trimLoop}" @click="trimLoop = !trimLoop" :title="trimLoop ? 'Preview mode: LOOP — the preview window (and a stage-region preview) loops, but only while transport Loop is on; a stage preview re-triggers its envelope stage every pass. Click to switch to one-shot.' : 'Preview mode: ONE-SHOT — the preview window plays once. Click to switch to loop.'"><i class="ph" :class="trimLoop ? 'ph-repeat' : 'ph-arrow-line-right'"></i><span x-text="trimLoop ? 'preview: loop' : 'preview: one-shot'"></span></button>
         <input type="text" :value="trimName" @input="trimName = $event.target.value" placeholder="new candidate name">
         <button class="small primary" :disabled="!regionKeys.some(k => regions[k]) || trimBusy" @click="exportAtlas()" title="Compose a NEW candidate from ONLY the labeled stage regions of this take (ATTACK, HOLD, DECAY, SUSTAIN, RELEASE in that order, samples copied verbatim, no gaps, no normalizing) and carry the regions over at their new positions. Unused samples are dropped; the envelope playback works exactly as before because it only reads the regions. Saved under scratch/desk_gen, becomes the current sound. Nothing is approved by this."><i class="ph-fill ph-scissors"></i><span x-text="trimBusy ? 'composing…' : 'Export Ranges to Atlas'"></span></button>
         <span class="hint" x-text="trimStatus"></span>
@@ -524,7 +524,7 @@ function desk() {
     regionClick(k) {   // with a selection: set the region; otherwise: make the region the current selection (then "preview window" auditions it through its stage)
       if (this.sel && !this.selRegion()) { this.setRegion(k); return; }
       if (this.sel && this.selRegion() === k) { this.setRegion(k); return; }   // re-set from a matching selection (harmless)
-      if (this.regions[k]) { this.stopPreview(); this.sel = { a: this.regions[k][0], b: this.regions[k][1] }; this.drawWave(); M.redraw(); this.note(k.toUpperCase() + ' range selected — preview window plays it through its ' + k + ' stage (looped per preview mode); tweak knobs while it loops.'); }
+      if (this.regions[k]) { this.stopPreview(); this.sel = { a: this.regions[k][0], b: this.regions[k][1] }; this.drawWave(); M.redraw(); this.note(k.toUpperCase() + ' range selected — preview window plays it through its ' + k + ' stage (loops only when preview-loop mode is on AND transport Loop is on); tweak knobs while it plays.'); }
       else if (this.sel) this.setRegion(k);
     },
     regionTip(k) {
@@ -638,22 +638,23 @@ function desk() {
       if (this.selPlaying) { this.stopPreview(); return; }
       if (!this.sel || !waveBuf) return;
       const k = this.selRegion();
-      if (k) { this.playRegion(k, { loop: this.trimLoop, viaPreview: true }); return; }
+      const loop = this.trimLoop && this.loop;   // the window loops only when preview-loop mode is on AND transport Loop is on
+      if (k) { this.playRegion(k, { loop, viaPreview: true }); return; }
       if (!engine.ensure()) return;
       const ctx = engine.ctx, { a, b } = this.sel;
       const src = ctx.createBufferSource(); src.buffer = waveBuf;
-      if (this.trimLoop) { src.loop = true; src.loopStart = a; src.loopEnd = b; }
+      if (loop) { src.loop = true; src.loopStart = a; src.loopEnd = b; }
       src.connect(monitorOut());
       const t0 = ctx.currentTime + 0.02;
-      if (this.trimLoop) src.start(t0, a); else src.start(t0, a, b - a);
+      if (loop) src.start(t0, a); else src.start(t0, a, b - a);
       src.onended = () => { if (previewSrc === src) { previewSrc = null; this.selPlaying = false; M.redraw(); this.drawWave(); } };
       this.stopRaw();
-      previewSrc = src; previewT0 = t0; this.selPlaying = true; M.redraw();
+      previewSrc = src; previewT0 = t0; src._wnd = { a, b, t0 }; this.selPlaying = true; M.redraw();
       cancelAnimationFrame(rawRaf);
       const step = () => {
         if (!this.selPlaying || previewSrc !== src) return;
         const u = Math.max(0, ctx.currentTime - t0), len = Math.max(b - a, 1e-3);
-        this.drawWave(a + (this.trimLoop ? u % len : Math.min(u, len)));
+        this.drawWave(a + (loop ? u % len : Math.min(u, len)));
         rawRaf = requestAnimationFrame(step);
       };
       step();
@@ -955,6 +956,39 @@ function desk() {
         this.note('Stopped (release tails toward Final).'); this.drawWave();
         if (was) this.animateRelease(); else this.drawEnv(this.rev);
       }
+    },
+    toggleLoop() {   // Loop off mid-loop: finish the current pass, then stop. On again cancels the pending loop-out.
+      this.loop = !this.loop; this.changed();
+      (this._loopOutTs || []).forEach(clearTimeout); this._loopOutTs = [];
+      if (!this.loop) this.loopOut();
+    },
+    loopOut() {
+      if (!engine || !engine.ctx) return;
+      const now = engine.ctx.currentTime;
+      const at = (ms, fn) => { this._loopOutTs.push(setTimeout(fn, Math.max(0, ms))); };
+      let n = 0;
+      if (voice && voice.playing) {   // main voice: normal stop at the next pass boundary (release tail after)
+        const v = voice;
+        let remain = -1;
+        if (v.loop && v.sampler && v.regions && v.regions.sustain) {
+          const sm = v.sampler, u = now - sm.susStart;
+          remain = u >= 0 ? sm.susLen - (u % Math.max(sm.susLen, 1e-3)) : (sm.susStart - now) + sm.susLen;
+        } else if (v.loop && v.src && v.src.buffer) {
+          const dur = v.src.buffer.duration;
+          remain = dur - (v.time % Math.max(dur, 1e-3));
+        }
+        if (remain >= 0) { at(remain * 1000, () => { if (voice === v) this.stop(); }); n++; }
+      }
+      if (auditionVoice && !auditionVoice.stopped) {   // stage/window audition: cut at the pass boundary (20 ms fade, no tail)
+        const v = auditionVoice;
+        const len = v.sampler ? v.sampler.auditionLen : 0;
+        if (v.auditionLoop && len > 0.005) { at((len - (v.time % len)) * 1000, () => { if (auditionVoice === v) v.stop({ immediate: true }); }); n++; }
+      }
+      if (previewSrc && previewSrc._wnd && previewSrc.loop) {   // raw window: stop at the window end
+        const s = previewSrc, w = s._wnd, len = Math.max(w.b - w.a, 1e-3);
+        at((w.b - (w.a + ((now - w.t0) % len))) * 1000, () => { if (previewSrc === s) this.stopPreview(); }); n++;
+      }
+      if (n) this.note('Loop off: finishing the current pass, then stopping.');
     },
 
     animateRelease() {   // playhead through the R segment after a stop / body-audition release

@@ -152,7 +152,7 @@ body.ed-move #game canvas{cursor:move}body.ed-scale #game canvas{cursor:nwse-res
     <div class="sub">Diner · sprite edition</div>
     <div class="row"><div class="stat" id="menuLevel">Level 1</div><div class="stat" id="menuCoins">🪙 0</div></div>
     <div class="starsBig" id="menuStars"><span>★</span><span>★</span><span>★</span></div>
-    <div class="howto">🍔 Tap the patty tray, then a pan — or drag. Cooked patty → plate with a hamburger bun; cooked sausage → plate with a hot dog bun.<br>🥤 Tap the soda machine to pour. 🍟 Tap the fries tray, then the fryer; cooked pile → carton on a plate.<br>🙂 Drag finished dishes to the customer who ordered them. 🪙 Tap tips to collect.</div>
+    <div class="howto">🍔 Tap the patty tray, then a pan — or drag. Cooked patty → plate with a hamburger bun; cooked sausage → plate with a hot dog bun.<br>🥤 Tap the soda machine to pour. 🍟 Tap the fries tray, then the fryer; cooked pile → carton on a plate.<br>🙂 Drag finished dishes to the customer who ordered them — some order two things, in any order. 🪙 Tap the coin piles to collect.</div>
     <div class="row"><button class="big" id="playBtn">Play</button><button class="ghost" id="resetBtn">Reset save</button></div>
   </div>
 </div>
@@ -161,7 +161,7 @@ body.ed-move #game canvas{cursor:move}body.ed-scale #game canvas{cursor:nwse-res
     <h1 id="endTitle">Level Complete!</h1>
     <div class="sub" id="endSub"></div>
     <div class="starsBig" id="endStars"><span>★</span><span>★</span><span>★</span></div>
-    <div class="row"><div class="stat" id="endServed"></div><div class="stat" id="endCoins"></div></div>
+    <div class="row"><div class="stat" id="endServed"></div><div class="stat" id="endCoins"></div><div class="stat" id="endSplit"></div></div>
     <div class="row"><button class="big" id="nextBtn">Next level</button><button class="ghost" id="retryBtn">Retry</button><button class="ghost" id="endMenuBtn">Menu</button></div>
   </div>
 </div>
@@ -939,15 +939,19 @@ class Decor{constructor(key,x,y,w,ay=0){this.spr=sprite(key,{w,ax:.5,ay,layer:L.
 const SLOT_X=[-477,-167,190,526];
 const CUST_Y=COUNTER_Y-90;           // feet point hidden behind the counter
 class Customer{
-  constructor(charId,dish,patience,slot){
-    this.customer=true;this.p=new Puppet(charId);this.dish=dish;this.dur=patience;this.patience=1;this.slot=slot;this.state='entering';this.dead=false;
+  constructor(charId,dishOrOrder,patience,slot){
+    this.customer=true;this.p=new Puppet(charId);this.order=Array.isArray(dishOrOrder)?dishOrOrder.slice():[dishOrOrder];this.dish=this.order[0];this.remaining=this.order.slice();this.dur=patience;this.patience=1;this.slot=slot;this.state='entering';this.dead=false;
     this.p.g.position.set(-W/2-200,CUST_Y,0);this.p.face(-1);this.p.pose=1;this.p.walk=1;this.p.apply();
     scene.add(this.p.g);
     // speech bubble with dish icon + patience bar
     this.bub=new THREE.Group();this.bub.position.set(SLOT_X[slot]-150,CUST_Y+270,0);
     const b=sprite('bubble',{w:130,layer:L.BUBBLE});this.bub.add(b);
-    const d=DISH[dish];
-    const icon=sprite(d.icon,{w:d.iconW||74,layer:L.BUBBLE+1,x:d.iconX??-6,y:d.iconY??14});this.bub.add(icon);
+    this.icons=[];const nI=this.order.length;   // one icon per order line (checked off as lines land); pairs squeeze into the same bubble
+    this.order.forEach((od,idx)=>{
+      const dd=DISH[od];
+      const icon=sprite(dd.icon,{w:nI>1?54:(dd.iconW||74),layer:L.BUBBLE+1,x:nI>1?(idx-(nI-1)/2)*56:(dd.iconX??-6),y:nI>1?14:(dd.iconY??14)});
+      icon.userData.editName='Bubble:'+od+'['+idx+']';this.bub.add(icon);this.icons.push({spr:icon,dish:od,done:false});
+    });
     this.bar=makeBar(84,12);this.bar.position.set(-6,-58,0);this.bar.visible=true;this.bar.set(1,0x4ade80);this.bub.add(this.bar);
     this.bub.visible=false;this.bub.scale.setScalar(.01);scene.add(this.bub);
     this.i=addI({owner:this,mesh:()=>this.p.bodyG,priority:.5,customer:true});
@@ -956,12 +960,20 @@ class Customer{
     tw(this.p.g.position,{x},1.1,easeInOut,()=>{this.p.walk=0;this.p.turn(0,.5);this.p.face(1);this.state='waiting';this.bub.visible=true;tw(this.bub.scale,{x:1,y:1},.3);this.p.setExpr('talk');setTimeout(()=>this.p.setExpr('neutral'),700);});
     customers.push(this);
   }
-  accepts(item){return this.state==='waiting'&&item.dish()===this.dish;}
+  accepts(item){const d=item.dish();return this.state==='waiting'&&!!d&&this.remaining.includes(d);}
+  /** hand over one order line: patience refill (CF partial-serve), icon check-off; true when the order is complete */
+  serveItem(dish){
+    const i=this.remaining.indexOf(dish);if(i<0)return false;
+    this.remaining.splice(i,1);
+    const e=this.icons.find(e=>!e.done&&e.dish===dish);if(e){e.done=true;e.spr.material.opacity=.3;}
+    if(this.p.expr==='sad')this.p.setExpr('neutral');
+    return this.remaining.length===0;
+  }
   update(dt){
     this.p.update(dt);
     if(this.state==='waiting'){
       this.patience-=dt/this.dur;this.bar.set(this.patience,this.patience>.5?0x4ade80:this.patience>.25?0xffb703:0xef4444);
-      if(this.patience<.35&&this.p.expr==='neutral')this.p.setExpr('sad');
+      if(this.patience<TIP_CUTOFF&&this.p.expr==='neutral')this.p.setExpr('sad');
       if(this.patience<=0){this.leave(false);}
       // idle: glance around
       if(Math.random()<dt*.25)this.p.look((Math.random()-.5)*2,(Math.random()-.5)*.6);
@@ -985,16 +997,27 @@ class Customer{
 }
 /* tip spawn zones, posed as rect1-4 in the Layout studio 2026-09-05 (one per customer slot) */
 const TIP_ZONES=[[-523.5,79.2,-413.6,120.8],[-252.2,74.2,-94.1,109.1],[97.3,80.8,293.7,114.1],[450.1,74.2,603.3,109.1]];
+const TIP_CUTOFF=0.35;   // patience at/above this at the final handoff still tips (the sad line); below pays the bill only
 function spawnAngry(x,y){const s=sprite('hud_angry',{w:60,layer:L.FX,x,y});s.material.opacity=0;scene.add(s);tw(s.material,{opacity:1},.15);tw(s.position,{y:y+30},.9,easeOut,()=>{tw(s.material,{opacity:0},.3,easeOut,()=>removeObj(s));});}
 
 /* ---------- coin piles (tips), coin burst, smoke ---------- */
 class CoinPile{
-  constructor(x,y,value){this.value=value;this.spr=sprite('coin_stack',{w:110,ax:.5,ay:0,layer:L.STATION+5,x,y});this.spr.scale.setScalar(.01);scene.add(this.spr);setSize(this.spr,110);const w=this.spr.scale.x,h=this.spr.scale.y;this.spr.scale.set(.01,.01,1);tw(this.spr.scale,{x:w,y:h},.35,easeOut);this.i=addI({owner:this,mesh:()=>this.spr,priority:3});this.t=0;piles.push(this);}
+  constructor(x,y,value,slot=null,kind='bill'){this.value=value;this.slot=slot;this.kind=kind;this.spr=sprite('coin_stack',{w:110,ax:.5,ay:0,layer:L.STATION+5,x,y});this.spr.scale.setScalar(.01);scene.add(this.spr);setSize(this.spr,110);const w=this.spr.scale.x,h=this.spr.scale.y;this.spr.scale.set(.01,.01,1);tw(this.spr.scale,{x:w,y:h},.35,easeOut);if(kind==='tip')this.spr.material.color.setHex(0xcd7f32);/* CF bronze tip coins */this.i=addI({owner:this,mesh:()=>this.spr,priority:3});this.t=0;piles.push(this);}
   onTap(){collectPile(this);return true;}
   update(dt){this.t+=dt;this.spr.position.y+=Math.sin(this.t*4)*.15;}
   dispose(){removeI(this.i);removeObj(this.spr);const i=piles.indexOf(this);if(i>=0)piles.splice(i,1);}
 }
-function collectPile(p){G.addCoins(p.value,p.spr.position.x,p.spr.position.y+40);coinBurst(p.spr.position.x,p.spr.position.y+30,6);p.dispose();}
+function collectPile(p){
+  if(!p.spr.parent)return;   // already collected as part of its slot group (end-of-level sweep iterates a stale slice)
+  const group=p.slot==null?[p]:piles.filter(q=>q.slot===p.slot);   // one tap takes the whole slot: bill + tip together (CF)
+  let total=0;const x=p.spr.position.x,y=p.spr.position.y;
+  for(const q of group.slice()){
+    if(q.kind==='tip')G.tips+=q.value;else G.earnings+=q.value;
+    G.coins+=q.value;G.score+=q.value;total+=q.value;
+    q.dispose();
+  }
+  floatText(x,y+40,'+'+total,'coin');coinBurst(x,y+30,6+2*group.length);bumpHud();updateHUD();
+}
 function coinBurst(x,y,n=8){
   for(let i=0;i<n;i++){const s=sprite('coin',{w:34+Math.random()*14,layer:L.FX,x,y});scene.add(s);
     fxList.push({m:s,vx:(Math.random()-.5)*420,vy:260+Math.random()*300,g:-900,life:.9+Math.random()*.4,t:0,spin:(Math.random()-.5)*10});}
@@ -1050,21 +1073,30 @@ function tryDrop(it,target,slot){
   if(!ok){SFX.error();return false;}
   if(selected===it)selected=null;
   it.g.scale.setScalar(1);
-  if(target.customer){serveCustomer(target,it);return true;}
+  if(target.customer){deliverToCustomer(target,it);return true;}
   const from=it._from;
   if(target.drop(it,slot)){if(it.kind==='plate'&&from&&from.type==='rack')from.rack.refill(from.slot);return true;}
   return false;
 }
-function serveCustomer(c,it){
+function deliverToCustomer(c,it){
+  const dish=it.dish();
   const from=it._from;
   if(it.station&&it.station.take)it.station.take(it);
   if(from&&from.type==='rack')from.rack.refill(from.slot);
   it.dispose();
+  if(c.serveItem(dish)){serveCustomer(c);}
+  else{c.patience=Math.min(1,c.patience+.25);SFX.place();}   // partial line: patience refill, no money until the final handoff (CF)
+  return true;
+}
+/** full order complete: a bill pile always + a tip pile when still happy; nothing banks until the piles are tapped */
+function serveCustomer(c){
   c.serve();
-  const base=DISH[c.dish].base,p=clamp(c.patience,0,1);
-  const coins=Math.round(base*(.6+p*.6));
-  G.addCoins(coins,c.p.g.position.x,CUST_Y+200,{fly:true});
-  if(p>.5){const z=TIP_ZONES[c.slot]||TIP_ZONES[0];new CoinPile(z[0]+Math.random()*(z[2]-z[0]),z[1]+Math.random()*(z[3]-z[1]),Math.round(base*.4));}
+  const bill=c.order.reduce((n,d)=>n+DISH[d].base,0);
+  const p=clamp(c.patience,0,1);
+  const tip=p>=TIP_CUTOFF?Math.round(bill*.5*p):0;
+  const z=TIP_ZONES[c.slot]||TIP_ZONES[0];
+  new CoinPile(z[0]+(z[2]-z[0])*.3,(z[1]+z[3])/2,bill,c.slot,'bill');
+  if(tip>0)new CoinPile(z[0]+(z[2]-z[0])*.7,(z[1]+z[3])/2,tip,c.slot,'tip');
   SFX.serve();G.onServed&&G.onServed(c);
 }
 const ndcTmp={x:0,y:0};
@@ -1200,7 +1232,7 @@ let SAVE={level:1,best:{},coins:0};
 try{const s=localStorage.getItem(SAVE_KEY);if(s)SAVE=Object.assign(SAVE,JSON.parse(s));}catch(e){}
 const save=()=>{try{localStorage.setItem(SAVE_KEY,JSON.stringify(SAVE));}catch(e){}};
 const G={
-  mode:'menu',level:1,cfg:null,coins:0,score:0,served:0,lost:0,time:0,elapsed:0,queue:[],spawnIdx:0,nextSpawnAt:0,
+  mode:'menu',level:1,cfg:null,coins:0,score:0,served:0,lost:0,earnings:0,tips:0,time:0,elapsed:0,queue:[],spawnIdx:0,nextSpawnAt:0,
   inputEnabled(){return this.mode==='playing'||this.mode==='story'||this.mode==='pose'||this.mode==='studio';},
   addCoins(n,x,y,{fly=false}={}){this.coins+=n;this.score+=n;floatText(x,y,'+'+n,'coin');if(fly)flyCoins(x,y,Math.min(8,2+Math.round(n/6)));else bumpHud();updateHUD();},
   onServed:null,
@@ -1241,18 +1273,20 @@ function updateHUD(){
 function startLevel(n){
   clearWorld();G.level=n;G.cfg=levelConfig(n);
   const rng=mulberry32(G.cfg.seed);G.queue=[];
-  for(let i=0;i<G.cfg.total;i++){const dish=i===0?'soda':G.cfg.pool[Math.floor(rng()*G.cfg.pool.length)];G.queue.push({dish,dur:G.cfg.patience*(.85+rng()*.5),delay:i===0?1:2.5+rng()*3,ch:rng()<.5?'man':'woman'});}
+  for(let i=0;i<G.cfg.total;i++){const pick=()=>G.cfg.pool[Math.floor(rng()*G.cfg.pool.length)];const order=[i===0?'soda':pick()];
+  if(i>0&&G.level>=2&&rng()<.45)order.push(pick());   // multi-item orders from level 2 (CF: partial serves refill patience, money moves on the final handoff)
+  G.queue.push({order,dur:G.cfg.patience*(.85+rng()*.5)*(1+.4*(order.length-1)),delay:i===0?1:2.5+rng()*3,ch:rng()<.5?'man':'woman'});}
   buildKitchen(G.cfg);
-  G.served=0;G.coins=0;G.score=0;G.lost=0;G.elapsed=0;G.time=G.cfg.timer;G.spawnIdx=0;G.nextSpawnAt=1;
+  G.served=0;G.coins=0;G.score=0;G.earnings=0;G.tips=0;G.lost=0;G.elapsed=0;G.time=G.cfg.timer;G.spawnIdx=0;G.nextSpawnAt=1;
   G.mode='playing';Time.unfreeze();syncPauseBtn();Music.start();G.onServed=()=>{G.served++;updateHUD();if(G.served>=G.cfg.goal)setTimeout(()=>endLevel(true),900);};
   $('menu').classList.add('hidden');$('end').classList.add('hidden');$('paused').classList.add('hidden');$('story').classList.add('hidden');$('hud').classList.remove('hidden');
   updateHUD();
   if(n===1)setTimeout(()=>toast('Tap the patty tray, then a pan. Tap buns, then a plate. Drag dishes to customers!',4500),600);
 }
-function freeSlot(){for(let i=0;i<G.cfg.slots;i++)if(!customers.some(c=>c.slot===i&&c.state!=='leaving'))return i;return null;}
+function freeSlot(){for(let i=0;i<G.cfg.slots;i++)if(!customers.some(c=>c.slot===i&&c.state!=='leaving')&&!piles.some(p=>p.slot===i))return i;return null;}   // a slot stays occupied until its counter piles are tapped away (CF pacing: sitting piles throttle the wave)
 function updateGame(dt){
   G.elapsed+=dt;G.time-=dt;
-  if(G.spawnIdx<G.queue.length&&G.elapsed>=G.nextSpawnAt){const s=freeSlot();if(s!=null){const q=G.queue[G.spawnIdx++];new Customer(q.ch,q.dish,q.dur,s);G.nextSpawnAt=G.elapsed+q.delay;}else G.nextSpawnAt=Math.max(G.nextSpawnAt,G.elapsed+.5);}
+  if(G.spawnIdx<G.queue.length&&G.elapsed>=G.nextSpawnAt){const s=freeSlot();if(s!=null){const q=G.queue[G.spawnIdx++];new Customer(q.ch,q.order||q.dish,q.dur,s);G.nextSpawnAt=G.elapsed+q.delay;}else G.nextSpawnAt=Math.max(G.nextSpawnAt,G.elapsed+.5);}
   updateWorld(dt);
   updateHUD();
   if(G.time<=0){endLevel(G.served>=G.cfg.goal);return;}
@@ -1272,7 +1306,7 @@ function endLevel(win){
   SAVE.best[G.level]=Math.max(SAVE.best[G.level]||0,stars);SAVE.coins+=G.coins;save();
   setTimeout(()=>{$('endTitle').textContent=win?'Level Complete!':"Time's Up!";$('endSub').textContent=win?(stars===3?'Perfect service! 🔥':stars===2?'Nice work, chef!':'Level cleared!'):'The customers got too hungry...';
     const sp=$('endStars').children;for(let i=0;i<3;i++)sp[i].classList.remove('on');for(let i=0;i<stars;i++)setTimeout(()=>{sp[i].classList.add('on');SFX.star(i);},400+i*450);
-    $('endServed').textContent='Served '+G.served+'/'+G.cfg.goal;$('endCoins').textContent='+'+G.coins+' 🪙';$('nextBtn').classList.toggle('hidden',!win);$('end').classList.remove('hidden');},600);
+    $('endServed').textContent='Served '+G.served+'/'+G.cfg.goal;$('endCoins').textContent='+'+G.coins+' 🪙';$('endSplit').textContent='Earn '+G.earnings+' · Tips '+G.tips;$('nextBtn').classList.toggle('hidden',!win);$('end').classList.remove('hidden');},600);
 }
 function showMenu(){
   G.mode='menu';Music.stop();$('volPanel').classList.add('hidden');Time.unfreeze();syncPauseBtn();clearWorld();
@@ -1314,7 +1348,7 @@ function setStorySidebar(hidden){
 function openStory(pageIdx=0){
   G.mode='story';clearWorld();
   $('menu').classList.add('hidden');$('hud').classList.remove('hidden');
-  G.cfg={goal:10,patience:20,slots:4};G.served=0;G.coins=0;G.score=0;G.time=90;G.level=1;updateHUD();
+  G.cfg={goal:10,patience:20,slots:4};G.served=0;G.coins=0;G.score=0;G.earnings=0;G.tips=0;G.time=90;G.level=1;updateHUD();
   setStorySidebar(false);
   const nav=$('storyNav');nav.innerHTML='';PAGES.forEach((p,i)=>{const b=document.createElement('button');b.textContent=p.name;b.onclick=()=>Studio.active?Studio.showPage(i):showPage(i);nav.appendChild(b);});
   showPage(pageIdx);

@@ -1,0 +1,24 @@
+id: sfx_fries_fry_loop
+date: '2026-09-06'
+engine: human-ref
+rendered: human-ref (human-isolated recording, ~/Downloads/deep-fry.wav, 3.53 s
+  192 kHz stereo) · posted to desk standard (mono 48 kHz, 80 Hz highpass, peak
+  -1 dB, no loop splice) · desk take fries_ref_deepfry_182848 v01
+sample_rate: 48000
+loop: true
+game_keys:
+  sfx_fries_fry_loop_v01: sfx_fries_fry_loop_v01.wav
+seed: null
+copy_as: 'cp soundman/out/sfx_fries_fry_loop/sfx_fries_fry_loop_v01.wav assets/sfx/sfx_fries_fry_loop/sfx_fries_fry_loop_v01.wav
+
+  '
+assets_snippet: 'sfx_fries_fry_loop_v01: A+''sfx/sfx_fries_fry_loop/sfx_fries_fry_loop_v01.wav'',
+
+  '
+listen_verify: python3 present.py sfx_fries_fry_loop (pre-accept, voice announce +
+  playback); post-accept playback check in cook2.html?debug (code side)
+notes: "human-supplied deep-fryer recording for the fries station (not a synth/model\n  render) \xB7 sampler stage regions (attack/hold/decay/sustain/release cover the\n  full 3.533 s) + two-layer AHDSR + gain on automation.yaml; raw/ holds the 192\n  kHz stereo source + desk job/settings \xB7 license: human-supplied, provenance\n  unverified \u2014 confirm before commercial ship"
+approved: 2026-09-06 (take 1 = fries_ref_deepfry_182848 v01, automation approved
+  as perfect by human on the desk; promoted from scratch/promote_fries/)
+license: human-supplied recording — provenance unverified, confirm before commercial
+  ship

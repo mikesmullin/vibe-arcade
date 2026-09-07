@@ -94,7 +94,8 @@ def catalogue():
 
 def save_catalogue(cat):
     GEN.mkdir(parents=True, exist_ok=True)
-    (GEN / "sounds.json").write_text(json.dumps(cat, indent=1, sort_keys=True) + "\n")
+    ordered = dict(sorted(cat.items(), key=lambda kv: kv[1].get("date", ""), reverse=True))   # newest first: the Candidates card reads file order, same as Generated
+    (GEN / "sounds.json").write_text(json.dumps(ordered, indent=1) + "\n")
 
 
 def rescan():

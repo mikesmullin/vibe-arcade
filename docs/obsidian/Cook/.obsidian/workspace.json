@@ -1,0 +1,211 @@
+{
+  "main": {
+    "id": "0a42b062cbdbaf7b",
+    "type": "split",
+    "children": [
+      {
+        "id": "ee25e7c263c2b912",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "9e2634569e85a9c8",
+            "type": "leaf",
+            "state": {
+              "type": "canvas",
+              "state": {
+                "file": "Cook Canvas.canvas",
+                "viewState": {
+                  "x": 56.099454121369206,
+                  "y": 36.15510010997782,
+                  "zoom": 0.8
+                }
+              },
+              "icon": "lucide-layout-dashboard",
+              "title": "Cook Canvas"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "44b13973440b9be2",
+    "type": "split",
+    "children": [
+      {
+        "id": "253727a44dcd71d7",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "34338feabfa7559d",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "4f6d28402d5e2749",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "becc095b384d977d",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "right": {
+    "id": "fe3565e1a2c0efff",
+    "type": "split",
+    "children": [
+      {
+        "id": "d7108ba973360511",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "7cfbaa8582ed11b0",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "Cook Canvas.canvas",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks"
+            }
+          },
+          {
+            "id": "a1bb1a56835ce97d",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "Cook Canvas.canvas",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links"
+            }
+          },
+          {
+            "id": "b30b2064b9f106b4",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "c97c9686a2e50c8e",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "f60d35c7e4afcd4f",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "Cook Canvas.canvas",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "9e2634569e85a9c8",
+  "lastOpenFiles": [
+    "level select screen 3.png",
+    "shop for upgrades between rounds.png",
+    "win seq final tally.png",
+    "win sequence begins w confetti.png",
+    "Pasted image 20260906212321.png",
+    "win sequence contd.png",
+    "coins increment while confetti falls.png",
+    "confetti eventually stops.png",
+    "goal begins round.png",
+    "level select screen.png",
+    "biome select screen.png",
+    "Cook Canvas.canvas",
+    "Welcome.md"
+  ]
+}

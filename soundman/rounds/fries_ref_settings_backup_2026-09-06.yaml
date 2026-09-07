@@ -1,0 +1,53 @@
+id: sfx_fries_fry_loop
+date: '2026-09-06'
+note: 'human re-tweak: monitor -17 -> -3 dB, hit attack 531 -> 300 ms, hit decay 128
+  -> 220 ms, hit sustain -13.5 -> -34 dB, body sustain -18 -> -23 dB, attack region
+  starts 0.230 s (was 0)'
+take: scratch/desk_gen/fries_ref_deepfry_182848/fries_ref_deepfry_182848_v01.wav ->
+  out/sfx_fries_fry_loop/sfx_fries_fry_loop_v01.wav
+desk_get:
+  sound: fries_ref_deepfry_182848
+  take: 1
+  loop: true
+  monitorDb: -3
+  layers:
+    hit:
+      enabled: true
+      initialDb: -80
+      attackMs: 300
+      peakDb: 0
+      holdMs: 1062
+      decayMs: 220
+      sustainDb: -34
+      releaseMs: 635
+      finalDb: -17
+    body:
+      enabled: true
+      initialDb: -80
+      attackMs: 250
+      peakDb: -3.5
+      holdMs: 0
+      decayMs: 240
+      sustainDb: -23
+      releaseMs: 600
+      finalDb: -10.5
+  paramsOn: false
+  sweepS: 3
+  src: scratch/desk_gen
+  samplerOn: true
+  regions:
+    attack:
+    - 0.23035416666666667
+    - 0.5307916666666667
+    hold:
+    - 0.5267916666666667
+    - 1.5883958333333332
+    decay:
+    - 1.584375
+    - 1.7125833333333333
+    sustain:
+    - 1.7125833333333333
+    - 2.8903541666666666
+    release:
+    - 2.8983541666666666
+    - 3.5333125

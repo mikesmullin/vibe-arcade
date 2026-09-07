@@ -1,4 +1,35 @@
-# SOUNDMAN INDEX — finished outbox ids (sound-written). Code side: ls out/*/intake.yaml works just as well.
+music_diner_loop:
+  backend: sa3_medium/desk
+  date: '2026-09-06'
+  files:
+  - music_diner_loop_v01.wav
+  keys:
+  - music_diner_loop_v01
+  loop: true
+sfx_customer_angry:
+  backend: moss_v2/desk
+  date: '2026-09-06'
+  files:
+  - sfx_customer_angry_v01.wav
+  keys:
+  - sfx_customer_angry_v01
+  loop: false
+sfx_customer_happy:
+  backend: moss_v2/atlas
+  date: '2026-09-06'
+  files:
+  - sfx_customer_happy_v01.wav
+  keys:
+  - sfx_customer_happy_v01
+  loop: false
+sfx_fries_fry_loop:
+  backend: human-ref/desk
+  date: '2026-09-06'
+  files:
+  - sfx_fries_fry_loop_v01.wav
+  keys:
+  - sfx_fries_fry_loop_v01
+  loop: true
 sfx_patty_sizzle_loop:
   backend: synth/sizzle
   date: '2026-09-05'
