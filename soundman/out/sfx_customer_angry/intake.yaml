@@ -1,0 +1,26 @@
+id: sfx_customer_angry
+date: '2026-09-06'
+engine: moss_soundeffect_v2
+rendered: "moss_v2 (MOSS-SoundEffect v2.0, Apache-2.0) \xB7 desk round 1 (rounds/customer_r1.yaml,\
+  \ prompt cust_r1_angry, seed 81, take v03 seed 2035, 1.5 s one-shot, mono 48 kHz,\
+  \ peak -1 dB)"
+sample_rate: 48000
+loop: false
+game_keys:
+  sfx_customer_angry_v01: sfx_customer_angry_v01.wav
+seed: 2035
+copy_as: 'cp soundman/out/sfx_customer_angry/sfx_customer_angry_v01.wav assets/sfx/sfx_customer_angry/sfx_customer_angry_v01.wav
+
+  '
+assets_snippet: 'sfx_customer_angry_v01: A+''sfx/sfx_customer_angry/sfx_customer_angry_v01.wav'',
+
+  '
+listen_verify: 'reviewed on the Sound Desk (daw.html?src=scratch/desk_gen, Candidates);
+  post-accept: cook2.html?debug, let a customer time out'
+notes: "prompt was: frustrated customer annoyed sigh and irritated huff, angry grumble\
+  \ walking away, cartoon diner, close mic, no words, no music \xB7 human: \"okay,\
+  \ could work for man customer\" 50% (desk feedback 2026-09-06). Whole take, no cut.\
+  \ Layers neutral unity (human tuned nothing)."
+approved: 2026-09-06 (take 1 = desk take cust_r1_angry_moss_v2_005921 v03, approved
+  by human on the desk; promoted from scratch/promote_angry/)
+license: "Apache-2.0 (MOSS-SoundEffect v2.0) \u2014 commercial OK"

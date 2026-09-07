@@ -668,12 +668,23 @@ assets:
 
   - id: fry_carton_empty
     type: prop
-    # empty red-BLACK striped carton matching the in-carton fry keepers; magenta key keeps the white interior.
+    # empty scoop carton matching the in-carton fry keepers (2026-09-06 fix): same short/wide
+    # scoop-front carton as fries_cooked, fries erased via reference lock. Magenta key keeps
+    # the white interior (rembg would eat it).
     bg: solid bright magenta
     cutout: key
-    prompt: an empty tall paper french-fry carton with red and black vertical stripes, open top showing the empty white paper interior, standing alone seen from a 3/4 elevated angle, no fries, no food, cartoon game prop
+    refs: [out/fries/raw/fries_cooked.png]
+    template: >-
+      {ref_clause} Using the reference image of the french-fry carton, redraw the exact same carton
+      with the same shape, size, position, camera angle and art style: a short wide paper carton with
+      red and black vertical stripes and a low scooped front lip, glossy cel-shaded cartoon with clean
+      outlines and soft highlights, seen from a 3/4 elevated angle. But completely empty: erase all
+      fries and all food, show the open empty white paper interior with soft shading inside. No fries,
+      no food, nothing sticking out. Plain flat {bg} background, nothing else. No ground shadow,
+      no scene, no text, no UI.
+    prompt: an empty red and black striped paper french-fry carton with a low scooped front, open top showing the empty white paper interior, no fries, no food, cartoon game prop
     size: 1024
-    seed: 43911
+    seed: 43913
 
   - id: cheese_slices
     type: stateful

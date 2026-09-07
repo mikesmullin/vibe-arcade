@@ -1,0 +1,23 @@
+# Round 1 — gameplay music loop. Human asked: gameplay, upbeat cartoon diner,
+# 30 s seamless loop, ref Cooking Fever. No prior notes (first music round).
+# Moves: shippable-only bake-off (sa3_medium / sao1 / moss_v2 — tango+audiox are
+# non-commercial, excluded so nobody falls in love with an unshippable take),
+# identical core prompt, 2 takes each to keep 30 s renders sane, loop=true so
+# the desk post applies the 0.5 s crossfade splice.
+defaults: {seconds: 30, loop: true, takes: 2}
+jobs:
+  - name: music_r1_diner
+    model: sa3_medium
+    seed: 101
+    prompt: "upbeat cartoon diner background music loop, bouncy piano and ukulele with punchy drums and playful brass stabs, cheerful fast tempo, steady groove, even energy all the way through, loopable, no intro, no outro, no fade, no vocals, no speech"
+    negative: "vocals, singing, talking, speech, intro, outro, fade out, breakdown, silence, sound effects"
+  - name: music_r1_diner
+    model: sao1
+    seed: 201
+    prompt: "upbeat cartoon diner background music loop, bouncy piano and ukulele with punchy drums and playful brass stabs, cheerful fast tempo, steady groove, even energy all the way through, loopable, no intro, no outro, no fade, no vocals, no speech"
+    negative: "vocals, singing, talking, speech, intro, outro, fade out, breakdown, silence, sound effects"
+  - name: music_r1_diner
+    model: moss_v2
+    seed: 301
+    takes: 1
+    prompt: "upbeat cartoon diner background music loop, bouncy piano and ukulele with punchy drums, cheerful fast tempo, steady playful groove, loopable, no vocals, no speech"

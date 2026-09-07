@@ -1,0 +1,64 @@
+id: sfx_fries_fry_loop
+date: '2026-09-06'
+take: 1
+keeper: sfx_fries_fry_loop_v01.wav
+keeper_mp3: sfx_fries_fry_loop_v01.mp3
+raw_note: "mp3 is the raw keeper transcoded \u2014 NO automation baked in; the game\
+  \ applies layers live at runtime"
+layers:
+  hit:
+    enabled: true
+    initialDb: -80
+    attackMs: 300
+    peakDb: 0
+    holdMs: 1062
+    decayMs: 220
+    sustainDb: -34
+    releaseMs: 635
+    finalDb: -17
+  body:
+    enabled: true
+    initialDb: -80
+    attackMs: 250
+    peakDb: -3.5
+    holdMs: 0
+    decayMs: 240
+    sustainDb: -23
+    releaseMs: 600
+    finalDb: -10.5
+params: null
+regions:
+  attack:
+  - 0.23035416666666667
+  - 0.5307916666666667
+  hold:
+  - 0.5267916666666667
+  - 1.5883958333333332
+  decay:
+  - 1.584375
+  - 1.7125833333333333
+  sustain:
+  - 1.7125833333333333
+  - 2.8903541666666666
+  release:
+  - 2.8983541666666666
+  - 3.5333125
+monitorDb: -3
+monitor_note: "playback gain \u2014 applied live on the voice by daw.mjs (desk ==\
+  \ game); never rendered into audio"
+render:
+  mp3: libmp3lame 128k mono 48000Hz
+  ffmpeg: ffmpeg version n8.1.2 Copyright (c) 2000-2026 the FFmpeg developers
+files:
+  sfx_fries_fry_loop_v01.mp3: sfx_fries_fry_loop_v01.mp3
+sha256_mp3: e2db58a6fb1f66265455fe257dfca191c76d72a11cf23ede3f952122fd4d966e
+copy_as: 'cp soundman/out/sfx_fries_fry_loop/sfx_fries_fry_loop_v01.wav assets/sfx/sfx_fries_fry_loop/sfx_fries_fry_loop_v01.wav
+
+  cp soundman/out/sfx_fries_fry_loop/sfx_fries_fry_loop_v01.mp3 assets/sfx/sfx_fries_fry_loop/sfx_fries_fry_loop_v01.mp3
+
+  cp soundman/out/sfx_fries_fry_loop/automation.yaml assets/sfx/sfx_fries_fry_loop/automation.yaml
+
+  '
+command: python3 export.py --settings '<get() JSON>' --force
+determinism: same keeper + same ffmpeg build -> same bytes (sha256 above; rerun with
+  --force and cmp)

@@ -1,4 +1,32 @@
 {
+ "music_diner_loop": {
+  "audition": "audition.wav",
+  "keepers": [
+   "music_diner_loop_v01.wav"
+  ],
+  "loop": true
+ },
+ "sfx_customer_angry": {
+  "audition": "audition.wav",
+  "keepers": [
+   "sfx_customer_angry_v01.wav"
+  ],
+  "loop": false
+ },
+ "sfx_customer_happy": {
+  "audition": "audition.wav",
+  "keepers": [
+   "sfx_customer_happy_v01.wav"
+  ],
+  "loop": false
+ },
+ "sfx_fries_fry_loop": {
+  "audition": "audition.wav",
+  "keepers": [
+   "sfx_fries_fry_loop_v01.wav"
+  ],
+  "loop": true
+ },
  "sfx_patty_sizzle_loop": {
   "audition": "audition.wav",
   "keepers": [

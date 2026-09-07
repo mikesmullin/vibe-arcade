@@ -1,0 +1,32 @@
+id: music_diner_loop
+date: '2026-09-06'
+engine: stable_audio_3_medium
+rendered: "sa3_medium (Stable Audio 3 medium, Stability Community) \xB7 desk round\
+  \ 1 (rounds/music_r1.yaml, prompt music_r1_diner, seed 101, take v02 seed 1078,\
+  \ 30 s loop, 0.5 s crossfade splice, mono 48 kHz, peak -1 dB)"
+sample_rate: 48000
+loop: true
+game_keys:
+  music_diner_loop_v01: music_diner_loop_v01.wav
+seed: 1078
+copy_as: 'cp soundman/out/music_diner_loop/music_diner_loop_v01.wav assets/music/music_diner_loop/music_diner_loop_v01.wav
+
+  cp soundman/out/music_diner_loop/music_diner_loop_v01.mp3 assets/music/music_diner_loop/music_diner_loop_v01.mp3
+
+  cp soundman/out/music_diner_loop/automation.yaml assets/music/music_diner_loop/automation.yaml
+
+  '
+assets_snippet: 'music_diner_loop_v01: A+''music/music_diner_loop/music_diner_loop_v01.wav'',
+
+  '
+listen_verify: "reviewed on the Sound Desk (daw.html?src=scratch/desk_gen, Candidates);\
+  \ post-accept: cook2.html?debug, start a level \u2014 gameplay music loop"
+notes: "prompt was: upbeat cartoon diner background music loop, bouncy piano and ukulele\
+  \ with punchy drums and playful brass stabs, cheerful fast tempo, steady groove,\
+  \ even energy all the way through, loopable, no intro, no outro, no fade, no vocals,\
+  \ no speech \xB7 human: \"wow very good\" 95% (desk feedback 2026-09-06; v01 also\
+  \ 90%); sao1 takes 45% \"too simple\" \xB7 layers on automation.yaml are neutral\
+  \ unity (human tuned nothing \u2014 music ships flat, tune later if needed)"
+approved: 2026-09-06 (take 1 = desk take music_r1_diner_sa3_medium_005151 v02, approved
+  by human on the desk; promoted from scratch/promote_music/)
+license: "Stability Community (commercial <$1M/yr) \u2014 commercial OK"

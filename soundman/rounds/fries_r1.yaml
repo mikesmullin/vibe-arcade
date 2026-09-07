@@ -1,0 +1,20 @@
+# Round 1 — fries fryer loop. Human asked: fries cooking in the fry station.
+# Texture loop in the sizzle/pour family: steady vigorous oil bubbling, seamless.
+# Moves: shippable-only trio (small_sfx daily driver / sao1 / moss_v2 — tango/audiox
+# excluded, non-commercial), 6 s loop=true (0.5 s crossfade), 3 takes each.
+defaults: {seconds: 6, loop: true, takes: 3, asset: sfx_fries_fry_loop}
+jobs:
+  - name: fries_r1_bubble
+    model: sa3_small_sfx
+    seed: 11
+    prompt: "french fries deep frying in hot oil, vigorous bubbling and crackling oil, fryer basket sizzle, steady, close mic, no speech, no music"
+    negative: "speech, talking, music, beeping, alarms, background voices"
+  - name: fries_r1_bubble
+    model: sao1
+    seed: 21
+    prompt: "french fries deep frying in hot oil, vigorous bubbling and crackling oil, fryer basket sizzle, steady, close mic, no speech, no music"
+    negative: "speech, talking, music, beeping, alarms, background voices"
+  - name: fries_r1_bubble
+    model: moss_v2
+    seed: 31
+    prompt: "french fries deep frying in hot oil, vigorous bubbling and crackling oil, fryer basket sizzle, steady, close mic, no speech, no music"

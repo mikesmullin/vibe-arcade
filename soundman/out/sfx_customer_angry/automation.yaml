@@ -1,0 +1,49 @@
+id: sfx_customer_angry
+date: '2026-09-06'
+take: 1
+keeper: sfx_customer_angry_v01.wav
+keeper_mp3: sfx_customer_angry_v01.mp3
+raw_note: "mp3 is the raw keeper transcoded \u2014 NO automation baked in; the game\
+  \ applies layers live at runtime"
+layers:
+  hit:
+    enabled: true
+    initialDb: 0
+    attackMs: 5
+    peakDb: 0
+    holdMs: 0
+    decayMs: 0
+    sustainDb: 0
+    releaseMs: 120
+    finalDb: -80
+  body:
+    enabled: false
+    initialDb: -80
+    attackMs: 3000
+    peakDb: -3
+    holdMs: 0
+    decayMs: 200
+    sustainDb: -3
+    releaseMs: 800
+    finalDb: -80
+params: null
+regions: null
+monitorDb: 0
+monitor_note: "playback gain \u2014 applied live on the voice by daw.mjs (desk ==\
+  \ game); never rendered into audio"
+render:
+  mp3: libmp3lame 128k mono 48000Hz
+  ffmpeg: ffmpeg version n8.1.2 Copyright (c) 2000-2026 the FFmpeg developers
+files:
+  sfx_customer_angry_v01.mp3: sfx_customer_angry_v01.mp3
+sha256_mp3: 9558557c29995dec87cbfda76bfaa172f07ab342e9df588fe0590841c66c6384
+copy_as: 'cp soundman/out/sfx_customer_angry/sfx_customer_angry_v01.wav assets/sfx/sfx_customer_angry/sfx_customer_angry_v01.wav
+
+  cp soundman/out/sfx_customer_angry/sfx_customer_angry_v01.mp3 assets/sfx/sfx_customer_angry/sfx_customer_angry_v01.mp3
+
+  cp soundman/out/sfx_customer_angry/automation.yaml assets/sfx/sfx_customer_angry/automation.yaml
+
+  '
+command: python3 export.py --settings '<get() JSON>'
+determinism: same keeper + same ffmpeg build -> same bytes (sha256 above; rerun with
+  --force and cmp)

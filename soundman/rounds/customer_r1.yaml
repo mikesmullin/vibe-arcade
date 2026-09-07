@@ -1,0 +1,53 @@
+# Round 1 — customer voices. Human asked: (1) happy (possibly eating) noises on
+# fast serve, (2) angry/frustrated noises on walkaway-timeout. No prior notes.
+# Moves: shippable-only bake-off (tango/audiox excluded — non-commercial),
+# 4 models x 2 sounds, 3 takes each (short one-shots, cheap renders), loop=false.
+# Non-verbal vocalizations only — negatives block intelligible words/singing/music.
+defaults: {seconds: 1.5, loop: false, takes: 3}
+jobs:
+  - name: cust_r1_happy
+    asset: sfx_customer_happy
+    model: sa3_small_sfx
+    seed: 11
+    prompt: "happy customer delighted eating sounds, cheerful mmm and yum, satisfied lip smacking, cartoon diner, close mic, no words, no music"
+    negative: "intelligible speech, words, sentences, singing, music, background noise"
+  - name: cust_r1_happy
+    asset: sfx_customer_happy
+    model: sao1
+    seed: 21
+    prompt: "happy customer delighted eating sounds, cheerful mmm and yum, satisfied lip smacking, cartoon diner, close mic, no words, no music"
+    negative: "intelligible speech, words, sentences, singing, music, background noise"
+  - name: cust_r1_happy
+    asset: sfx_customer_happy
+    model: sa3_medium
+    seed: 31
+    prompt: "happy customer delighted eating sounds, cheerful mmm and yum, satisfied lip smacking, cartoon diner, close mic, no words, no music"
+    negative: "intelligible speech, words, sentences, singing, music, background noise"
+  - name: cust_r1_happy
+    asset: sfx_customer_happy
+    model: moss_v2
+    seed: 41
+    prompt: "happy customer delighted eating sounds, cheerful mmm and yum, satisfied lip smacking, cartoon diner, close mic, no words, no music"
+  - name: cust_r1_angry
+    asset: sfx_customer_angry
+    model: sa3_small_sfx
+    seed: 51
+    prompt: "frustrated customer annoyed sigh and irritated huff, angry grumble walking away, cartoon diner, close mic, no words, no music"
+    negative: "intelligible speech, words, sentences, singing, music, background noise"
+  - name: cust_r1_angry
+    asset: sfx_customer_angry
+    model: sao1
+    seed: 61
+    prompt: "frustrated customer annoyed sigh and irritated huff, angry grumble walking away, cartoon diner, close mic, no words, no music"
+    negative: "intelligible speech, words, sentences, singing, music, background noise"
+  - name: cust_r1_angry
+    asset: sfx_customer_angry
+    model: sa3_medium
+    seed: 71
+    prompt: "frustrated customer annoyed sigh and irritated huff, angry grumble walking away, cartoon diner, close mic, no words, no music"
+    negative: "intelligible speech, words, sentences, singing, music, background noise"
+  - name: cust_r1_angry
+    asset: sfx_customer_angry
+    model: moss_v2
+    seed: 81
+    prompt: "frustrated customer annoyed sigh and irritated huff, angry grumble walking away, cartoon diner, close mic, no words, no music"

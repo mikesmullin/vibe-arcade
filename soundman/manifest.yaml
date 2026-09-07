@@ -55,3 +55,31 @@ assets:
     variations: 4
     seed: 61031
     synth: {recipe: coin}
+
+  - id: music_diner_loop
+    prompt: "upbeat cartoon diner background music loop, bouncy piano and ukulele with punchy drums and playful brass stabs, cheerful fast tempo, steady groove, even energy all the way through, loopable, no intro, no outro, no fade, no vocals, no speech"
+    seconds: 30
+    loop: true
+    variations: 1
+    seed: 1078
+
+  - id: sfx_customer_happy
+    prompt: "happy customer delighted eating sounds, cheerful mmm and yum, satisfied lip smacking, cartoon diner, close mic, no words, no music"
+    seconds: 1.5
+    loop: false
+    variations: 1
+    seed: 41
+
+  - id: sfx_customer_angry
+    prompt: "frustrated customer annoyed sigh and irritated huff, angry grumble walking away, cartoon diner, close mic, no words, no music"
+    seconds: 1.5
+    loop: false
+    variations: 1
+    seed: 2035
+
+  - id: sfx_fries_fry_loop
+    prompt: "french fries deep frying in hot oil, vigorous bubbling and crackling oil, fryer basket sizzle, steady, close mic, no speech, no music"
+    seconds: 6
+    loop: true
+    variations: 3
+    seed: 64001
