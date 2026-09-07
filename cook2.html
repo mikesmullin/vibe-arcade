@@ -314,11 +314,11 @@ const Music={
 /* Looping keepers with runtime automation (SfxEngine). A station "wants" a loop every
    update it is active (Loops.set); frame() sweeps loops nobody wanted for 250 ms — so
    pause/end/menu/dispose/mute all stop it with its release tail, no per-path plumbing. */
-const SND={sizzle:'sfx_patty_sizzle_loop_v03',pour:'sfx_soda_pour_loop_v01',music:'music_diner_loop_v01'};   // game keys from assets/sfx.json (all accepted; Loops.set warns once + no-ops for any key not in the bank)
+const SND={sizzle:'sfx_patty_sizzle_loop_v03',pour:'sfx_soda_pour_loop_v01',fry:'sfx_fries_fry_loop_v01',music:'music_diner_loop_v01'};   // game keys from assets/sfx.json (all accepted; Loops.set warns once + no-ops for any key not in the bank)
 const MUSIC_DB=-1.9;   // music bus trim: -20% amplitude on the keeper voice (runtime only; the card still ships flat at 0 dB)
 const SIZZLE_RESTART_ON_ADD=true;   // experimental (2026-09-05): adding an item to a grill that already has one restarts the sizzle from the top; set false to revert
 const Loops={v:{},want:{},warned:{},
-  set(name,key,on){this.want[name]=on?performance.now():0;if(on&&!this.v[name]&&Audio.ctx&&!Audio.muted){if(!Sfx.bank[key]){if(!this.warned[key]){this.warned[key]=1;console.warn('[Loops] sound key not in bank yet: '+key);}return;}const v=Sfx.play(key,{loop:true});if(v)this.v[name]=v;}},
+  set(name,key,on,opts){this.want[name]=on?performance.now():0;if(on&&!this.v[name]&&Audio.ctx&&!Audio.muted){if(!Sfx.bank[key]){if(!this.warned[key]){this.warned[key]=1;console.warn('[Loops] sound key not in bank yet: '+key);}return;}const v=Sfx.play(key,Object.assign({loop:true},opts));if(v)this.v[name]=v;}},
   param(name,param,v){const voice=this.v[name];if(voice)voice.setParam(param,v);},   // runtime parameter 0..1 (e.g. cup fullness), every frame is fine
   sweep(){const now=performance.now();for(const n in this.v)if(now-(this.want[n]||0)>250||Audio.muted){this.v[n].stop();delete this.v[n];}},
   stop(name,opts){const v=this.v[name];if(v){v.stop(opts);delete this.v[name];}this.want[name]=0;},
@@ -456,7 +456,8 @@ function applySize(){
   if(asp>=W/H){fh=H;fw=H*asp;}else{fw=W;fh=W/asp;}   // fit height (landscape) or width (portrait)
   camera.left=-fw/2;camera.right=fw/2;camera.top=fh/2;camera.bottom=-fh/2;camera.updateProjectionMatrix();
   view={w,h,fw,fh};
-  if(bgSprite){const s=Math.max(fw/W,fh/H);bgSprite.scale.set(W*s,H*s,1);counterSprite.scale.set(W*s,counterH*s,1);counterSprite.position.y=(-H/2)*s+counterH*s/2;}
+  const s=Math.max(fw/W,fh/H);view.s=s;scene.scale.set(s,s,1);   // cover zoom lives on the whole scene root (bg + items as one): design units ARE desk-image pixels, so poses hold at any aspect
+  if(bgSprite){bgSprite.scale.set(W,H,1);counterSprite.scale.set(W,counterH,1);counterSprite.position.y=-H/2+counterH/2;}
 }
 addEventListener('resize',()=>{applySize();if(typeof Pose!=='undefined'&&Pose.active)Pose.frame();});
 visualViewport&&visualViewport.addEventListener('resize',()=>{applySize();if(typeof Pose!=='undefined'&&Pose.active)Pose.frame();});
@@ -502,12 +503,12 @@ function setSize(m,w,h=null){const a=aspectOf(m.userData.key);if(h==null)h=w/a;m
 function setTex(m,key){m.material.map=mapFor(key);m.geometry=geoFor(key,m.userData.uv||{f:'a',ax:.5,ay:.5});m.userData.key=key;m.material.needsUpdate=true;}
 function setLayer(o,layer){o.traverse(c=>{if(c.isMesh)c.renderOrder=layer+(c.userData.sub||0);});}
 const _box=new THREE.Box3();
-function worldRect(m){scene.updateMatrixWorld();_box.setFromObject(m);return {x0:_box.min.x,x1:_box.max.x,y0:_box.min.y,y1:_box.max.y};}
+function worldRect(m){scene.updateMatrixWorld();_box.setFromObject(m);const s=scene.scale.x||1;return {x0:_box.min.x/s,x1:_box.max.x/s,y0:_box.min.y/s,y1:_box.max.y/s};}   // scene-local (desk-image px): the scene root carries the cover zoom
 function hitRect(r,x,y,pad=0){return x>=r.x0-pad&&x<=r.x1+pad&&y>=r.y0-pad&&y<=r.y1+pad;}
 function removeObj(o){if(o&&o.parent)o.parent.remove(o);}
-// pointer <-> design space via the camera's actual frustum (the poser zooms/pans it)
-function clientToDesign(cx,cy){const r=renderer.domElement.getBoundingClientRect();const fw=camera.right-camera.left,fh=camera.top-camera.bottom;return {x:camera.position.x+((cx-r.left)/r.width-.5)*fw,y:camera.position.y+(.5-(cy-r.top)/r.height)*fh};}
-function designToClient(x,y){const r=renderer.domElement.getBoundingClientRect();const fw=camera.right-camera.left,fh=camera.top-camera.bottom;return {x:r.left+((x-camera.position.x)/fw+.5)*r.width,y:r.top+(.5-(y-camera.position.y)/fh)*r.height};}
+// pointer <-> design space (desk-image px) via the camera frustum + the scene-root cover zoom (the poser zooms/pans the camera)
+function clientToDesign(cx,cy){const r=renderer.domElement.getBoundingClientRect();const fw=camera.right-camera.left,fh=camera.top-camera.bottom;const s=scene.scale.x||1;return {x:(camera.position.x+((cx-r.left)/r.width-.5)*fw)/s,y:(camera.position.y+(.5-(cy-r.top)/r.height)*fh)/s};}
+function designToClient(x,y){const r=renderer.domElement.getBoundingClientRect();const fw=camera.right-camera.left,fh=camera.top-camera.bottom;const s=scene.scale.x||1;return {x:r.left+((x*s-camera.position.x)/fw+.5)*r.width,y:r.top+(.5-(y*s-camera.position.y)/fh)*r.height};}
 
 /* ---------- background + counter (same plate, counter = lower crop drawn above customers) ---------- */
 let bgSprite=null,counterSprite=null,counterH=H/2+COUNTER_Y;
@@ -776,12 +777,12 @@ class Station{
 
 /** Grill: N pan slots. raw patty/sausage dropped in → cooking → cooked → burnt; fresh cheese → cooking → melted → burnt. */
 class Grill extends Station{
-  constructor(x,y,slots,{cook=4,burn=5,grillW=470,panW=112}={}){
+  constructor(x,y,slots,{cook=4,burn=5,grillW=470,panW=112,barW=80,barDy=50}={}){
     super('grill',x,y,grillW,{ay:0});
     this.cookT=cook;this.burnT=burn;
     this.slots=slots.map(([sx,sy],si)=>{
       const pan=sprite('pan',{w:panW,layer:L.STATION+1,x:sx,y:sy});pan.userData.editName='Grill.pan['+si+']';scene.add(pan);
-      const bar=makeBar(80);bar.position.set(sx,sy+50,0);scene.add(bar);
+      const bar=makeBar(barW);bar.position.set(sx,sy+barDy,0);scene.add(bar);
       const s={x:sx,y:sy,pan,bar,item:null,t:0,smoke:0,panW};
       s.i=addI({owner:this,slot:s,mesh:()=>pan,priority:1.5});
       return s;
@@ -824,15 +825,17 @@ class Grill extends Station{
 
 /** Tray of raw items (infinite). Tap = pick one up (selected mode), drag = drag one out. */
 class Tray extends Station{
-  constructor(kind,x,y,{count=3,w=150,tray=true}={}){
+  constructor(kind,x,y,{count=3,w=150,tray=true,decor=null,rot=0}={}){
     super('prep_tray',x,y,w,{ay:.5});
     this.kind=kind;
     this.spr.userData.editName='Tray('+kind+')';
+    if(rot)this.spr.rotation.z=rot;
     if(!tray)this.spr.material.opacity=0;   // invisible but still tappable
     this.decor=[];
     for(let i=0;i<count;i++){
       const key=kind==='patty'?'patty_raw':kind==='sausage'?'sausage_raw':kind==='bun'?'bun_whole':kind==='hotdog_bun'?'hotdog_bun':kind==='fries'?'fries_pile_raw':kind==='carton'?'carton_empty':'cheese_fresh';
-      const s=sprite(key,{w:(ITEM_W[kind]||90)*.85,layer:L.STATION+1,x:x+(i-(count-1)/2)*26,y:y+12+i*3});s.renderOrder=L.STATION+1+i;s.userData.editName='Tray('+kind+').decor['+i+']';scene.add(s);this.decor.push(s);
+      const off=decor&&decor[i]?decor[i]:[(i-(count-1)/2)*26,12+i*3];   // explicit stack layout (posed) or the default row; the stack always follows the tray body
+      const s=sprite(key,{w:(ITEM_W[kind]||90)*.85,layer:L.STATION+1,x:x+off[0],y:y+off[1]});s.renderOrder=L.STATION+1+i;s.rotation.z=rot;s.userData.editName='Tray('+kind+').decor['+i+']';scene.add(s);this.decor.push(s);
     }
     this.i.priority=1.2;
   }
@@ -910,14 +913,18 @@ class SodaMachine extends Station{
 }
 /** Fryer: raw pile in (basket lowers) → cooked pile out (basket raises); pile must be cartoned before serving (no burn). Tap the fries tray then the fryer, or tap the fryer directly. */
 class Fryer extends Station{
-  constructor(x,y,w=240){super('fry_station_raised',x,y,w,{ay:0});this.item=null;this.t=0;this.cookT=4;this.itemPos={x,y:y+130};this.bar=makeBar(80);this.bar.position.set(x,y+200,0);scene.add(this.bar);}
+  constructor(x,y,w=240){super('fry_station_raised',x,y,w,{ay:0});this.item=null;this.resumed=false;this.t=0;this.cookT=4;this.itemPos={x,y:y+130};this.bar=makeBar(80);this.bar.position.set(x,y+200,0);scene.add(this.bar);}
   poseState(st){if(this.item){this.item.dispose();this.item=null;this.bar.visible=false;}if(!st||st==='none')return;this.onTap();if(st==='ready'){this.t=this.cookT;this.update(0);}else{this.t=this.cookT*.5;this.update(0);}}
   accepts(item){return !this.item&&item.kind==='fries'&&item.state==='raw';}
   drop(item){if(!this.accepts(item))return false;this.item=item;item.station=this;item.home=null;item.g.position.set(this.itemPos.x,this.itemPos.y,0);item.set('cooking');item.g.visible=false;   // pile hides: the lowered asset already depicts the basket down
-this.t=0;setTex(this.spr,'fry_station_lowered');SFX.sizzle();return true;}
+this.t=0;this.resumed=false;setTex(this.spr,'fry_station_lowered');SFX.place();return true;}   // fresh cook: loop starts in update() at the attack (its swell covers the basket drop)
   onTap(){if(selected&&this.accepts(selected))return tryDrop(selected,this,null);if(this.item&&this.item.state==='ready'&&!selected){select(this.item);return true;}if(this.item||selected)return false;const it=new Item('fries','raw',this.itemPos.x,this.itemPos.y);return this.drop(it);}
-  take(item){if(item===this.item){this.item=null;this.bar.visible=false;}item.station=null;item.g.visible=true;if(!this.item)setTex(this.spr,'fry_station_raised');}
-  update(dt){if(this.item&&this.item.state==='cooking'){this.t+=dt;this.bar.visible=true;this.bar.set(this.t/this.cookT,0xffb703);if(this.t>=this.cookT){this.item.set('ready');this.bar.visible=false;SFX.ding();}}}
+  take(item){if(item===this.item){this.item=null;this.bar.visible=false;}item.station=null;item.g.visible=true;if(!this.item)setTex(this.spr,'fry_station_raised');
+    if(this.resumed&&Audio.ctx&&!Audio.muted)Sfx.play(SND.fry,{audition:'release'});   // sustain-start voices fade on stop WITHOUT the release sample — fire it explicitly so every pickup ends with the identical tail (fresh voices play it in stop() already, so no double)
+    Loops.stop('fryer',this.resumed?{immediate:true}:undefined);this.resumed=true;}   // sustain voice also gets an immediate fade so no full-level sustain lingers under the tail
+  update(dt){if(this.item&&this.item.state==='cooking'){this.t+=dt;this.bar.visible=true;this.bar.set(this.t/this.cookT,0xffb703);if(this.t>=this.cookT){this.item.set('ready');this.bar.visible=false;SFX.ding();}}
+    const pile=this.item;
+    Loops.set('fryer',SND.fry,!!(pile&&(pile.state==='cooking'||pile.state==='ready')),this.resumed?{audition:'sustain'}:null);}   // loop + sustain while the pile is in the basket (ready piles keep sizzling — no burn); reattached piles skip the attack and start in the sustain loop
   dispose(){super.dispose();removeObj(this.bar);this.item&&this.item.dispose();}
 }
 class Trash extends Station{
@@ -1088,7 +1095,7 @@ function onMove(e){
       if(selected){it=selected;selected=null;}
       else if(h&&h.owner instanceof Item&&h.drag&&h.owner.kind==='plate'&&isLoneContainer(h.owner)){it=splitContainer(h.owner);it.g.position.set(p.x,p.y,0);}   // lone container lifts off; the plate stays bare
       else if(h&&h.owner instanceof Item&&h.drag&&(canPick(h.owner)||(h.owner.state==='cooking'&&h.owner.station instanceof Grill))){it=h.owner;detachItem(it);it.refresh();it.g.position.set(p.x,p.y,0);}   // cooking grill items: drag pauses cooking (take clears the slot so update() skips it); failed drop reattaches and resumes from the same t
-      else if(h&&h.owner instanceof Fryer&&h.owner.item&&canPick(h.owner.item)){it=h.owner.item;detachItem(it);it.refresh();it.g.position.set(p.x,p.y,0);}   // fryer pile is invisible in the machine: grab it off the station and it appears in hand
+      else if(h&&h.owner instanceof Fryer&&h.owner.item&&(canPick(h.owner.item)||h.owner.item.state==='cooking')){it=h.owner.item;detachItem(it);it.refresh();it.g.position.set(p.x,p.y,0);}   // fryer pile is invisible in the machine: grab it off the station and it appears in hand (partial-cook grab pauses progress; failed drop resumes)
       else if(h&&h.owner instanceof Tray){it=h.owner.dragOut();detachItem(it);if(it)it.g.position.set(p.x,p.y,0);}   // spawner: item pops into existence at the tray, not the cursor — snap it to the pointer so ox/oy start at 0 and it adheres during the drag
       if(it){drag={it,ox:it.g.position.x-p.x,oy:it.g.position.y-p.y,origin:{x:it.g.position.x,y:it.g.position.y}};it.setLayer(L.DRAG);it.g.scale.setScalar(1.15);SFX.pop();}
     }
@@ -1195,22 +1202,22 @@ function levelConfig(n){
   return {goal,timer:Math.min(70+goal*8,180),pool,patience:Math.max(14,30-n),total:goal+2,seed:4242+n*131,slots:Math.min(4,2+Math.floor(n/2)),grillSlots:n>=3?3:2};
 }
 function starThresholds(cfg){const per=18+cfg.patience*.5;return [Math.round(cfg.goal*per*.45),Math.round(cfg.goal*per*.7),Math.round(cfg.goal*per)];}
-function buildKitchen(cfg={grillSlots:3}){   // countertop layout posed in the Layout studio 2026-09-05
-  new SodaMachine(-615.7,-214.8,260,0.14);
-  new Decor('napkins',857.5,-55,115);
-  new Decor('ketchup',770.8,31.2,64);
-  new Tray('bun',-227,-413,{count:3,w:170,tray:false});
-  new Tray('hotdog_bun',-4,-430,{count:3,w:170,tray:false});
-  new PlateRack([[-340.1,-181.7],[-190.7,-224.7],[-185.4,-108.2]]);
-  const pans=[[68.5,-60.9],[336.3,-53.7],[195.5,-119.7]].slice(0,cfg.grillSlots);
-  new Grill(188,-335.1,pans,{cook:4,burn:5,grillW:587,panW:140});
-  new Tray('patty',371.1,-347.4,{count:3,w:180});
-  new Tray('sausage',453.5,-258.9,{count:2,w:170});
-  new Tray('cheese',206,-366.7,{count:3,w:180});
-  new Tray('fries',769.1,-293.3,{count:2,w:140});
-  new Tray('carton',-506.7,-147.3,{count:3,w:140,tray:false});
-  new Fryer(633.7,-274.7,330);
-  new Trash(-426,-646,228,0.29);
+function buildKitchen(cfg={grillSlots:3}){   // countertop layout posed in the studio 2026-09-07 (desk-image px; aspect-proof via the scene-root cover zoom)
+  new SodaMachine(-534.6,-184.3,260,0.14);
+  new Decor('napkins',628.7,13,115);
+  new Decor('ketchup',716.1,-45.1,64);
+  new Tray('bun',-218.2,-335.1,{count:3,w:170,tray:false,decor:[[9.4,19.2],[1.6,1.3],[-10.9,-20.6]]});
+  new Tray('hotdog_bun',-48.2,-343.2,{count:3,w:170,tray:false,decor:[[-2.7,27.2],[0,1.3],[2.7,-28.6]]});
+  new PlateRack([[-245.6,-118.7],[-134.3,-176.6],[-173.8,-30.3]]);
+  const pans=[[23.2,-38.6],[242.9,-32.7],[127.4,-86.8]].slice(0,cfg.grillSlots);
+  new Grill(121.3,-263.5,pans,{cook:4,burn:5,grillW:481.6,panW:114.9,barW:65.6,barDy:41});
+  new Tray('patty',227.3,-258.6,{count:3,w:180});
+  new Tray('sausage',348.6,-186.4,{count:2,w:170});
+  new Tray('cheese',423.6,-257.8,{count:3,w:180});
+  new Tray('fries',585.6,-214,{count:2,w:140});
+  new Tray('carton',-437.1,-119.1,{count:3,w:140,tray:false,rot:0.27,decor:[[-28.2,4.6],[-4,14.5],[20.3,24.3]]});
+  new Fryer(497.7,-198.7,330);
+  new Trash(-353.7,-592.2,228,0.29);
 }
 function updateHUD(){
   $('coinText').textContent=G.coins;
@@ -1269,10 +1276,15 @@ $('playBtn').onclick=()=>{Audio.ensure();requestShell();startLevel(SAVE.level);}
 $('resetBtn').onclick=()=>{SAVE={level:1,best:{},coins:0};save();showMenu();toast('Save reset');};
 $('nextBtn').onclick=()=>startLevel(G.level+1);$('retryBtn').onclick=()=>startLevel(G.level);$('endMenuBtn').onclick=showMenu;
 function syncPauseBtn(){$('pauseBtn').textContent=G.mode==='paused'?'▶':'⏸';}
-function pauseGame(){if(G.mode!=='playing')return;G.mode='paused';Music.stop();Time.freeze(true);syncPauseBtn();}
-function resumeGame(){if(G.mode!=='paused')return;G.mode='playing';Time.unfreeze();Music.start();$('paused').classList.add('hidden');syncPauseBtn();}
+/* pause/resume audio: suspend()/resume() are async and interleave badly on quick toggles
+   (resume skipped while a suspend is still in flight = stuck silent), so serialize them in call order */
+let audioGate=Promise.resolve();
+function suspendAudio(){audioGate=audioGate.then(()=>{if(Audio.ctx)return Audio.ctx.suspend();}).catch(()=>{});}
+function resumeAudio(){audioGate=audioGate.then(()=>{if(Audio.ctx)return Audio.ctx.resume();}).catch(()=>{});}
+function pauseGame(){if(G.mode!=='playing')return;G.mode='paused';Music.stop();Time.freeze(true);syncPauseBtn();suspendAudio();}   // suspend freezes ALL audio time mid-sustain (no release tails); resume continues exactly where it left off
+function resumeGame(){if(G.mode!=='paused')return;G.mode='playing';Time.unfreeze();resumeAudio();Music.start();$('paused').classList.add('hidden');syncPauseBtn();}
 $('pauseBtn').onclick=()=>{Audio.ensure();G.mode==='paused'?resumeGame():pauseGame();};
-$('menuBtn').onclick=()=>{if(G.mode==='playing'){G.mode='paused';Music.stop();Time.freeze(true);syncPauseBtn();$('paused').classList.remove('hidden');}else if(G.mode==='story')showMenu();};
+$('menuBtn').onclick=()=>{if(G.mode==='playing'){G.mode='paused';Music.stop();Time.freeze(true);syncPauseBtn();suspendAudio();$('paused').classList.remove('hidden');}else if(G.mode==='story')showMenu();};
 $('resumeBtn').onclick=()=>resumeGame();$('quitBtn').onclick=showMenu;
 $('muteBtn').onclick=()=>{Audio.ensure();syncVol();toggleVolPanel();};
 $('storyHide').onclick=()=>setStorySidebar(true);$('storyRestore').onclick=()=>setStorySidebar(false);
@@ -1408,9 +1420,9 @@ function render(){renderer.render(scene,camera);}
 function frame(){const dt=Time.advance();if(dt>0){tick(dt);if(G.mode==='playing'){
   if(Sfx.bank[SND.music]){Loops.set('music',SND.music,volMusic>0);const m=Loops.v.music;if(m){const w=MUSIC_DB+dbOf(volMusic);if(m.gainDb!==w)m.setGain(w);}}
   else if(volMusic>0)Music.tick();
-  if(volSfx<=0){Loops.stop('grill');Loops.stop('soda');}   // sfx slider at 0: don't burn CPU on silent keeper loops; stations re-want them when audible
-  else for(const n of ['grill','soda']){const v=Loops.v[n];if(v){if(v._baseDb==null)v._baseDb=v.gainDb;const w=v._baseDb+dbOf(volSfx);if(v.gainDb!==w)v.setGain(w);}}
-}}Loops.sweep();render();requestAnimationFrame(frame);}   // gameplay music: the keeper loop while its slider is up (chiptune synth is fallback only when the bank key is missing)
+  if(volSfx<=0){Loops.stop('grill');Loops.stop('soda');Loops.stop('fryer');}   // sfx slider at 0: don't burn CPU on silent keeper loops; stations re-want them when audible
+  else for(const n of ['grill','soda','fryer']){const v=Loops.v[n];if(v){if(v._baseDb==null)v._baseDb=v.gainDb;const w=v._baseDb+dbOf(volSfx);if(v.gainDb!==w)v.setGain(w);}}
+}}if(G.mode!=='paused')Loops.sweep();render();requestAnimationFrame(frame);}   // no sweep while paused: frozen voices are wanted again on resume, so they continue instead of releasing
 
 /* ---------- poser: isolate one object on a studio backdrop ---------- */
 function backdropTexture(kind,opts={}){
@@ -1476,15 +1488,15 @@ const Pose={
     camera.left=-view.fw/2*fit;camera.right=view.fw/2*fit;camera.top=view.fh/2*fit;camera.bottom=-view.fh/2*fit;camera.position.x=c.x+px;camera.position.y=c.y+py;camera.updateProjectionMatrix();
     if(this.plane){
       this.plane.position.set(c.x+px,c.y+py,0);
-      const fw=camera.right-camera.left,fh=camera.top-camera.bottom;this.plane.scale.set(fw,fh,1);
-      const map=this.plane.material.map;if(map.userData.tilePx){map.repeat.set(fw/map.userData.tilePx,fh/map.userData.tilePx);map.needsUpdate=true;}
+      const fw=camera.right-camera.left,fh=camera.top-camera.bottom,sc=scene.scale.x||1;this.plane.scale.set(fw/sc,fh/sc,1);   // the plane is a scene child, so it inherits the cover zoom: size it in desk-image px
+      const map=this.plane.material.map;if(map.userData.tilePx){map.repeat.set((fw/sc)/map.userData.tilePx,(fh/sc)/map.userData.tilePx);map.needsUpdate=true;}
     }
   },
   setZoom(z){this.zoom=z;this.frame();render();},
   center(x,y){ // pan the studio camera (design units, relative to the object's bounds center)
     this.pan={x,y};this.frame();render();},
   setBg(bg,opts={}){if(this.plane){this.plane.material.map=backdropTexture(bg,opts);this.plane.material.needsUpdate=true;this.frame();render();}},
-  info(){const b=this.obj&&this.obj.root?new THREE.Box3().setFromObject(this.obj.root):null;return {active:this.active,spec:this.spec,zoom:this.zoom,bounds:b?{x:[+b.min.x.toFixed(1),+b.max.x.toFixed(1)],y:[+b.min.y.toFixed(1),+b.max.y.toFixed(1)]}:null};},
+  info(){const b=this.obj&&this.obj.root?new THREE.Box3().setFromObject(this.obj.root):null;const sc=scene.scale.x||1;return {active:this.active,spec:this.spec,zoom:this.zoom,bounds:b?{x:[+(b.min.x/sc).toFixed(1),+(b.max.x/sc).toFixed(1)],y:[+(b.min.y/sc).toFixed(1),+(b.max.y/sc).toFixed(1)]}:null};},
   show(v={}){for(const p of [this.obj,this.obj&&this.obj.side]){if(!p||!p.parts)continue;if('ears' in v)p._hideEars=!v.ears;if('head' in v)p._hideHead=!v.head;if('body' in v)p._hideBody=!v.body;p.apply();}render();},
   /** per-part dump for puppets: world rect of each part */
   parts(){const p=this.obj;if(!p||!p.parts)return null;scene.updateMatrixWorld();const out={};for(const n in p.parts){const m=p.parts[n];const r=worldRect(m);out[n]={key:m.userData.key,vis:m.visible,alpha:+m.material.opacity.toFixed(2),rect:[+r.x0.toFixed(0),+r.y0.toFixed(0),+r.x1.toFixed(0),+r.y1.toFixed(0)],order:m.renderOrder};}
@@ -1599,7 +1611,7 @@ const Layout={
     this.buildGroups();
     this.bindUI(true);
     Editor.setTool('move');
-    this.log('Layout poser ready — '+this.groups.length+' groups + '+this.UI.length+' UI pills. M move · S scale · R rotate · 📋 dumps JSON. Time frozen; leave the page to resume.');
+    this.log('Layout poser ready — '+this.groups.length+' groups + '+this.UI.length+' UI pills. M move · S scale · R rotate · 📋 dumps JSON. Coords are desk-image px (aspect-proof). Time frozen; leave the page to resume.');
   },
   deactivate(){
     if(!this.active)return;
@@ -1698,14 +1710,14 @@ const Layout={
 };
 window.__cook.layout=Layout;
 document.addEventListener('click',e=>{if(Layout.active&&e.target.closest&&e.target.closest('#hud')){e.stopPropagation();e.preventDefault();}},true);
-page('Layout','Full countertop in the poser: every station, plate, customer and HUD pill drags as one composite (M move · S scale · R rotate). Time is frozen; leave the page to resume. Deltas log below, in 📋, and in the console for the coder to encode.',body=>{
+page('Layout','Full countertop in the poser: every station, plate, customer and HUD pill drags as one composite (M move · S scale · R rotate). Coords are desk-image pixels — what you set here holds at any browser aspect. Time is frozen; leave the page to resume. Deltas log below, in 📋, and in the console for the coder to encode.',body=>{
   buildKitchen({grillSlots:3});
   const dishes=['burger','hotdog','fries','soda'],chars=['man','woman','man','woman'];
   dishes.forEach((d,i)=>{const c=new Customer(chars[i],d,3600,i);killTweens(c.p.g.position);c.p.g.position.set(SLOT_X[i],CUST_Y,0);c.p.walk=0;c.p.pose=0;c.p.face(1);c.p.apply();c.state='waiting';c.bub.visible=true;c.bub.scale.setScalar(1);});
   G.coins=150;G.score=150;G.served=5;G.time=75;updateHUD();
   $('hud').classList.remove('hidden');
   const hint=document.createElement('p');hint.style.cssText='color:#9fb4c8;font-size:13px';
-  hint.textContent='M move · S scale · R rotate · 📋 dumps JSON. Groups move as one; UI pills drag in place. Deltas log below + console.';
+  hint.textContent='M move · S scale · R rotate · 📋 dumps JSON. Groups move as one; UI pills drag in place. Deltas are desk-image px (aspect-proof) — log below + console.';
   body.appendChild(hint);
   Layout.activate(body);
 });
@@ -1774,9 +1786,16 @@ const Editor={
     console.debug('[rect]',d.name,entry);
     if(Layout.active)Layout.log('[rect] '+d.name+' '+JSON.stringify({x0:entry.x0,y0:entry.y0,x1:entry.x1,y1:entry.y1}));
     this.box(null);},
+  /** station units drag as one with the move tool: a grill body carries its pans+bars (+pan items); a tray body carries its decor stack */
+  carryFor(o){
+    const st=stations.find(s=>s.spr===o);if(!st||o.parent!==scene)return [];
+    if(st instanceof Grill)return st.slots.flatMap(s=>[s.pan,s.bar,s.item&&s.item.g].filter(m=>m&&m.parent===scene));
+    if(st.constructor.name==='Tray')return (st.decor||[]).filter(m=>m.parent===scene);
+    return [];
+  },
   onDown(e){if(e.button===1)return;if(this.tool==='rect'){this.rectDown(e);return;}const p=clientToDesign(e.clientX,e.clientY);const o=this.pick(p.x,p.y);if(!o||this.tool==='log')return;
     this.sel=o;const v=this.values(o);const isHead=o.userData.part==='headF'||o.userData.part==='headS';
-    this.drag={o,start:p,x0:e.clientX,y0:e.clientY,before:v,pos:o.position.clone(),scale:o.scale.clone(),rot:o.rotation.z,
+    this.drag={o,start:p,x0:e.clientX,y0:e.clientY,before:v,pos:o.position.clone(),scale:o.scale.clone(),rot:o.rotation.z,carry:this.tool==='move'?this.carryFor(o).map(m=>({m,base:m.position.clone(),before:this.values(m)})):[],
       off:JSON.parse(JSON.stringify((o.userData.puppet&&(isHead?o.userData.puppet.editOff.headG:o.userData.puppet.editOff[o.userData.part]))||{}))};
     this.box(o,true);renderer.domElement.setPointerCapture&&renderer.domElement.setPointerCapture(e.pointerId);},
   onMove(e){
@@ -1807,7 +1826,7 @@ const Editor={
     }else{
       // convert the world delta into the parent's local frame (handles mirrored/rotated parents)
       const par=o.parent;const a=par.worldToLocal(new THREE.Vector3(d.start.x,d.start.y,0)),b=par.worldToLocal(new THREE.Vector3(p.x,p.y,0));
-      if(this.tool==='move'){o.position.set(d.pos.x+(b.x-a.x),d.pos.y+(b.y-a.y),0);}
+      if(this.tool==='move'){o.position.set(d.pos.x+(b.x-a.x),d.pos.y+(b.y-a.y),0);for(const c of (d.carry||[]))c.m.position.set(c.base.x+(o.position.x-d.pos.x),c.base.y+(o.position.y-d.pos.y),0);}
       if(this.tool==='scale'){o.scale.set(d.scale.x*dsc,d.scale.y*dsc,1);o.userData.w=Math.abs(o.scale.x);o.userData.h=o.scale.y;}
       if(this.tool==='rotate'){o.rotation.z=d.rot+drot;}
     }
@@ -1818,11 +1837,13 @@ const Editor={
     const d=this.drag;if(!d)return;this.drag=null;
     const after=this.values(d.o);const name=this.name(d.o);
     const entry={name,tool:this.tool,before:d.before,after,t:+Time.T.toFixed(2)};
+    if((d.carry||[]).length)entry.members=d.carry.map(c=>({part:this.name(c.m),before:c.before,after:this.values(c.m)}));
     if(JSON.stringify(d.before)!==JSON.stringify(after)){this.edits.push(entry);
       let hint=after.kind==='headGroup'?'\n  paste into CHAR: headY:'+after.headY+(after.dx?' (sideHead/dx '+after.dx+')':'')+(after.scale!==1?' headW:'+Math.round(after.headW*after.scale):''):after.off?'\n  paste into POSE/editOff: '+JSON.stringify(after.off):'';
       if(name.startsWith('Label:'))hint+='\n  paste into page("Stations") label(x,y,...)';
       else if(name.startsWith('Tray(')||['Grill','SodaMachine','Fryer','Trash','PlateRack'].includes(name))hint+='\n  paste into buildKitchen()';
-      console.debug('[edit]',name,this.tool,'\n  before',JSON.stringify(d.before),'\n  after ',JSON.stringify(after),hint);}
+      console.debug('[edit]',name,this.tool,'\n  before',JSON.stringify(d.before),'\n  after ',JSON.stringify(after),hint);
+      for(const cm of (entry.members||[]))console.debug('[carried] '+cm.part+'\n  before',JSON.stringify(cm.before),'\n  after ',JSON.stringify(cm.after));}
     this.box(d.o,true);
   },
   dump(){const out=this.edits.map(e=>({name:e.name,tool:e.tool,before:e.before,after:e.after}));console.debug('[edits] '+out.length+' edits\n'+JSON.stringify(out,null,1));return out;},
@@ -1837,7 +1858,7 @@ renderer.domElement.addEventListener('wheel',e=>{
   const before=clientToDesign(e.clientX,e.clientY);
   Pose.zoom=clamp(Pose.zoom*Math.exp(-dy*0.0015),.1,40);Pose.frame();
   const after=clientToDesign(e.clientX,e.clientY);      // keep the point under the cursor fixed
-  Pose.pan={x:(Pose.pan.x||0)+(before.x-after.x),y:(Pose.pan.y||0)+(before.y-after.y)};Pose.frame();render();
+  Pose.pan={x:(Pose.pan.x||0)+(before.x-after.x)*(scene.scale.x||1),y:(Pose.pan.y||0)+(before.y-after.y)*(scene.scale.x||1)};Pose.frame();render();
   if(Editor.hover)Editor.box(Editor.hover,Editor.sel===Editor.hover);
   $('poseZoom').value=Pose.zoom.toFixed(2);
 },{passive:false});
@@ -1851,6 +1872,7 @@ renderer.domElement.addEventListener('auxclick',e=>{if(e.button===1)e.preventDef
 window.__cook.edit=Editor;window.__cook.edits=Editor.edits;
 const DBG_HELP=`__cook.edit — edit tools (debug toolbar on the left: ▲ pointer, ✥ move, ⤢ scale, ⟳ rotate, ▭ rect, 📋 dump)
   hover highlights the smallest sprite under the cursor (parts inside composites are pickable); drag to edit.
+  station bodies carry their unit with the move tool (grill body → pans+bars+items, tray body → decor stack).
   every drag logs console.debug('[edit]', name, before, after); __cook.edit.dump() prints all edits as JSON.
   puppet face parts log offsets in head-width units (paste into POSE / CHAR); dragging the head texture moves the
   whole head group and logs headY; everything else logs design px.

@@ -60,6 +60,8 @@
  "sausage_cooking": "art/sausage/sausage_cooking.png",
  "sausage_raw": "art/sausage/sausage_raw.png",
  "scene": "art/scene_diner/scene_diner.png",
+ "sfx_fries_fry_loop_v01": "sfx/sfx_fries_fry_loop/sfx_fries_fry_loop_v01.wav",
+ "sfx_fries_fry_loop_v01_mp3": "sfx/sfx_fries_fry_loop/sfx_fries_fry_loop_v01.mp3",
  "sfx_patty_sizzle_loop_v03": "sfx/sfx_patty_sizzle_loop/sfx_patty_sizzle_loop_v03.wav",
  "sfx_patty_sizzle_loop_v03_mp3": "sfx/sfx_patty_sizzle_loop/sfx_patty_sizzle_loop_v03.mp3",
  "sfx_soda_pour_loop_v01": "sfx/sfx_soda_pour_loop/sfx_soda_pour_loop_v01.wav",

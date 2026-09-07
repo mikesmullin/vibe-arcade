@@ -33,6 +33,61 @@
   "take": 1,
   "wav": "music/music_diner_loop/music_diner_loop_v01.wav"
  },
+ "sfx_fries_fry_loop_v01": {
+  "automation": "sfx/sfx_fries_fry_loop/automation.yaml",
+  "gainDb": -3,
+  "layers": {
+   "body": {
+    "attackMs": 250,
+    "decayMs": 240,
+    "enabled": true,
+    "finalDb": -10.5,
+    "holdMs": 0,
+    "initialDb": -80,
+    "peakDb": -3.5,
+    "releaseMs": 600,
+    "sustainDb": -23
+   },
+   "hit": {
+    "attackMs": 300,
+    "decayMs": 220,
+    "enabled": true,
+    "finalDb": -17,
+    "holdMs": 1062,
+    "initialDb": -80,
+    "peakDb": 0,
+    "releaseMs": 635,
+    "sustainDb": -34
+   }
+  },
+  "loop": true,
+  "mp3": "sfx/sfx_fries_fry_loop/sfx_fries_fry_loop_v01.mp3",
+  "params": null,
+  "regions": {
+   "attack": [
+    0.23035416666666667,
+    0.5307916666666667
+   ],
+   "decay": [
+    1.584375,
+    1.7125833333333333
+   ],
+   "hold": [
+    0.5267916666666667,
+    1.5883958333333332
+   ],
+   "release": [
+    2.8983541666666666,
+    3.5333125
+   ],
+   "sustain": [
+    1.7125833333333333,
+    2.8903541666666666
+   ]
+  },
+  "take": 1,
+  "wav": "sfx/sfx_fries_fry_loop/sfx_fries_fry_loop_v01.wav"
+ },
  "sfx_patty_sizzle_loop_v03": {
   "automation": "sfx/sfx_patty_sizzle_loop/automation.yaml",
   "gainDb": -18.5,
