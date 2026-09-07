@@ -1042,6 +1042,7 @@ function select(it){
 function deselect(){
   const it=selected;if(!it)return;selected=null;it.g.scale.setScalar(1);
   if(it.home){it.dispose();return;}            // fresh from a tray: just vanish
+  if(restoreSplit(it))return;                  // lone container off a plate: back onto its plate (or vanish if the plate was served away)
   it.setLayer(L.ITEM);reattach(it);it.refresh();it.g.visible=!(it.station instanceof Fryer);if(it.station instanceof Fryer)setTex(it.station.spr,'fry_station_lowered');const o=itOrigin(it);it.g.position.set(o.x,o.y,0);
 }
 function tryDrop(it,target,slot){
@@ -1114,7 +1115,7 @@ function onUp(e){
     const t=findTarget(p.x,p.y,it);
     if(!(t&&tryDrop(it,t.owner,t.slot))){ // no valid target: go home
       if(it.home)it.dispose();
-      else{it.setLayer(L.ITEM);reattach(it);it.refresh();it.g.visible=!(it.station instanceof Fryer);if(it.station instanceof Fryer)setTex(it.station.spr,'fry_station_lowered');const o=itOrigin(it);it.g.position.set(o.x,o.y,0);}
+      else if(!restoreSplit(it)){it.setLayer(L.ITEM);reattach(it);it.refresh();it.g.visible=!(it.station instanceof Fryer);if(it.station instanceof Fryer)setTex(it.station.spr,'fry_station_lowered');const o=itOrigin(it);it.g.position.set(o.x,o.y,0);}
     }
   }
   else if(!pDown.moved){tap(pDown.hit,p);}
@@ -1161,7 +1162,16 @@ function isLoneContainer(o){return o&&o.kind==='plate'&&o.stack&&o.stack.length=
 function splitContainer(plate){
   const key=plate.stack[0],[kind,state]=LONE_CONTAINER[key];
   plate.stack.pop();plate.refresh();
-  return new Item(kind,state,plate.g.position.x,plate.g.position.y+20);
+  const it=new Item(kind,state,plate.g.position.x,plate.g.position.y+20);
+  it._split={plate,key};   // homeless by design: a failed drop restores it onto its plate (restoreSplit), it never lands mid-air
+  return it;
+}
+/** a lone container lifted off its plate: failed drop puts it back (unless the plate was served away mid-hold — then it just vanishes) */
+function restoreSplit(it){
+  const s=it&&it._split;if(!s)return false;
+  const p=s.plate;
+  if(p&&p.g.parent&&p.slot&&p.slot.item===p&&p.stack){p.stack.push(s.key);p.refresh();it.dispose();return true;}
+  it.dispose();return true;
 }
 function tap(h,p){
   if(selected){ // tap-to-place
@@ -1272,7 +1282,7 @@ function showMenu(){
   // decorative: kitchen behind the menu
   buildKitchen({grillSlots:3});
 }
-$('playBtn').onclick=()=>{Audio.ensure();requestShell();startLevel(SAVE.level);};
+$('playBtn').onclick=()=>{Audio.ensure();startLevel(SAVE.level);};   // no requestShell here: auto-fullscreen would resize the viewport at Play and visibly re-zoom the scene (menu must depict the game exactly); fullscreen stays manual via the ⛶ button
 $('resetBtn').onclick=()=>{SAVE={level:1,best:{},coins:0};save();showMenu();toast('Save reset');};
 $('nextBtn').onclick=()=>startLevel(G.level+1);$('retryBtn').onclick=()=>startLevel(G.level);$('endMenuBtn').onclick=showMenu;
 function syncPauseBtn(){$('pauseBtn').textContent=G.mode==='paused'?'▶':'⏸';}
