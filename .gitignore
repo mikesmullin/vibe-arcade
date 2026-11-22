@@ -5,3 +5,5 @@ artman/.venv/
 artman/out/*/raw/
 artman/scratch/
 artman/__pycache__/
+.obsidian/
+*.canvas
