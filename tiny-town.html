@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tiny Town — SimCity-lite</title>
+<style>
+  html, body {
+    margin: 0; height: 100%; overflow: hidden; background: #04050e;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  #hud {
+    position: fixed; top: 12px; left: 16px; z-index: 10;
+    color: #cfefff; user-select: none; pointer-events: none;
+  }
+  #money { font-size: 30px; font-weight: 700; text-shadow: 0 0 12px rgba(120, 220, 255, .5); }
+  #stats { font-size: 13px; opacity: .75; margin-top: 2px; letter-spacing: .5px; }
+  #toolbar {
+    position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 10;
+    display: flex; gap: 8px;
+  }
+  #toolbar button {
+    background: rgba(10, 18, 36, .85); color: #cfefff; border: 1px solid #2a4a66;
+    border-radius: 8px; padding: 8px 12px; font-size: 14px; cursor: pointer;
+    font-family: inherit; transition: background .15s, border-color .15s;
+  }
+  #toolbar button:hover { background: rgba(30, 55, 90, .85); }
+  #toolbar button.sel { background: rgba(40, 120, 180, .5); border-color: #6cc4ff; }
+  #toolbar button.cant { opacity: .45; }
+  #toolbar .k { opacity: .6; font-size: 12px; margin-left: 4px; }
+  #msg {
+    position: fixed; top: 66px; left: 50%; transform: translateX(-50%);
+    color: #ffd75e; font-size: 14px; z-index: 10; user-select: none; pointer-events: none;
+    opacity: 0; transition: opacity .3s;
+  }
+  #hint {
+    position: fixed; bottom: 10px; width: 100%; text-align: center;
+    color: #5f92b3; font-size: 13px; z-index: 10; user-select: none;
+  }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="money">$1000</div>
+  <div id="stats">POP 0 · INCOME $0/s · DAY</div>
+</div>
+<div id="toolbar">
+  <button data-t="house">🏠 House · $100 <span class="k">[1]</span></button>
+  <button data-t="shop">🏪 Shop · $300 <span class="k">[2]</span></button>
+  <button data-t="factory">🏭 Factory · $500 <span class="k">[3]</span></button>
+  <button data-t="park">🌳 Park · $150 <span class="k">[4]</span></button>
+  <button data-t="road">🛣️ Road · $50 <span class="k">[5]</span></button>
+</div>
+<div id="msg"></div>
+<div id="hint">Click to build · Right-click to demolish (50% refund) · Buildings need a road next to them to work</div>
+
+<script src="three.min.js"></script>
+<script>
+"use strict";
+
+// ================= constants =================
+const N = 24, T = 2; // map size, tile size
+const B = {
+  house:   { cost: 100, income: 3,  pop: 2, road: true,  color: 0xffa14a, h: 1.3, w: 1.4 },
+  shop:    { cost: 300, income: 10, pop: 0, road: true,  color: 0xff6b35, h: 2.4, w: 1.5 },
+  factory: { cost: 500, income: 20, pop: 0, road: true,  color: 0x8a94a6, h: 3.4, w: 1.6 },
+  park:    { cost: 150, income: 0,  pop: 0, road: false, color: 0x3fb950, h: 0.35, w: 1.8 },
+  road:    { cost: 50,  income: 0,  pop: 0, road: false, color: 0x2a2f3a, h: 0.1,  w: 1.9 },
+};
+const ORDER = ["house", "shop", "factory", "park", "road"];
+
+// ================= scene =================
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x04050e);
+scene.fog = new THREE.Fog(0x04050e, 40, 110);
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 300);
+camera.position.set(0, 44, 38);
+camera.lookAt(0, 0, 0);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+document.body.appendChild(renderer.domElement);
+
+const ambient = new THREE.AmbientLight(0x6688aa, 0.6);
+scene.add(ambient);
+const sun = new THREE.DirectionalLight(0xfff2d8, 0.8);
+sun.position.set(30, 25, 15);
+scene.add(sun);
+
+const floor = new THREE.Mesh(
+  new THREE.PlaneGeometry(300, 300),
+  new THREE.MeshStandardMaterial({ color: 0x0a1020, roughness: 0.95 })
+);
+floor.rotation.x = -Math.PI / 2;
+scene.add(floor);
+
+const grid = new THREE.GridHelper(N * T, N, 0x1d3a55, 0x101c30);
+scene.add(grid);
+
+// ================= materials / geometry =================
+const parkMat  = new THREE.MeshStandardMaterial({ color: 0x2e9e44, roughness: 0.9 });
+const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2f, roughness: 0.9 });
+const leafMat  = new THREE.MeshStandardMaterial({ color: 0x1f7a33, roughness: 0.9 });
+const roadMat  = new THREE.MeshStandardMaterial({ color: 0x232833, roughness: 0.95 });
+
+const geos = {};
+function geoFor(type) {
+  if (!geos[type]) geos[type] = new THREE.BoxGeometry(B[type].w, B[type].h, B[type].w);
+  return geos[type];
+}
+const trunkGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.5, 8);
+const leafGeo  = new THREE.ConeGeometry(0.5, 0.9, 8);
+
+function pvMat(color, ok) {
+  return new THREE.MeshStandardMaterial({
+    color, transparent: true, opacity: 0.5,
+    emissive: ok ? 0x22aa44 : 0xaa2222, emissiveIntensity: 0.5
+  });
+}
+
+function createBuilding(type, preview, ok) {
+  const d = B[type];
+  let obj, mat;
+  if (type === "road") {
+    mat = preview ? pvMat(d.color, ok) : roadMat;
+    obj = new THREE.Mesh(geoFor(type), mat);
+    obj.position.y = d.h / 2;
+  } else if (type === "park") {
+    mat = preview ? pvMat(d.color, ok) : parkMat;
+    const base = new THREE.Mesh(geoFor(type), mat);
+    base.position.y = d.h / 2;
+    const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+    trunk.position.y = d.h + 0.25;
+    const top = new THREE.Mesh(leafGeo, leafMat);
+    top.position.y = d.h + 0.85;
+    obj = new THREE.Group();
+    obj.add(base, trunk, top);
+  } else {
+    mat = preview
+      ? pvMat(d.color, ok)
+      : new THREE.MeshStandardMaterial({ color: d.color, roughness: 0.7 });
+    obj = new THREE.Mesh(geoFor(type), mat);
+    obj.position.y = d.h / 2;
+  }
+  return { obj, mat };
+}
+
+// ================= state =================
+const cells = new Map(); // "i,j" -> cell
+let money = 1000;
+let selected = null;
+let income = 0, population = 0;
+let hoverKey = null;
+let hoverCell = null;
+let msgTimer = 0;
+
+const moneyEl = document.getElementById("money");
+const statsEl = document.getElementById("stats");
+const msgEl = document.getElementById("msg");
+const toolbarBtns = [...document.querySelectorAll("#toolbar button")];
+
+const key = (i, j) => i + "," + j;
+function tilePos(i, j) { return { x: (i - N / 2 + 0.5) * T, z: (j - N / 2 + 0.5) * T }; }
+function inBounds(i, j) { return i >= 0 && i < N && j >= 0 && j < N; }
+function hasRoad(i, j) {
+  return [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([di, dj]) => {
+    const c = cells.get(key(i + di, j + dj));
+    return c && c.type === "road";
+  });
+}
+
+function recalc() {
+  let total = 0, pop = 0, parks = 0;
+  for (const c of cells.values()) {
+    const d = B[c.type];
+    if (d.road) {
+      c.active = hasRoad(c.i, c.j);
+      if (c.mat) c.mat.color.setHex(c.active ? d.color : 0x3a3f47);
+    } else {
+      c.active = true;
+    }
+    if (c.active) total += d.income;
+    pop += d.pop;
+    if (c.type === "park") parks++;
+  }
+  income = total * Math.min(1.5, 1 + parks * 0.05);
+  population = pop;
+}
+
+function showMsg(s) {
+  msgEl.textContent = s;
+  msgEl.style.opacity = s ? 1 : 0;
+  msgTimer = s ? 1.8 : 0;
+}
+
+function updateHud() {
+  moneyEl.textContent = "$" + Math.floor(money);
+  statsEl.textContent = "POP " + population + " · INCOME $" + Math.round(income) + "/s · " + (nightNow ? "NIGHT" : "DAY");
+  toolbarBtns.forEach(b => b.classList.toggle("cant", money < B[b.dataset.t].cost));
+}
+
+function placeAt(i, j, type) {
+  const k = key(i, j);
+  if (cells.has(k)) return;
+  const d = B[type];
+  if (money < d.cost) { showMsg("Can't afford a " + type + " ($" + d.cost + ")"); return; }
+  money -= d.cost;
+  const { x, z } = tilePos(i, j);
+  const { obj, mat } = createBuilding(type, false, true);
+  obj.position.set(x, 0, z);
+  obj.scale.setScalar(0.01);
+  scene.add(obj);
+  cells.set(k, { type, i, j, active: true, age: 0, mesh: obj, mat: type === "road" || type === "park" ? null : mat });
+  recalc();
+  updateHud();
+}
+
+function removeAt(i, j) {
+  const k = key(i, j);
+  const c = cells.get(k);
+  if (!c) return;
+  const refund = Math.floor(B[c.type].cost * 0.5);
+  money += refund;
+  scene.remove(c.mesh);
+  cells.delete(k);
+  recalc();
+  updateHud();
+  showMsg("Demolished +" + refund);
+}
+
+// ================= preview + hover =================
+let preview = null;
+function setPreview(type) {
+  if (preview) scene.remove(preview.obj);
+  preview = null;
+  if (!type) return;
+  const { obj, mat } = createBuilding(type, true, true);
+  obj.position.set(0, 0, 999);
+  obj.visible = false;
+  scene.add(obj);
+  preview = { obj, mat };
+}
+
+function setCellHighlight(c, on) {
+  if (!c || !c.mat) return;
+  c.mat.emissive.setHex(on ? 0x335566 : 0x000000);
+}
+
+function updateHover(i, j) {
+  if (hoverCell) setCellHighlight(hoverCell, false);
+  const k = key(i, j);
+  hoverKey = k;
+  hoverCell = cells.get(k);
+  if (hoverCell) setCellHighlight(hoverCell, true);
+
+  if (selected) {
+    const d = B[selected];
+    const ok = !hoverCell && money >= d.cost;
+    const { x, z } = tilePos(i, j);
+    preview.obj.position.set(x, 0, z);
+    preview.obj.visible = !hoverCell;
+    preview.mat.emissive.setHex(ok ? 0x22aa44 : 0xaa2222);
+  } else if (preview) {
+    preview.obj.visible = false;
+  }
+}
+
+function clearHover() {
+  if (hoverCell) setCellHighlight(hoverCell, false);
+  hoverCell = null;
+  hoverKey = null;
+  if (preview) preview.obj.visible = false;
+}
+
+// ================= selection =================
+function select(type) {
+  selected = type;
+  toolbarBtns.forEach(b => b.classList.toggle("sel", b.dataset.t === type));
+  setPreview(type);
+}
+toolbarBtns.forEach(b => b.addEventListener("click", () => select(b.dataset.t)));
+
+// ================= input =================
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+function pickTile(e) {
+  mouse.x = (e.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hit = raycaster.intersectObject(floor)[0];
+  if (!hit) return null;
+  const i = Math.floor((hit.point.x + (N * T) / 2) / T);
+  const j = Math.floor((hit.point.z + (N * T) / 2) / T);
+  return inBounds(i, j) ? { i, j } : null;
+}
+
+addEventListener("mousemove", (e) => {
+  const t = pickTile(e);
+  if (t) updateHover(t.i, t.j);
+  else clearHover();
+});
+addEventListener("mousedown", (e) => {
+  if (e.button === 0) {
+    const t = pickTile(e);
+    if (t && selected) placeAt(t.i, t.j, selected);
+  } else if (e.button === 2) {
+    const t = pickTile(e);
+    if (t) removeAt(t.i, t.j);
+  }
+});
+addEventListener("contextmenu", (e) => e.preventDefault());
+
+addEventListener("keydown", (e) => {
+  if (e.code.startsWith("Digit")) {
+    const idx = parseInt(e.code.slice(5)) - 1;
+    if (idx >= 0 && idx < ORDER.length) select(ORDER[idx]);
+  }
+  if (e.code === "Escape") select(null);
+});
+
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ================= loop =================
+const clock = new THREE.Clock();
+const NIGHT = new THREE.Color(0x04050e);
+const DAY = new THREE.Color(0x1a2b4a);
+let nightNow = false;
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = clock.elapsedTime;
+
+  // economy
+  money += income * dt;
+
+  // build-up animation
+  for (const c of cells.values()) {
+    c.age += dt;
+    const s = Math.min(1, c.age / 0.35);
+    c.mesh.scale.setScalar(1 - Math.pow(1 - s, 3));
+  }
+
+  // day / night
+  const a = (t / 120) * Math.PI * 2;
+  sun.position.set(Math.cos(a) * 35, Math.sin(a) * 25 + 5, 15);
+  const dayness = Math.max(0, Math.min(1, (Math.sin(a) + 0.15) / 1.15));
+  scene.background.copy(NIGHT).lerp(DAY, dayness);
+  scene.fog.color.copy(scene.background);
+  ambient.intensity = 0.35 + 0.55 * dayness;
+  sun.intensity = 0.1 + 0.7 * dayness;
+  nightNow = dayness < 0.3;
+
+  // message fade
+  if (msgTimer > 0) {
+    msgTimer -= dt;
+    if (msgTimer <= 0) msgEl.style.opacity = 0;
+  }
+
+  updateHud();
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>

@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Orb Dodge — Three.js</title>
+<style>
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: #05060f;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  #hud {
+    position: fixed; top: 16px; left: 16px; z-index: 10;
+    color: #aee7ff; user-select: none; pointer-events: none;
+  }
+  #score {
+    font-size: 34px; font-weight: 700; letter-spacing: 1px;
+    text-shadow: 0 0 14px rgba(80, 200, 255, 0.8);
+  }
+  #sub { font-size: 13px; opacity: 0.7; margin-top: 4px; letter-spacing: 0.5px; }
+  #overlay {
+    position: fixed; inset: 0; z-index: 20;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(4, 6, 18, 0.74); color: #d7f2ff; text-align: center;
+  }
+  #overlay h1 {
+    font-size: 52px; margin: 0 0 10px; letter-spacing: 3px;
+    text-shadow: 0 0 24px rgba(120, 200, 255, 0.6);
+  }
+  #overlay p { margin: 6px 0; opacity: 0.85; font-size: 16px; }
+  #overlay .key {
+    display: inline-block; padding: 1px 8px; border: 1px solid #4a7a9a;
+    border-radius: 4px; background: rgba(70, 130, 180, 0.15); font-size: 14px;
+  }
+  #final { min-height: 22px; font-weight: 600; color: #ffd75e; }
+  .hidden { display: none !important; }
+  #hint {
+    position: fixed; bottom: 12px; width: 100%; text-align: center;
+    color: #5f92b3; font-size: 13px; z-index: 10; user-select: none;
+  }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="score">0</div>
+  <div id="sub">BEST <span id="best">0</span> &nbsp;·&nbsp; SPEED <span id="speed">1.0</span>x &nbsp;·&nbsp; ORBS <span id="orbs">0</span></div>
+</div>
+
+<div id="overlay">
+  <h1 id="title">ORB DODGE</h1>
+  <p>Move with <span class="key">W A S D</span> or <span class="key">arrow keys</span></p>
+  <p>Grab the golden orbs. Don't touch the asteroids.</p>
+  <p id="final"></p>
+  <p id="cta">Press any key to play</p>
+</div>
+
+<div id="hint">WASD / arrow keys to move · collect orbs · dodge rocks</div>
+
+<script src="three.min.js"></script>
+<script>
+"use strict";
+
+// ================= setup =================
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x05060f);
+scene.fog = new THREE.Fog(0x05060f, 35, 95);
+
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 250);
+camera.position.set(0, 18, 20);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+document.body.appendChild(renderer.domElement);
+
+scene.add(new THREE.AmbientLight(0x445577, 0.9));
+const sun = new THREE.DirectionalLight(0xaabbff, 0.8);
+sun.position.set(15, 25, 10);
+scene.add(sun);
+const playerLight = new THREE.PointLight(0x33ccff, 1.1, 30);
+scene.add(playerLight);
+
+const floor = new THREE.Mesh(
+  new THREE.PlaneGeometry(300, 300),
+  new THREE.MeshStandardMaterial({ color: 0x0a0f22, roughness: 0.95, metalness: 0.1 })
+);
+floor.rotation.x = -Math.PI / 2;
+scene.add(floor);
+
+const grid = new THREE.GridHelper(300, 150, 0x224466, 0x10182e);
+scene.add(grid);
+
+const BOUND = 38;
+
+const player = new THREE.Mesh(
+  new THREE.BoxGeometry(1.4, 1.4, 1.4),
+  new THREE.MeshStandardMaterial({
+    color: 0x33ddff, emissive: 0x0a4a66, emissiveIntensity: 0.7, roughness: 0.35
+  })
+);
+player.position.set(0, 1.2, 0);
+scene.add(player);
+
+const playerVel = new THREE.Vector3();
+
+const asteroidGeo = new THREE.DodecahedronGeometry(1, 0);
+const orbGeo = new THREE.SphereGeometry(0.55, 20, 16);
+const ORB_COUNT = 6;
+
+const asteroids = [];
+const orbs = [];
+
+function makeAsteroid() {
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0x8a7f9e, roughness: 0.85, metalness: 0.2, flatShading: true
+  });
+  const m = new THREE.Mesh(asteroidGeo, mat);
+  const r = BOUND + 10;
+  const a = Math.random() * Math.PI * 2;
+  m.position.set(Math.cos(a) * r, 1.2, Math.sin(a) * r);
+  const s = 0.9 + Math.random() * 1.3;
+  m.scale.setScalar(s);
+  m.userData = {
+    s,
+    spinX: (Math.random() - 0.5) * 4,
+    spinY: (Math.random() - 0.5) * 4
+  };
+  scene.add(m);
+  asteroids.push(m);
+}
+
+function makeOrb() {
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xffd75e, emissive: 0xcc9922, emissiveIntensity: 1.4, roughness: 0.4
+  });
+  const m = new THREE.Mesh(orbGeo, mat);
+  m.position.set(
+    (Math.random() * 2 - 1) * (BOUND - 5),
+    1.1,
+    (Math.random() * 2 - 1) * (BOUND - 5)
+  );
+  m.userData = { phase: Math.random() * Math.PI * 2 };
+  scene.add(m);
+  orbs.push(m);
+}
+
+function removeOrb(i) {
+  const m = orbs.splice(i, 1)[0];
+  scene.remove(m);
+  m.material.dispose();
+}
+
+function removeAsteroid(i) {
+  const m = asteroids.splice(i, 1)[0];
+  scene.remove(m);
+  m.material.dispose();
+}
+
+// ================= state =================
+let state = "menu";
+let score = 0;
+let orbsCollected = 0;
+let elapsed = 0;
+let asteroidTimer = 0;
+let orbTimer = 0;
+
+function loadBest() {
+  try { return parseInt(localStorage.getItem("orbDodgeBest") || "0", 10); } catch (e) { return 0; }
+}
+function saveBest(v) {
+  try { localStorage.setItem("orbDodgeBest", String(v)); } catch (e) {}
+}
+let best = loadBest();
+
+const scoreEl = document.getElementById("score");
+const bestEl = document.getElementById("best");
+const speedEl = document.getElementById("speed");
+const orbsEl = document.getElementById("orbs");
+const overlay = document.getElementById("overlay");
+const titleEl = document.getElementById("title");
+const finalEl = document.getElementById("final");
+const ctaEl = document.getElementById("cta");
+
+bestEl.textContent = best;
+
+const keys = {};
+addEventListener("keydown", (e) => {
+  keys[e.code] = true;
+  if (e.code === "Space") e.preventDefault();
+  if (state === "menu") startGame();
+  else if (state === "gameover" && (e.code === "KeyR" || e.code === "Space" || e.code === "Enter")) startGame();
+});
+addEventListener("keyup", (e) => { keys[e.code] = false; });
+
+function startGame() {
+  while (asteroids.length) removeAsteroid(asteroids.length - 1);
+  while (orbs.length) removeOrb(orbs.length - 1);
+  score = 0;
+  orbsCollected = 0;
+  elapsed = 0;
+  asteroidTimer = 1.2;
+  orbTimer = 0;
+  player.position.set(0, 1.2, 0);
+  playerVel.set(0, 0, 0);
+  state = "playing";
+  overlay.classList.add("hidden");
+  titleEl.textContent = "ORB DODGE";
+  finalEl.textContent = "";
+  ctaEl.textContent = "Press any key to play";
+  scoreEl.textContent = "0";
+  orbsEl.textContent = "0";
+  speedEl.textContent = "1.0";
+  for (let i = 0; i < ORB_COUNT; i++) makeOrb();
+}
+
+function gameOver() {
+  state = "gameover";
+  if (score > best) {
+    best = score;
+    saveBest(best);
+  }
+  bestEl.textContent = best;
+  titleEl.textContent = "GAME OVER";
+  finalEl.textContent = "Score: " + score + " · Orbs: " + orbsCollected + " · Best: " + best;
+  ctaEl.textContent = "Press R to play again";
+  overlay.classList.remove("hidden");
+}
+
+// ================= update =================
+function update(dt, t) {
+  elapsed += dt;
+  const speedMult = 1 + Math.min(1.5, elapsed * 0.04);
+  speedEl.textContent = speedMult.toFixed(1);
+
+  // --- player movement ---
+  const ax = (keys["KeyD"] || keys["ArrowRight"] ? 1 : 0) - (keys["KeyA"] || keys["ArrowLeft"] ? 1 : 0);
+  const az = (keys["KeyS"] || keys["ArrowDown"] ? 1 : 0) - (keys["KeyW"] || keys["ArrowUp"] ? 1 : 0);
+  if (ax !== 0 || az !== 0) {
+    playerVel.x += ax * 70 * dt;
+    playerVel.z += az * 70 * dt;
+  }
+  playerVel.multiplyScalar(Math.exp(-6.5 * dt));
+  player.position.x += playerVel.x * dt;
+  player.position.z += playerVel.z * dt;
+  const lim = BOUND - 0.8;
+  player.position.x = Math.max(-lim, Math.min(lim, player.position.x));
+  player.position.z = Math.max(-lim, Math.min(lim, player.position.z));
+  if (Math.abs(player.position.x) === lim) playerVel.x = 0;
+  if (Math.abs(player.position.z) === lim) playerVel.z = 0;
+
+  player.rotation.z = -playerVel.x * 0.03;
+  player.rotation.x = playerVel.z * 0.03;
+  playerLight.position.set(player.position.x, 3, player.position.z);
+
+  // --- asteroids ---
+  asteroidTimer -= dt;
+  const spawnInterval = Math.max(0.45, 1.5 - elapsed * 0.012);
+  if (asteroidTimer <= 0) {
+    makeAsteroid();
+    asteroidTimer = spawnInterval;
+  }
+  const astSpeed = 4.5 * speedMult;
+  for (let i = asteroids.length - 1; i >= 0; i--) {
+    const a = asteroids[i];
+    a.rotation.x += a.userData.spinX * dt;
+    a.rotation.y += a.userData.spinY * dt;
+    const to = new THREE.Vector3().subVectors(player.position, a.position);
+    to.y = 0;
+    if (to.lengthSq() > 0.0001) to.normalize();
+    else to.set(0, 0, 1);
+    a.position.addScaledVector(to, astSpeed * dt);
+    if (a.position.distanceTo(player.position) < a.userData.s + 0.8) {
+      removeAsteroid(i);
+      gameOver();
+      return;
+    }
+  }
+
+  // --- orbs ---
+  orbTimer -= dt;
+  if (orbTimer <= 0) {
+    orbTimer = 2.5;
+    if (orbs.length < ORB_COUNT) makeOrb();
+  }
+  for (let i = orbs.length - 1; i >= 0; i--) {
+    const o = orbs[i];
+    o.position.y = 1.1 + Math.sin(t * 3 + o.userData.phase) * 0.35;
+    o.rotation.y += dt * 2;
+    if (o.position.distanceTo(player.position) < 1.3) {
+      score += 10;
+      orbsCollected++;
+      removeOrb(i);
+      scoreEl.textContent = score;
+      orbsEl.textContent = orbsCollected;
+    }
+  }
+}
+
+// ================= loop =================
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = clock.elapsedTime;
+
+  if (state === "playing") {
+    update(dt, t);
+  } else if (state === "menu") {
+    player.position.y = 1.2 + Math.sin(t * 2) * 0.25;
+    player.rotation.y += dt * 0.8;
+    player.rotation.x = 0.35;
+    player.rotation.z = 0;
+  }
+
+  const follow = 0.8;
+  const tx = player.position.x * follow;
+  const tz = player.position.z * follow;
+  const k = 1 - Math.exp(-3 * dt);
+  camera.position.x += (tx - camera.position.x) * k;
+  camera.position.y += (16 - camera.position.y) * k;
+  camera.position.z += (tz + 18 - camera.position.z) * k;
+  camera.lookAt(tx, 1, tz);
+
+  renderer.render(scene, camera);
+}
+animate();
+
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
